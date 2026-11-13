@@ -1,0 +1,531 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway. Ticket "Whole-screen layout" (issues/016), round 1.
+  Base: round 6 of prototypes/lattice-editing/index.html (theory + layout + audio code reused).
+  Shows the whole app screen with a 32-bar AABA tune inside a simulated device frame.
+  The yellow bar ABOVE the frame is prototype-only: it switches device size, strip placement, zoom, stand mode, etc.
+  Simplified theory (small chord table, fixed scale per quality). No persistence, no tests.
+  Run: open index.html   (URL params mirror the yellow-bar controls, e.g. ?device=tabletL&strip=side)
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<title>PROTOTYPE — Whole-screen layout (round 1)</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 13px system-ui, sans-serif; background: #5b5f66; color: #222; overflow: hidden; height: 100vh; }
+  #proto { background: #fffbe6; border-bottom: 1px solid #e5d9a8; padding: 6px 12px; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font-size: 12px; position: relative; z-index: 50; }
+  #proto .tag { background: #c0392b; color: #fff; font-weight: 700; padding: 1px 6px; border-radius: 3px; font-size: 11px; }
+  #proto label { display: inline-flex; gap: 4px; align-items: center; color: #555; }
+  #proto select { font: 12px system-ui; }
+  #stage { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: flex-start; justify-content: center; padding-top: 12px; }
+  #device { background: #f4f3ef; box-shadow: 0 6px 30px #0007; border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; transform-origin: top center; position: relative; }
+  #devlabel { position: absolute; top: -2px; left: 50%; transform: translate(-50%, -100%); color: #ddd; font-size: 11px; white-space: nowrap; }
+
+  /* ---- app chrome ---- */
+  #top { flex: none; height: 46px; display: flex; align-items: center; gap: 10px; padding: 0 12px; background: #fff; border-bottom: 1px solid #ddd; }
+  #top button, #top select, .pbtn { font: 13px system-ui; padding: 4px 9px; border: 1px solid #ccc; background: #fff; border-radius: 5px; cursor: pointer; }
+  #top .title { font: 700 17px system-ui; padding: 2px 4px; border-radius: 4px; cursor: text; white-space: nowrap; }
+  #top .title:hover { background: #f0f0f0; }
+  #top .dot { color: #bbb; }
+  #instr { border: none !important; font-weight: 600 !important; color: #3a5; padding: 2px !important; background: transparent !important; }
+  #top .meta { color: #999; font-size: 12px; white-space: nowrap; }
+  #top .sp { flex: 1; }
+  #top .ic { width: 32px; padding: 4px 0 !important; text-align: center; }
+  #main { flex: 1; display: flex; min-height: 0; }
+  #chart { flex: 1; overflow: auto; position: relative; }
+  #chart svg { display: block; user-select: none; margin: 0 auto; }
+  g.note { cursor: pointer; }
+  .chordInput { position: absolute; font: 700 14px system-ui; padding: 2px 4px; border: 2px solid #3a7bd5; border-radius: 4px; z-index: 6; }
+
+  /* ---- strip panel ---- */
+  .panel { background: #fff; border-top: 1px solid #ccc; flex: none; }
+  .phead { display: flex; align-items: center; gap: 8px; padding: 6px 10px; flex-wrap: wrap; }
+  .phead b { white-space: nowrap; }
+  .phead input { font: 14px ui-monospace, monospace; padding: 3px 6px; width: 200px; }
+  .pbtn { font-weight: 600; }
+  .pbtn small { color: #999; font-weight: 400; }
+  .keysWrap { overflow-x: auto; padding: 0 10px 8px; }
+  .keys { display: flex; user-select: none; margin: 0 auto; width: max-content; }
+  .key { height: 150px; border: 1px solid #999; margin-right: -1px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; font-size: 11px; font-weight: 600; cursor: pointer; padding-bottom: 5px; gap: 4px; position: relative; }
+  .key.black { height: 100px; background: #333 !important; color: #fff; border-color: #333; padding: 3px 3px 5px; justify-content: space-between; }
+  .key .fill { flex: 1; align-self: stretch; border-radius: 2px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 4px; }
+  .key .ico { width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 15px; line-height: 1; flex: none; }
+  .key .ico.add { color: #0005; border: 1.5px solid #0003; }
+  .key.black .ico.add { color: #fff8; border-color: #fff6; }
+  .key .ico.rem { background: #111; color: #fff; font-weight: 800; }
+  .key.black .ico.rem { background: #fff; color: #111; }
+  .key.oor { opacity: .35; }
+  .key:hover { outline: 2px solid #e67e22; z-index: 1; }
+  .key .ico:hover { outline: 2px solid #e67e22; }
+  .panel.collapsed .keysWrap { display: none; }
+
+  /* inline variant: the panel floats inside the chart, in a gap left under the target row */
+  .panel.inline { position: absolute; left: 0; right: 0; border: 1px solid #3a7bd5; border-width: 2px 0; box-shadow: 0 2px 10px #0002; z-index: 5; }
+
+  /* side variant: vertical keyboard, low at the bottom like the note stacks */
+  .panel.side { width: 190px; border-top: none; border-left: 1px solid #ccc; display: flex; flex-direction: column; }
+  .panel.side .phead { flex-direction: column; align-items: stretch; }
+  .panel.side .phead input { width: 100%; }
+  .panel.side .keysWrap { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 0 8px 8px; }
+  .panel.side .keys { flex-direction: column-reverse; width: 100%; }
+  .panel.side .key { height: auto; width: 100%; flex-direction: row-reverse; justify-content: flex-start; padding: 0 6px; margin: 0 0 -1px; gap: 6px; }
+  .panel.side .key.black { width: 68%; padding: 0 3px; margin-left: auto; height: auto; justify-content: flex-start; }
+  .panel.side .key .fill { flex: 1; align-self: stretch; padding: 0 3px; justify-content: flex-start; align-items: center; flex-direction: row-reverse; gap: 6px; }
+
+  /* stand mode */
+  .stand #top { height: 40px; }
+  .stand .editonly { display: none !important; }
+  #toast { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); background: #222; color: #fff; padding: 6px 12px; border-radius: 5px; font-size: 12px; opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 20; }
+</style>
+</head>
+<body>
+<div id="proto">
+  <span class="tag">PROTOTYPE</span>
+  <label>Device <select data-k="device">
+    <option value="laptop14">Laptop 1440×900</option><option value="laptop13">Laptop 1280×800</option>
+    <option value="tabletL">Tablet landscape 1180×820</option><option value="tabletP">Tablet portrait 820×1180</option>
+    <option value="window">This window</option></select></label>
+  <label>Strip <select data-k="strip">
+    <option value="dock">A · docked bottom</option><option value="inline">B · inline under target row</option><option value="side">C · vertical, right side</option></select></label>
+  <label>Zoom <select data-k="zoom"><option value="fit">fit width</option><option value="1">100%</option><option value="1.25">125%</option><option value="0.8">80%</option></select></label>
+  <label>Rows <select data-k="rows"><option value="fixed">fixed height</option><option value="compact">fit tallest stack</option></select></label>
+  <label>Notes <select data-k="notes"><option value="typical">typical</option><option value="dense">dense</option><option value="sparse">sparse</option></select></label>
+  <label>Stand cols <select data-k="standcols"><option value="all">range ∪ used (as edit)</option><option value="used">used octaves only</option></select></label>
+  <label>Stand notes <select data-k="standR"><option value="20">large (R 20)</option><option value="15">same as edit (R 15)</option><option value="24">huge (R 24)</option></select></label>
+  <label><input type="checkbox" data-k="barnums" checked> bar numbers</label>
+  <span style="color:#888">S = stand mode · K = hide strip · [ ] target · Space ▶ Chord</span>
+</div>
+<div id="stage"><div id="device"><div id="devlabel"></div>
+  <div id="top">
+    <button class="editonly" title="Library">☰ Library</button>
+    <span class="title" title="click to rename">Rhythm-changes-ish AABA</span><span class="dot">·</span><select id="instr" title="instrument view"></select>
+    <button id="mute" class="ic" title="Mute (M)">🔊</button>
+    <span class="meta editonly">4/4 · <select id="per" style="font:12px system-ui;border:none;color:#999;padding:0"><option>2</option><option selected>4</option><option>8</option></select> per row</span>
+    <span class="sp"></span>
+    <button class="ic editonly" title="Undo (⌘Z)">↶</button><button class="ic editonly" title="Redo (⇧⌘Z)">↷</button>
+    <select id="zoomApp" class="editonly" title="zoom"><option value="fit">Fit</option><option value="0.8">80%</option><option value="1">100%</option><option value="1.25">125%</option></select>
+    <button id="standBtn" title="Stand mode (S)">⤢ Stand</button>
+  </div>
+  <div id="main"><div id="chart"><svg id="svg"><g id="content"></g></svg></div></div>
+  <div id="toast"></div>
+</div></div>
+
+<script>
+// ---------- theory (simplified, prototype-grade; from lattice-editing round 6) ----------
+const LET = 'CDEFGAB', LPC = [0, 2, 4, 5, 7, 9, 11];
+const DEF = ['C','C#','D','Eb','E','F','F#','G','Ab','A','Bb','B'];
+const SHARP = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const FLAT = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+const COL = { chord: '#2e9e5b', scale: '#3a7bd5', passing: '#8b5a2b', grey: '#9a9a9a' };
+const mod = x => ((x % 12) + 12) % 12;
+const SC = {
+  ionian: ['Ionian', [[0,0],[2,1],[4,2],[5,3],[7,4],[9,5],[11,6]]],
+  dorian: ['Dorian', [[0,0],[2,1],[3,2],[5,3],[7,4],[9,5],[10,6]]],
+  mixolydian: ['Mixolydian', [[0,0],[2,1],[4,2],[5,3],[7,4],[9,5],[10,6]]],
+  locrian: ['Locrian', [[0,0],[1,1],[3,2],[5,3],[6,4],[8,5],[10,6]]],
+  lydian: ['Lydian', [[0,0],[2,1],[4,2],[6,3],[7,4],[9,5],[11,6]]],
+  halfwhole: ['half-whole', [[0,0],[1,1],[3,1],[4,2],[6,3],[7,4],[9,5],[10,6]]],
+  wholehalf: ['whole-half', [[0,0],[2,1],[3,2],[5,3],[6,4],[8,5],[9,5],[11,6]]],
+  altered: ['altered', [[0,0],[1,1],[3,1],[4,2],[6,4],[8,5],[10,6]]],
+};
+const T = { R:[0,0], m3:[3,2], M3:[4,2], P4:[5,3], P5:[7,4], d5:[6,4], A5:[8,4], M6:[9,5], m7:[10,6], M7:[11,6], d7:[9,6], M9:[2,1], b9:[1,1], s9:[3,1], s11:[6,3], M13:[9,5] };
+const Q = {
+  '': [['R','M3','P5'], 'ionian'], m: [['R','m3','P5'], 'dorian'],
+  '7': [['R','M3','P5','m7'], 'mixolydian'], maj7: [['R','M3','P5','M7'], 'ionian'],
+  m7: [['R','m3','P5','m7'], 'dorian'], m7b5: [['R','m3','d5','m7'], 'locrian'],
+  dim7: [['R','m3','d5','d7'], 'wholehalf'], dim: [['R','m3','d5'], 'wholehalf'],
+  '6': [['R','M3','P5','M6'], 'ionian'], m6: [['R','m3','P5','M6'], 'dorian'],
+  '9': [['R','M3','P5','m7','M9'], 'mixolydian'], m9: [['R','m3','P5','m7','M9'], 'dorian'],
+  maj9: [['R','M3','P5','M7','M9'], 'ionian'], '13': [['R','M3','P5','m7','M9','M13'], 'mixolydian'],
+  '7b9': [['R','M3','P5','m7','b9'], 'halfwhole'], '7#9': [['R','M3','P5','m7','s9'], 'halfwhole'],
+  '7alt': [['R','M3','A5','m7','s9'], 'altered'], 'maj7#11': [['R','M3','P5','M7','s11'], 'lydian'],
+  sus4: [['R','P4','P5'], 'mixolydian'], '7sus4': [['R','P4','P5','m7'], 'mixolydian'],
+};
+const AL = { '-':'m', min:'m', '-7':'m7', min7:'m7', M7:'maj7', 'Δ':'maj7', 'Δ7':'maj7', ma7:'maj7', 'ø':'m7b5', 'ø7':'m7b5', '-7b5':'m7b5', o:'dim', '°':'dim', o7:'dim7', '°7':'dim7', alt:'7alt', sus:'sus4', '-9':'m9', M:'', maj:'' };
+const acc = s => s === '#' ? 1 : s === 'b' ? -1 : 0;
+const fromName = n => { const L = LET.indexOf(n[0]); const a = n.length > 1 ? acc(n[1]) : 0; return { pc: mod(LPC[L] + a), L, a }; };
+function spell(rl, ra, s, d) {
+  const L = ((rl + d) % 7 + 7) % 7, pc = mod(LPC[rl] + ra + s);
+  const a = mod(pc - LPC[L] + 6) - 6;
+  return Math.abs(a) > 1 ? fromName(DEF[pc]) : { pc, L, a };
+}
+const infoCache = {};
+function info(sym) {
+  const s = (sym || '').trim();
+  if (s in infoCache) return infoCache[s];
+  let r;
+  if (!s) r = { kind: 'empty' };
+  else if (/^n\.?c\.?$/i.test(s)) r = { kind: 'nc' };
+  else {
+    const m = /^([A-G])([#b]?)([^\/\s]*)(?:\/([A-G])([#b]?))?$/.exec(s);
+    const q = m ? (m[3] in AL ? AL[m[3]] : m[3]) : null;
+    if (!m || !Q[q]) r = { kind: 'bad' };
+    else {
+      const rl = LET.indexOf(m[1]), ra = acc(m[2]), chord = new Map(), scale = new Map();
+      for (const k of Q[q][0]) { const sp = spell(rl, ra, ...T[k]); chord.set(sp.pc, sp); }
+      if (m[4]) { const bl = LET.indexOf(m[4]), ba = acc(m[5]), pc = mod(LPC[bl] + ba); if (!chord.has(pc)) chord.set(pc, { pc, L: bl, a: ba }); }
+      const [sname, ivs] = SC[Q[q][1]];
+      for (const iv of ivs) { const sp = spell(rl, ra, ...iv); if (!scale.has(sp.pc)) scale.set(sp.pc, sp); }
+      let f = 0, sh = 0; for (const sp of scale.values()) { if (sp.a < 0) f++; if (sp.a > 0) sh++; }
+      r = { kind: 'ok', chord, scale, lean: f > sh ? FLAT : sh > f ? SHARP : DEF, scaleName: m[1] + m[2] + ' ' + sname };
+    }
+  }
+  return (infoCache[s] = r);
+}
+// ---------- instruments: [name, semitones, letter steps, written range (MIDI) or null] — ranges from research/instrument-practical-ranges.md ----------
+const INSTR = {
+  concert: ['Concert', 0, 0, null], flute: ['Flute', 0, 0, [60, 96]],
+  tpt: ['B♭ trumpet', 2, 1, [54, 84]], tenor: ['B♭ tenor sax', 14, 1, [58, 90]],
+  alto: ['E♭ alto sax', 9, 5, [58, 90]], bari: ['E♭ baritone sax', 21, 5, [58, 90]],
+  horn: ['F horn', 7, 4, [48, 79]], guitar: ['Guitar', 12, 0, [52, 88]], bass: ['Double bass / bass guitar', 12, 0, [40, 67]],
+};
+let TR = 'concert';
+const trS = () => INSTR[TR][1], trD = () => INSTR[TR][2], range = () => INSTR[TR][3];
+const octOf = m => Math.floor(m / 12) - 1;
+function transposeSym(sym, ts, td) {
+  if (!ts && !td) return sym;
+  const t = (_, l, a) => { const sp = spell(LET.indexOf(l), acc(a), ts, td); return LET[sp.L] + (sp.a > 0 ? '#' : sp.a < 0 ? 'b' : ''); };
+  return sym.replace(/^([A-G])([#b]?)/, t).replace(/\/([A-G])([#b]?)$/, (m, l, a) => '/' + t(m, l, a));
+}
+const dispSym = sid => transposeSym(S.slots[sid].chord || '', trS(), trD());
+function nameOf(midi, sid) { return nameW(midi + trS(), dispSym(sid)); }
+function nameW(midi, sym) {
+  const inf = info(sym), pc = mod(midi);
+  let sp, role;
+  if (inf.kind !== 'ok') { role = 'grey'; sp = fromName(DEF[pc]); }
+  else if (inf.chord.has(pc)) { role = 'chord'; sp = inf.chord.get(pc); }
+  else if (inf.scale.has(pc)) { role = 'scale'; sp = inf.scale.get(pc); }
+  else { role = 'passing'; sp = fromName(inf.lean[pc]); }
+  const oct = Math.round((midi - sp.a - LPC[sp.L]) / 12) - 1;
+  const letter = LET[sp.L] + (sp.a > 0 ? '#' : sp.a < 0 ? 'b' : '');
+  const rg = range(), oor = !!rg && (midi < rg[0] || midi > rg[1]);
+  return { name: letter + oct, letter, oct, role, oor };
+}
+function parseNote(t) {
+  const m = /^([a-g])([#b]?)(-?\d)$/i.exec(t.trim()); if (!m) return null;
+  return (+m[3] + 1) * 12 + LPC[LET.indexOf(m[1].toUpperCase())] + acc(m[2]);
+}
+
+// ---------- audio: plain sine ----------
+let ac = null, muted = false;
+function play(midi, delay = 0, vol = 0.25) {
+  if (muted) return;
+  ac ??= new AudioContext();
+  const t = ac.currentTime + delay, o = ac.createOscillator(), g = ac.createGain();
+  o.type = 'sine'; o.frequency.value = 440 * 2 ** ((midi - 69) / 12);
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + (vol < 0.25 ? 1.6 : 0.9));
+  o.connect(g).connect(ac.destination); o.start(t); o.stop(t + 1.7);
+}
+function playChord(sid) {
+  const inf = info(S.slots[sid].chord); if (inf.kind !== 'ok') return;
+  const tones = [...inf.chord.values()], root = 48 + tones[0].pc;
+  tones.forEach((t, i) => play(i === 0 ? root : root + (mod(t.pc - tones[0].pc) || 12) + (i > 3 ? 12 : 0), 0, 0.12));
+}
+const playNotes = sid => notesIn(sid).sort((a, b) => a.midi - b.midi).forEach((n, i) => play(n.midi, i * 0.15));
+
+// ---------- the tune: 32 bars AABA, concert pitch, several split bars ----------
+const TUNE = [
+  'Cmaj7', 'A7', 'Dm7', 'G7', 'Em7 A7', 'Dm7 G7', 'Cmaj7 A7', 'Dm7 G7',
+  'Cmaj7', 'A7', 'Dm7', 'G7', 'Em7 A7', 'Dm7 G7', 'C6', 'Gm7 C7',
+  'Fmaj7', 'Fm7 Bb7', 'Ebmaj7', 'Ab7', 'Em7b5 A7b9', 'Dm7', 'Dm7b5', 'G7alt',
+  'Cmaj7', 'A7', 'Dm7', 'G7', 'Em7 A7', 'Dm7 G7', 'C6', 'Dm7 G7',
+];
+const S = { bars: [], slots: {}, notes: {}, sel: null };
+let nid = 0, sidN = 0;
+const has = (slot, midi) => Object.values(S.notes).some(n => n.slot === slot && n.midi === midi);
+const add = (slot, midi) => { if (has(slot, midi)) return null; const id = 'n' + (++nid); S.notes[id] = { id, slot, midi }; return id; };
+const order = () => S.bars.flat();
+const notesIn = sid => Object.values(S.notes).filter(n => n.slot === sid);
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function seed(density) {
+  S.bars = []; S.slots = {}; S.notes = {}; S.sel = null; nid = 0; sidN = 0;
+  for (const b of TUNE) S.bars.push(b.split(' ').map(c => { const id = 's' + (++sidN); S.slots[id] = { chord: c }; return id; }));
+  const r = rng(7), [lo, hi] = density === 'dense' ? [4, 9] : density === 'sparse' ? [0, 3] : [1, 6];
+  order().forEach((sid, i) => {
+    if (density !== 'dense' && i % 6 === 5) return; // some slots not filled in yet
+    const inf = info(S.slots[sid].chord); if (inf.kind !== 'ok') return;
+    const pcs = [...inf.chord.keys(), ...inf.chord.keys(), ...inf.scale.keys()];
+    let k = lo + Math.floor(r() * (hi - lo + 1)); if (i === 3 || i === 20) k = 10; // two crowded slots
+    for (let j = 0; j < k * 3 && notesIn(sid).length < k; j++) add(sid, 60 + pcs[Math.floor(r() * pcs.length)] + 12 * Math.floor(r() * 2) - (r() < 0.15 ? 12 : 0));
+  });
+  add(order()[9], 50); add(order()[9], 53); add(order()[30], 86); add(order()[30], 88); // a few low/high notes for range flags
+}
+const cT = { slot: 's1' };
+
+// ---------- prototype options ----------
+const DEVICES = { laptop14: [1440, 900], laptop13: [1280, 800], tabletL: [1180, 820], tabletP: [820, 1180] };
+const P = { device: 'laptop14', strip: 'dock', zoom: 'fit', rows: 'fixed', notes: 'typical', standcols: 'all', standR: '20', barnums: true };
+const qs = new URLSearchParams(location.search);
+for (const k in P) if (qs.has(k)) P[k] = typeof P[k] === 'boolean' ? qs.get(k) !== '0' : qs.get(k);
+let stand = qs.get('stand') === '1', collapsed = false, PER = 4;
+
+// ---------- layout: pure-ish function of state + view ----------
+const BARW = 300, HEAD = 26, ROWH = 200, RGAP = 18, MARG = 14, PADV = 18;
+function layoutChart(v) {
+  const rg = range(), octs = new Set(), name = {};
+  for (const n of Object.values(S.notes)) { name[n.id] = nameOf(n.midi, n.slot); octs.add(name[n.id].oct); }
+  if (!v.usedOnly) { if (rg) for (let o = octOf(rg[0]); o <= octOf(rg[1]); o++) octs.add(o); else [3, 4, 5].forEach(o => octs.add(o)); }
+  if (!octs.size) octs.add(4);
+  const cols = [...octs].sort((a, b) => a - b);
+  const minSlotW = Math.min(...S.bars.map(b => BARW / b.length));
+  const R = Math.min(v.R, minSlotW / cols.length / 2 - 2); // notes never wider than the narrowest octave column
+  const per = v.per, nRows = Math.ceil(S.bars.length / per), stackMax = [];
+  for (let r = 0; r < nRows; r++) {
+    let k = 1;
+    for (const b of S.bars.slice(r * per, r * per + per)) for (const sid of b) for (const o of cols) k = Math.max(k, notesIn(sid).filter(n => name[n.id].oct === o).length);
+    stackMax.push(k);
+  }
+  const rowY = [], rowH = []; let y = 10;
+  for (let r = 0; r < nRows; r++) {
+    const h = v.rows === 'compact' ? Math.max(HEAD + 2 * PADV + 2 * R + 16, HEAD + 2 * PADV + 2 * R + 16 + (stackMax[r] - 1) * (2 * R + 2)) : ROWH * Math.max(1, v.R / 15);
+    rowY.push(y); rowH.push(h); y += h + RGAP;
+    if (v.gapRow === r) y += v.gapH;
+  }
+  const g = {}, p = {};
+  S.bars.forEach((b, bi) => {
+    const r = Math.floor(bi / per), bx = MARG + (bi % per) * BARW, w = BARW / b.length;
+    b.forEach((sid, k) => { g[sid] = { x: bx + k * w, y: rowY[r], w, h: rowH[r], row: r }; });
+  });
+  for (const sid of order()) {
+    const s = g[sid], cw = s.w / cols.length, bottom = s.y + s.h - PADV - 8, top = s.y + HEAD + PADV - 4, avail = bottom - top - 2 * R;
+    cols.forEach((o, c) => {
+      const ns = notesIn(sid).filter(n => name[n.id].oct === o).sort((a, b) => a.midi - b.midi), k = ns.length;
+      const dy = k > 1 ? Math.min(2 * R, Math.max(avail, 0) / (k - 1)) : 0, tight = dy < 2 * R - 2, off = Math.max(0, Math.min(cw / 2 - R - 1, R * 0.75));
+      const mid = (top + bottom) / 2;
+      ns.forEach((note, i) => { p[note.id] = { x: s.x + cw * (c + 0.5) + (tight ? (i % 2 ? off : -off) : 0), y: mid + ((k - 1) / 2 - i) * dy }; });
+    });
+  }
+  return { g, p, cols, R, name, rowY, rowH, W: 2 * MARG + per * BARW, H: y - RGAP + 10 };
+}
+
+// ---------- render ----------
+const svg = document.getElementById('svg'), content = document.getElementById('content'), chartEl = document.getElementById('chart');
+const device = document.getElementById('device'), main = document.getElementById('main');
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+let LAY, SCALE = 1, panel = null;
+const STRIP_H = 205; // px height of the inline panel (gap left in the chart for it)
+
+function fitDevice() {
+  const [w, h] = P.device === 'window' ? [innerWidth - 24, innerHeight - document.getElementById('proto').offsetHeight - 24] : DEVICES[P.device];
+  device.style.width = w + 'px'; device.style.height = h + 'px';
+  const stage = document.getElementById('stage'); stage.style.top = document.getElementById('proto').offsetHeight + 'px';
+  const sc = Math.min(1, (innerWidth - 24) / w, (stage.clientHeight - 24) / h);
+  device.style.transform = `scale(${sc})`;
+  document.getElementById('devlabel').textContent = `${w}×${h}${sc < 1 ? ` (shown at ${Math.round(sc * 100)}%)` : ''}`;
+}
+
+function buildPanel() {
+  panel?.remove();
+  panel = document.createElement('div');
+  panel.className = 'panel editonly ' + (P.strip === 'side' ? 'side' : P.strip === 'inline' ? 'inline' : 'dock') + (collapsed ? ' collapsed' : '');
+  panel.innerHTML = `<div class="phead">
+      <b id="ctarget"></b>
+      <span style="display:flex;gap:6px"><button class="pbtn" id="chordbtn">▶ Chord <small>Space</small></button><button class="pbtn" id="notesbtn">▶ Notes <small>⇧Space</small></button></span>
+      <input id="cinput" placeholder="type e4 or d5 f5 a5 + Enter" autocomplete="off">
+      ${P.strip === 'dock' ? `<span style="flex:1"></span><button class="pbtn" id="colbtn" title="K">${collapsed ? '▴ Show keys' : '▾ Hide keys'}</button>` : ''}
+    </div><div class="keysWrap"><div class="keys" id="keys"></div></div>`;
+  if (P.strip === 'inline') chartEl.appendChild(panel);
+  else if (P.strip === 'side') main.appendChild(panel);
+  else device.insertBefore(panel, document.getElementById('toast'));
+  panel.querySelector('#chordbtn').onclick = e => { playChord(cT.slot); e.currentTarget.blur(); };
+  panel.querySelector('#notesbtn').onclick = e => { playNotes(cT.slot); e.currentTarget.blur(); };
+  panel.querySelector('#colbtn')?.addEventListener('click', () => { collapsed = !collapsed; buildPanel(); render(); });
+  panel.querySelector('#keys').addEventListener('pointerdown', onKey);
+  const ci = panel.querySelector('#cinput');
+  ci.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      const ms = ci.value.split(/[\s,]+/).filter(Boolean).map(parseNote).map(m => m == null ? null : m - trS());
+      if (ms.length && ms.every(m => m != null)) { ms.forEach((m, i) => { add(cT.slot, m); play(m, i * 0.15); }); ci.value = ''; S.sel = null; render(); }
+      else { ci.style.outline = '2px solid #c0392b'; setTimeout(() => ci.style.outline = '', 600); }
+    } else if (e.key === 'Escape') ci.blur();
+  });
+}
+
+function render() {
+  device.classList.toggle('stand', stand);
+  document.getElementById('standBtn').textContent = stand ? '✕ Exit stand' : '⤢ Stand';
+  const inline = P.strip === 'inline' && !stand;
+  const v = {
+    per: PER, R: stand ? +P.standR : 15, rows: P.rows, usedOnly: stand && P.standcols === 'used',
+    gapRow: inline ? null : null, gapH: 0,
+  };
+  // first pass to get W and the target row; second pass reserves the inline gap
+  let lay = layoutChart(v);
+  const zoom = stand ? 'fit' : P.zoom;
+  SCALE = zoom === 'fit' ? (chartEl.clientWidth - 2) / lay.W : +zoom;
+  if (inline) { v.gapRow = lay.g[cT.slot].row; v.gapH = (STRIP_H + 8) / SCALE; lay = layoutChart(v); }
+  LAY = lay;
+  svg.setAttribute('viewBox', `0 0 ${lay.W} ${lay.H}`);
+  svg.setAttribute('width', lay.W * SCALE); svg.setAttribute('height', lay.H * SCALE);
+  const R = lay.R, fs = Math.max(10, R * 0.8), lab = stand ? 18 : 14;
+  let h = '';
+  const selNote = S.sel ? S.notes[S.sel] : null;
+  for (const sid of order()) {
+    const s = lay.g[sid], inf = info(dispSym(sid)), txt = dispSym(sid) || '—';
+    h += `<rect data-slot="${sid}" x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" fill="#fff"/>`;
+    const cw = s.w / lay.cols.length;
+    lay.cols.forEach((o, c) => {
+      if (c) h += `<line x1="${s.x + c * cw}" x2="${s.x + c * cw}" y1="${s.y + HEAD + 4}" y2="${s.y + s.h - 4}" stroke="#0000001c" stroke-dasharray="2 4" pointer-events="none"/>`;
+      if (!stand || P.standcols === 'all') h += `<text x="${s.x + cw * (c + 0.5)}" y="${s.y + s.h - 5}" font-size="9" fill="#bbb" text-anchor="middle" pointer-events="none">${o}</text>`;
+    });
+    if (!stand && cT.slot === sid) h += `<rect x="${s.x + 1.5}" y="${s.y + 1.5}" width="${s.w - 3}" height="${s.h - 3}" fill="#3a7bd50c" stroke="#3a7bd5" stroke-width="2" pointer-events="none"/>`;
+    h += `<g data-label="${sid}" style="cursor:text"><rect x="${s.x}" y="${s.y}" width="${s.w}" height="${HEAD}" fill="transparent"/>
+      <text x="${s.x + 8}" y="${s.y + (stand ? 21 : 18)}" font-weight="700" font-size="${lab}" fill="${inf.kind === 'bad' ? '#c0392b' : S.slots[sid].chord ? '#222' : '#bbb'}">${esc(txt)}</text>
+      ${inf.kind === 'ok' && !stand && s.w > 200 ? `<text x="${s.x + s.w - 6}" y="${s.y + 17}" text-anchor="end" font-size="10" fill="#999">${esc(inf.scaleName)}</text>` : ''}</g>`;
+  }
+  S.bars.forEach((b, bi) => {
+    const s0 = lay.g[b[0]], x0 = s0.x, x1 = x0 + BARW;
+    h += `<line x1="${x0}" x2="${x0}" y1="${s0.y}" y2="${s0.y + s0.h}" stroke="#333" stroke-width="2.5"/><line x1="${x1}" x2="${x1}" y1="${s0.y}" y2="${s0.y + s0.h}" stroke="#333" stroke-width="2.5"/>`;
+    h += `<line x1="${x0}" x2="${x1}" y1="${s0.y}" y2="${s0.y}" stroke="#ccc"/><line x1="${x0}" x2="${x1}" y1="${s0.y + s0.h}" y2="${s0.y + s0.h}" stroke="#ccc"/>`;
+    if (b.length > 1) { const xd = lay.g[b[1]].x; h += `<line x1="${xd}" x2="${xd}" y1="${s0.y}" y2="${s0.y + s0.h}" stroke="#aaa" stroke-dasharray="3 3"/>`; }
+    if (P.barnums && bi % PER === 0) h += `<text x="${x0 - 3}" y="${s0.y - 3}" font-size="10" fill="#999">${bi + 1}</text>`;
+  });
+  for (const n of Object.values(S.notes)) {
+    const p = lay.p[n.id], { letter, role, oor } = lay.name[n.id];
+    h += `<g class="note" data-note="${n.id}">`;
+    if (selNote === n && !stand) h += `<circle cx="${p.x}" cy="${p.y}" r="${R + 3}" fill="none" stroke="#111" stroke-width="2.5"/>`;
+    h += oor
+      ? `<circle cx="${p.x}" cy="${p.y}" r="${R - 1}" fill="#fff" stroke="${COL[role]}" stroke-width="2.5" opacity=".6"/><text x="${p.x}" y="${p.y + fs * 0.3}" font-size="${fs}" font-weight="700" fill="${COL[role]}" opacity=".55" text-anchor="middle" pointer-events="none">${letter}</text></g>`
+      : `<circle cx="${p.x}" cy="${p.y}" r="${R}" fill="${COL[role]}" stroke="#fff" stroke-width="1.5"/><text x="${p.x}" y="${p.y + fs * 0.3}" font-size="${fs}" font-weight="700" fill="#fff" text-anchor="middle" pointer-events="none">${letter}</text></g>`;
+  }
+  content.innerHTML = h;
+  if (!stand) renderPanel();
+}
+
+function renderPanel() {
+  if (!S.slots[cT.slot]) cT.slot = order()[0];
+  const sid = cT.slot, bi = S.bars.findIndex(b => b.includes(sid)), half = S.bars[bi].length > 1 ? (S.bars[bi][0] === sid ? ' (1st half)' : ' (2nd half)') : '';
+  panel.querySelector('#ctarget').textContent = `Bar ${bi + 1}${half} · ${dispSym(sid) || '(empty)'}`;
+  if (P.strip === 'inline') { const s = LAY.g[sid]; panel.style.top = (s.y + s.h) * SCALE + 6 + 'px'; panel.style.height = STRIP_H + 'px'; panel.style.width = LAY.W * SCALE + 'px'; panel.style.left = Math.max(0, (chartEl.clientWidth - LAY.W * SCALE) / 2) + 'px'; }
+  if (collapsed && P.strip === 'dock') return;
+  const lo = (LAY.cols[0] + 1) * 12, hi = (LAY.cols.at(-1) + 1) * 12 + 11, nk = hi - lo + 1;
+  const rg = range();
+  // key size: fill the space available, within limits; scroll beyond that
+  let size;
+  if (P.strip === 'side') size = Math.max(16, Math.min(30, (panel.querySelector('.keysWrap').clientHeight - 8) / nk));
+  else size = Math.max(18, Math.min(36, (panel.querySelector('.keysWrap').clientWidth - 20) / nk));
+  let k = '';
+  for (let m = lo; m <= hi; m++) {
+    const cm = m - trS(), { name, role } = nameOf(cm, sid), black = [1, 3, 6, 8, 10].includes(mod(m));
+    const oor = !!rg && (m < rg[0] || m > rg[1]), coloured = role === 'chord' || role === 'scale';
+    const bg = role === 'chord' ? '#c9ecd6' : role === 'scale' ? '#cfe0f7' : '#fff';
+    const ico = has(sid, cm) ? '<span class="ico rem" data-ico="1">−</span>' : '<span class="ico add" data-ico="1">+</span>';
+    const label = `<span>${coloured || mod(m) === 0 ? name : ''}</span>`;
+    const dim = P.strip === 'side' ? `height:${size}px` : `width:${size}px`;
+    k += `<div class="key ${black ? 'black' : ''} ${oor ? 'oor' : ''}" data-midi="${cm}" style="background:${bg};${dim}" title="${name}${oor ? ' — out of range' : ''}">${black && coloured ? `<span class="fill" style="background:${COL[role]}">${ico}</span>` : ico}${label}</div>`;
+  }
+  panel.querySelector('#keys').innerHTML = k;
+}
+
+function onKey(e) {
+  const k = e.target.closest('.key'); if (!k) return;
+  const m = +k.dataset.midi, existing = Object.values(S.notes).find(n => n.slot === cT.slot && n.midi === m);
+  if (e.target.closest('[data-ico]')) {
+    if (existing) { delete S.notes[existing.id]; if (S.sel === existing.id) S.sel = null; }
+    else { add(cT.slot, m); play(m); }
+  } else play(m);
+  render();
+}
+
+function scrollToSlot(sid) {
+  const s = LAY.g[sid]; if (!s) return;
+  const top = s.y * SCALE, bot = (s.y + s.h) * SCALE + (P.strip === 'inline' ? STRIP_H + 10 : 0);
+  if (top < chartEl.scrollTop) chartEl.scrollTo({ top: top - 10, behavior: 'smooth' });
+  else if (bot > chartEl.scrollTop + chartEl.clientHeight) chartEl.scrollTo({ top: bot - chartEl.clientHeight + 10, behavior: 'smooth' });
+}
+function target(sid) { cT.slot = sid; S.sel = null; render(); scrollToSlot(sid); }
+
+// ---------- interaction ----------
+svg.addEventListener('pointerdown', e => {
+  const t = e.target.closest('[data-note],[data-label],[data-slot]');
+  if (!t) { S.sel = null; render(); return; }
+  const d = t.dataset;
+  if (d.note) { const n = S.notes[d.note]; play(n.midi); if (stand) return; S.sel = n.id; cT.slot = n.slot; }
+  else if (stand) return;
+  else if (d.label) { editChord(d.label); return; }
+  else if (d.slot) { cT.slot = d.slot; S.sel = null; }
+  render();
+});
+let editing = null;
+function editChord(sid) {
+  if (editing) editing.commit();
+  cT.slot = sid; render();
+  const s = LAY.g[sid], inp = document.createElement('input');
+  inp.className = 'chordInput'; inp.value = dispSym(sid);
+  const ox = svg.offsetLeft;
+  Object.assign(inp.style, { left: ox + s.x * SCALE + 2 + 'px', top: s.y * SCALE + 1 + 'px', width: Math.max(80, s.w * SCALE - 4) + 'px' });
+  let done = false;
+  const finish = (save, move) => {
+    if (done) return; done = true; editing = null;
+    if (save) {
+      const back = x => transposeSym(x, -trS(), -trD());
+      const parts = inp.value.trim().split(/\s+/).filter(Boolean).map(back), bar = S.bars.find(b => b.includes(sid));
+      if (parts.length >= 2 && bar.length === 1) { const ns = 's' + (++sidN); S.slots[sid].chord = parts[0]; S.slots[ns] = { chord: parts[1] }; bar.push(ns); }
+      else S.slots[sid].chord = back(inp.value.trim());
+    }
+    inp.remove(); render();
+    if (move) { const o = order(), i = o.indexOf(sid) + move; if (i >= 0 && i < o.length) editChord(o[i]); }
+  };
+  editing = { commit: () => finish(true, 0) };
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); finish(true, e.shiftKey ? -1 : 1); }
+    else if (e.key === 'Escape') finish(false, 0);
+  });
+  inp.addEventListener('blur', () => finish(true, 0));
+  chartEl.appendChild(inp); inp.focus(); inp.select();
+}
+
+let toastT;
+function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.style.opacity = 1; clearTimeout(toastT); toastT = setTimeout(() => t.style.opacity = 0, 1400); }
+function setStand(on) { stand = on; render(); if (stand) toast('Stand mode — tap a note to hear it · Esc / S to exit'); }
+
+document.addEventListener('keydown', e => {
+  if (e.target.closest('input,textarea,select,[contenteditable]')) return;
+  if (e.metaKey || e.ctrlKey) return;
+  if (e.key === 's' || e.key === 'S') { setStand(!stand); return; }
+  if (e.key === 'Escape') { if (stand) setStand(false); else { S.sel = null; render(); } return; }
+  if (e.key === 'm' || e.key === 'M') { document.getElementById('mute').click(); return; }
+  if (e.key === ' ') { e.preventDefault(); e.shiftKey ? playNotes(cT.slot) : playChord(cT.slot); return; }
+  if (stand) return;
+  if (e.key === 'k' || e.key === 'K') { if (P.strip === 'dock') { collapsed = !collapsed; buildPanel(); render(); } return; }
+  if (e.key === '[' || e.key === ']') { const o = order(), i = o.indexOf(cT.slot) + (e.key === ']' ? 1 : -1); target(o[(i + o.length) % o.length]); return; }
+  if ((e.key === 'Backspace' || e.key === 'Delete') && S.sel) { e.preventDefault(); delete S.notes[S.sel]; S.sel = null; render(); return; }
+  const n = S.sel ? S.notes[S.sel] : null;
+  if (n && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+    e.preventDefault();
+    const m = n.midi + (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 12 : 1);
+    if (!has(n.slot, m)) { n.midi = m; play(m); render(); }
+    return;
+  }
+  if (/^[a-g]$/i.test(e.key)) panel.querySelector('#cinput')?.focus();
+});
+
+// ---------- wiring ----------
+const instrSel = document.getElementById('instr');
+instrSel.innerHTML = Object.entries(INSTR).map(([k, [n]]) => `<option value="${k}">${n}</option>`).join('');
+instrSel.onchange = () => { TR = instrSel.value; instrSel.blur(); render(); };
+document.getElementById('mute').onclick = e => { muted = !muted; e.currentTarget.textContent = muted ? '🔇' : '🔊'; e.currentTarget.blur(); toast(muted ? 'Muted' : 'Sound on'); };
+document.getElementById('per').onchange = e => { PER = +e.target.value; e.target.blur(); render(); };
+document.getElementById('standBtn').onclick = e => { e.currentTarget.blur(); setStand(!stand); };
+const zoomApp = document.getElementById('zoomApp');
+zoomApp.onchange = () => { P.zoom = zoomApp.value; document.querySelector('[data-k=zoom]').value = P.zoom; zoomApp.blur(); render(); };
+document.querySelectorAll('#proto [data-k]').forEach(el => {
+  const k = el.dataset.k;
+  if (el.type === 'checkbox') el.checked = P[k]; else el.value = P[k];
+  el.onchange = () => {
+    P[k] = el.type === 'checkbox' ? el.checked : el.value; el.blur();
+    const u = new URLSearchParams(P); u.set('stand', stand ? 1 : 0); history.replaceState(null, '', '?' + u);
+    if (k === 'notes') seed(P.notes);
+    if (k === 'zoom') zoomApp.value = P.zoom;
+    if (k === 'device') fitDevice();
+    if (k === 'strip') buildPanel();
+    render();
+  };
+});
+zoomApp.value = P.zoom;
+addEventListener('resize', () => { fitDevice(); render(); });
+seed(P.notes); fitDevice(); buildPanel(); render();
+</script>
+</body>
+</html>

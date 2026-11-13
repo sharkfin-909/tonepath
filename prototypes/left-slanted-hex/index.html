@@ -1,0 +1,187 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway. Ticket "Left-slanted hex grid" (issues/033).
+  Question: should the docked hex's left edge be a diagonal column climbing up-left (in thirds) from the lowest note,
+  with cells dropped on the right — instead of today's zigzag left edge?
+  Variants (?variant=A|B|C|D, floating bar or [ / ] keys):
+    A · Today      — odd rows indented half a cell right; rows start a third / fourth above the row below (3,2,3…).
+    B · Slanted, trimmed — each row half a cell LEFT of the one below; every row starts a third above (cell = c + 2r);
+                     right ends trimmed so the right edge stays (roughly) vertical.
+    C · Slanted, untrimmed — same slant, every row full length (parallelogram); cells shrink to fit.
+    D · A vs B      — today and slanted-trimmed stacked, same chord, for direct comparison.
+  4 rows by default (user: keep the 4 rows); columns chosen so the instrument's practical range is covered (Fit range).
+  Dock size = layout C at 50/50 (rail 128px). ←/→ or the chord buttons step a ii–V–I–alt loop to watch the pitch anchor.
+  Run: open prototypes/left-slanted-hex/index.html
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<title>PROTOTYPE — Left-slanted hex grid</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 13px system-ui, sans-serif; background: #eceae4; color: #222; }
+  #bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 8px 12px; background: #fff; border-bottom: 1px solid #ccc; }
+  .btn { font: 600 13px system-ui; height: 30px; border: 1px solid #aaa; background: #fff; border-radius: 4px; cursor: pointer; padding: 0 10px; }
+  .btn.on { background: #2a6fdb; color: #fff; border-color: #2a6fdb; }
+  #main { display: flex; gap: 12px; padding: 12px; align-items: flex-start; }
+  #docks { display: flex; flex-direction: column; gap: 10px; }
+  .dockBox { position: relative; background: #d9d6ce; border: 1px solid #999; }
+  .dockBox .lbl { position: absolute; left: 6px; top: 4px; font-size: 11px; font-weight: 700; color: #555; background: #fffc; padding: 1px 5px; border-radius: 3px; z-index: 2; }
+  .dockBox svg { display: block; width: 100%; height: 100%; }
+  .cell { cursor: pointer; }
+  .cell.inactive { cursor: not-allowed; }
+  .cell text { pointer-events: none; font-weight: 600; }
+  .cell .halo { fill: none; stroke: #2a6fdb; stroke-width: 4; opacity: 0; }
+  .cell.dup .halo { opacity: .9; }
+  .cell.lead .face { stroke-width: 5; }
+  .cell:hover .face { filter: brightness(.94); }
+  #state { width: 320px; flex: none; background: #1e1e1e; color: #d6d6d6; padding: 8px 10px; border-radius: 6px; font: 11.5px/1.5 ui-monospace, monospace; white-space: pre-wrap; }
+  #switch { position: fixed; left: 50%; bottom: 10px; transform: translateX(-50%); background: #111; color: #fff; border-radius: 999px; padding: 5px 8px; display: flex; gap: 8px; align-items: center; box-shadow: 0 4px 18px #0008; font-size: 12px; z-index: 9; }
+  #switch button { background: #333; color: #fff; border: 0; border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+  #switch .lbl { min-width: 190px; text-align: center; font-weight: 700; }
+  #switch .tag { background: #c0392b; padding: 1px 6px; border-radius: 3px; font-weight: 700; font-size: 10px; }
+</style>
+</head>
+<body>
+<div id="bar">
+  <span>Slot:</span><span id="chords"></span>
+  <label>Instrument <select id="instr"></select></label>
+  <label>Rows <select id="rows"><option>3</option><option selected>4</option><option>5</option></select></label>
+  <label>Dock <select id="size"><option value="1152x400">laptop 1280×800, layout C (1152×400)</option><option value="896x384">tablet 1024×768 (896×384)</option><option value="1312x450">laptop 1440×900 (1312×450)</option></select></label>
+  <label><input type="checkbox" id="leadMark"> mark the left (thirds) column</label>
+  <label>Degree ring <select id="ring"><option value="15">ring 15px (5×)</option><option value="12">ring 12px (4×)</option><option value="10" selected>ring 10px (3.3×)</option><option value="8">ring 8px</option><option value="3">3px (today)</option></select></label>
+</div>
+<div id="main"><div id="docks"></div><div id="state"></div></div>
+<div id="switch"><span class="tag">PROTOTYPE</span><button id="vPrev">◀</button><span class="lbl" id="vLbl"></span><button id="vNext">▶</button></div>
+<script>
+const LET = 'CDEFGAB', LPC = [0,2,4,5,7,9,11];
+const mod = (x, n) => ((x % n) + n) % n;
+const DEFSET = [['C',0],['C',1],['D',0],['E',-1],['E',0],['F',0],['F',1],['G',0],['A',-1],['A',0],['B',-1],['B',0]];
+const accS = a => a > 0 ? '♯' : a < 0 ? '♭' : '';
+const parsePitch = s => { const m = s.match(/^([A-G])(#|b)?(\d)$/); return 12 * (+m[3] + 1) + LPC[LET.indexOf(m[1])] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0); };
+const nameMidi = (m, L, a) => LET[L] + accS(a) + ((m - a - LPC[L]) / 12 - 1);
+function spellPc(L, pc) { const a = mod(pc - LPC[L] + 6, 12) - 6; if (Math.abs(a) > 1) { const [l, aa] = DEFSET[mod(pc, 12)]; return { L: LET.indexOf(l), a: aa }; } return { L, a }; }
+const SCALES = { Dorian: [[0,0],[1,2],[2,3],[3,5],[4,7],[5,9],[6,10]], Mixolydian: [[0,0],[1,2],[2,4],[3,5],[4,7],[5,9],[6,10]],
+  Ionian: [[0,0],[1,2],[2,4],[3,5],[4,7],[5,9],[6,11]], altered: [[0,0],[1,1],[2,3],[2,4],[4,6],[5,8],[6,10]] };
+const QUAL = { m7: ['Dorian', [0,3,7,10]], '7': ['Mixolydian', [0,4,7,10]], maj7: ['Ionian', [0,4,7,11]], '7alt': ['altered', [0,4,8,10,3]] };
+const LOOP = ['Dm7', 'G7', 'Cmaj7', 'G7alt'];
+const INSTR = [['Concert', null, null, [0,0]], ['Flute', 'C4', 'C7', [0,0]], ['Violin', 'G3', 'E7', [0,0]], ['Trombone', 'E2', 'Bb4', [0,0]],
+  ['B♭ trumpet', 'F#3', 'C6', [1,2]], ['B♭ tenor sax', 'Bb3', 'F#6', [8,14]], ['E♭ alto sax', 'Bb3', 'F#6', [5,9]], ['Guitar', 'E3', 'E6', [7,12]], ['Double bass / bass guitar', 'E2', 'G4', [7,12]]];
+// user theme 2026-11-13: 1 night bordeaux · 2 school-bus yellow (brightened #FFD52E) · 3 harvest orange · 4 navy electric · 5 dark raspberry · 6 moss green · 7 neon ice
+const DEG = ['#53131E','#FFD52E','#EC7C25','#390099','#9E0059','#5BB561','#12EAEA'];
+function buildSlot(sym, iv) {
+  const m = sym.match(/^([A-G][b#]?)(.*)$/), [scale, chord] = QUAL[m[2]];
+  const rL = LET.indexOf(m[1][0]), rA = m[1].length > 1 ? (m[1][1] === '#' ? 1 : -1) : 0;
+  const wr = spellPc(mod(rL + iv[0], 7), LPC[rL] + rA + iv[1]), rPc = mod(LPC[wr.L] + wr.a, 12);
+  const degs = SCALES[scale].map(([st, se]) => ({ semis: se, step: st, ...spellPc(mod(wr.L + st, 7), rPc + se) }));
+  return { rPc, degs, N: degs.length, chordPcs: new Set(chord.map(x => mod(rPc + x, 12))), name: LET[wr.L] + accS(wr.a) + m[2] + ' → ' + LET[wr.L] + accS(wr.a) + ' ' + scale };
+}
+function cellPitch(sc, t) { const d = mod(t, sc.N), o = Math.floor(t / sc.N), g = sc.degs[d]; const midi = 12 + sc.rPc + g.semis + 12 * o; return { t, deg: g.step, midi, L: g.L, a: g.a, chord: sc.chordPcs.has(mod(midi, 12)) }; }
+
+const $ = id => document.getElementById(id);
+const P = new URLSearchParams(location.search);
+let _v; const VARS = { A: 'Today (zigzag left)', B: 'Slanted, trimmed', C: 'Slanted, untrimmed', D: 'A vs B' };
+let variant = VARS[P.get('variant')] ? P.get('variant') : 'B', slotI = 0, instrIdx = 0, flash = null;
+const iv = () => INSTR[instrIdx][3];
+function rangeOf() { const [, lo, hi] = INSTR[instrIdx]; return lo ? { lo: parsePitch(lo), hi: parsePitch(hi), limited: true } : { lo: 48, hi: 84, limited: false }; }
+function hexPts(cx, cy, R) { let s = ''; for (let i = 0; i < 6; i++) { const a = Math.PI / 180 * (60 * i - 30); s += (cx + R * Math.cos(a)).toFixed(1) + ',' + (cy + R * Math.sin(a)).toFixed(1) + ' '; } return s; }
+
+// geometry: returns list of {r, c, t, xu} where xu = x in cell-width units (left edge of cell), plus width in units
+function geometry(kind, rows, N) {
+  const cells = []; let cols, wU;
+  if (kind === 'A') {                       // today: odd rows +0.5 right, row starts 3,2,3,2…
+    const off = r => { let o = 0; for (let i = 0; i < r; i++) o += (i % 2 === 0) ? 3 : 2; return o; };
+    cols = Math.max(4, N - off(rows - 1));
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) cells.push({ r, c, t: c + off(r), xu: c + (r % 2) * 0.5 });
+    wU = cols + (rows > 1 ? 0.5 : 0);
+  } else {                                  // slanted: row r sits (rows-1-r)/2 right of the top row; t = c + 2r
+    const top = Math.max(4, N - 2 * (rows - 1));
+    for (let r = 0; r < rows; r++) {
+      const o = (rows - 1 - r) * 0.5, n = kind === 'B' ? Math.floor(top - o + 1e-9) : top;
+      for (let c = 0; c < n; c++) cells.push({ r, c, t: c + 2 * r, xu: o + c });
+    }
+    wU = kind === 'B' ? top : top + (rows - 1) * 0.5;
+    cols = top;
+  }
+  return { cells, wU, cols };
+}
+function renderDock(box, kind, W, H, rows) {
+  const sc = buildSlot(LOOP[slotI], iv()), R0 = rangeOf();
+  let tLo = 0; while (cellPitch(sc, tLo).midi < R0.lo) tLo++;
+  let tHi = tLo; while (cellPitch(sc, tHi + 1).midi <= R0.hi) tHi++;
+  const N = tHi - tLo + 1, g = geometry(kind, rows, N);
+  const pad = 12, R = Math.min((W - 2 * pad) / (Math.sqrt(3) * g.wU), (H - 2 * pad) / (2 + 1.5 * (rows - 1)));
+  const cw = Math.sqrt(3) * R, x0 = (W - cw * g.wU) / 2;
+  let h = '', inCount = 0, grey = 0; const seen = {};
+  for (const k of g.cells) {
+    const p = cellPitch(sc, tLo + k.t), inR = !R0.limited || (p.midi >= R0.lo && p.midi <= R0.hi);
+    if (inR) { inCount++; seen[p.midi] = (seen[p.midi] || 0) + 1; } else grey++;
+    const cx = x0 + cw * (k.xu + 0.5), cy = H - pad - R - k.r * 1.5 * R;
+    const ringMode = +$('ring').value > 3; // user theme: chord tone = white, scale tone = #938581 (ring mode only)
+    const fill = !inR ? '#bdbab3' : ringMode ? (p.chord ? '#FFFFFF' : '#938581') : (p.chord ? '#fff' : '#141414');
+    const ink = !inR ? '#8a877f' : ringMode ? (p.chord ? '#111' : '#FFFFFF') : (p.chord ? '#111' : '#f4f4f4');
+    const lead = $('leadMark').checked && kind !== 'A' && k.c === 0;
+    const fs = Math.max(9, R * 0.42), ringW = +$('ring').value, Ro = R - 2;
+    const DARK = [false, true, true, false, false, true, true]; // light bands (yellow, orange, moss, ice) take dark ink // yellow band needs dark ink
+    if (ringW > 3) {
+      const Ri = Ro - ringW / Math.cos(Math.PI / 6), nIn = inR ? 1 : .35;
+      h += `<g class="cell${inR ? '' : ' inactive'}${flash === p.midi ? ' dup' : ''}${lead ? ' lead' : ''}" data-midi="${p.midi}" data-in="${inR ? 1 : 0}">
+      <polygon class="face" points="${hexPts(cx, cy, Ro)}" fill="${DEG[p.deg]}" fill-opacity="${nIn}" stroke="${lead ? '#000' : 'none'}" stroke-width="2"/>
+      <polygon points="${hexPts(cx, cy, Ri)}" fill="${fill}" stroke="${inR ? '#d9d6ce' : 'none'}" stroke-width="2"/>
+      <polygon class="halo" points="${hexPts(cx, cy, R + 1)}"/>
+      <text x="${cx}" y="${cy - Ri * .22}" text-anchor="middle" font-size="${fs * .62}" font-weight="700" fill="${ink}" opacity=".8">${p.deg + 1}</text>
+      <text x="${cx}" y="${cy + Ri * .42}" text-anchor="middle" font-size="${fs * 1.0}" fill="${ink}">${LET[p.L] + accS(p.a)}</text></g>`;
+      continue;
+    }
+    h += `<g class="cell${inR ? '' : ' inactive'}${flash === p.midi ? ' dup' : ''}${lead ? ' lead' : ''}" data-midi="${p.midi}" data-in="${inR ? 1 : 0}">
+      <polygon class="face" points="${hexPts(cx, cy, R - 2)}" fill="${fill}" stroke="${DEG[p.deg]}" stroke-opacity="${inR ? 1 : .35}" stroke-width="3"/>
+      <polygon class="halo" points="${hexPts(cx, cy, R + 1)}"/>
+      <text x="${cx}" y="${cy + fs * .35}" text-anchor="middle" font-size="${fs}" fill="${ink}">${LET[p.L] + accS(p.a)}</text>
+      <text x="${cx}" y="${cy - R * .45}" text-anchor="middle" font-size="${fs * .6}" fill="${ink}" opacity=".7">${p.deg + 1}</text></g>`;
+  }
+  box.querySelector('svg').innerHTML = h;
+  const covered = new Set(g.cells.map(k => cellPitch(sc, tLo + k.t)).filter(p => !R0.limited || (p.midi >= R0.lo && p.midi <= R0.hi)).map(p => p.midi));
+  let missing = 0; for (let t = tLo; t <= tHi; t++) if (!covered.has(cellPitch(sc, t).midi)) missing++;
+  const perRow = [...Array(rows).keys()].map(r => g.cells.filter(k => k.r === r).length);
+  const leftCol = g.cells.filter(k => k.c === 0).sort((a, b) => a.r - b.r).map(k => { const p = cellPitch(sc, tLo + k.t); return nameMidi(p.midi, p.L, p.a); });
+  return { kind, sc, R, cw, perRow, total: g.cells.length, inCount, grey, dups: Object.values(seen).filter(v => v > 1).length,
+    missing, N, lowest: (() => { const p = cellPitch(sc, tLo); return nameMidi(p.midi, p.L, p.a); })(), leftCol };
+}
+function render() {
+  const [W, H0] = $('size').value.split('x').map(Number), rows = +$('rows').value;
+  const kinds = variant === 'D' ? ['A', 'B'] : [variant], H = variant === 'D' ? Math.round(H0 * .8) : H0;
+  $('docks').innerHTML = kinds.map(k => `<div class="dockBox" data-k="${k}" style="width:${W}px;height:${H}px"><span class="lbl">${k} · ${VARS[k]}</span><svg></svg></div>`).join('');
+  const stats = [...document.querySelectorAll('.dockBox')].map(b => renderDock(b, b.dataset.k, W, H, rows));
+  $('chords').innerHTML = LOOP.map((s, i) => `<button class="btn${i === slotI ? ' on' : ''}" data-i="${i}">${s}</button>`).join(' ');
+  $('state').textContent = `slot        ${stats[0].sc.name}\ninstrument  ${INSTR[instrIdx][0]}\nrange       ${stats[0].N} scale steps · lowest ${stats[0].lowest}\n\n` + stats.map(s =>
+`── ${s.kind} · ${VARS[s.kind]}
+cells/row   ${s.perRow.join(' · ')} (bottom → top)
+cells       ${s.total} (${s.inCount} in range, ${s.grey} grey)
+cell width  ${s.cw.toFixed(0)}px
+duplicates  ${s.dups} pitches shown twice+
+missing     ${s.missing} range notes not on grid
+left column ${s.leftCol.join(' ')}`).join('\n\n') +
+  '\n\n←/→ step the ii–V–I–alt loop · [ / ] variant\nclick a cell: hear it, highlight duplicates';
+  $('vLbl').textContent = `${variant} — ${VARS[variant]}`;
+  const u = new URL(location); u.searchParams.set('variant', variant); history.replaceState(null, '', u);
+}
+let ctx = null;
+function play(m) { ctx = ctx || new AudioContext(); const o = ctx.createOscillator(), g = ctx.createGain(), t0 = ctx.currentTime;
+  o.type = 'sine'; o.frequency.value = 440 * Math.pow(2, (m - 69) / 12); g.gain.setValueAtTime(.0001, t0); g.gain.exponentialRampToValueAtTime(.22, t0 + .01); g.gain.exponentialRampToValueAtTime(.0001, t0 + .6);
+  o.connect(g).connect(ctx.destination); o.start(t0); o.stop(t0 + .65); }
+$('docks').addEventListener('click', e => { const c = e.target.closest('.cell'); if (!c || c.dataset.in !== '1') return; const w = +c.dataset.midi; play(w - iv()[1]); flash = w; render(); setTimeout(() => { flash = null; render(); }, 600); });
+$('chords').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { slotI = +b.dataset.i; render(); } });
+INSTR.forEach((x, i) => $('instr').add(new Option(x[0], i)));
+$('instr').onchange = e => { instrIdx = +e.target.value; render(); e.target.blur(); };
+['rows', 'size', 'leadMark', 'ring'].forEach(id => $(id).onchange = e => { render(); e.target.blur(); });
+const cyc = d => { const ks = Object.keys(VARS); variant = ks[mod(ks.indexOf(variant) + d, ks.length)]; render(); };
+$('vPrev').onclick = () => cyc(-1); $('vNext').onclick = () => cyc(1);
+document.addEventListener('keydown', e => {
+  if (e.target.matches('select, input')) return;
+  if (e.key === '[' || e.key === ']') cyc(e.key === ']' ? 1 : -1);
+  if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { slotI = mod(slotI + (e.key === 'ArrowRight' ? 1 : -1), LOOP.length); render(); }
+});
+render();
+</script>
+</body>
+</html>

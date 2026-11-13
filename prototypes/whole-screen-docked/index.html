@@ -1,0 +1,561 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway. Ticket "Whole-screen layout (docked hex)" (issues/030).
+  Question: what does the whole screen look like on a real tune (32 bars, split bars) with in-slot notation on top
+  and the docked hex below — where do the title, instrument, mute and length/Rest latches sit, how does the chart
+  scroll or zoom, and what does a tablet-on-a-stand read mode look like?
+  Three layouts, switched with ?variant=A|B|C or the floating bar ( [ / ] keys ):
+    A · Scroll stack  — header on top, chart scrolls at a fixed zoom (−/+), entry toolbar sits between chart and dock.
+    B · Focus rows    — the chart shows only the caret's row ± 1 (large), with an overview minimap of all 32 bars; latches
+                        live in columns on the dock's left and right edges.
+    C · Fit all + rail — every row of the form is squeezed into the top half (auto zoom, no scroll); all controls
+                        sit in a left rail that runs the full height.
+  Stand (read) mode: \ key or the "Stand" button — hides the hex and edit chrome; "fit page" vs "large + page turns".
+  Frame: preview at laptop / tablet sizes (scaled to fit the window). ⓘ shows measured sizes (hex cell, staff gap, bars visible).
+  Editing = overwrite model from "Melody entry and caret (docked)". Notation is a crude stand-in for VexFlow.
+  Run: open prototypes/whole-screen-docked/index.html
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<title>PROTOTYPE — Whole-screen layout (docked hex)</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { font: 13px system-ui, sans-serif; background: #6b6b6b; color: #222; overflow: hidden; }
+  #stage { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+  #app { background: #eceae4; position: relative; overflow: hidden; display: flex; flex-direction: column; transform-origin: center center; box-shadow: 0 0 0 1px #000, 0 10px 40px #0006; }
+  body.fluid #app { box-shadow: none; }
+  button, select, input { font: inherit; }
+  .btn { font: 600 13px system-ui; min-width: 32px; height: 30px; border: 1px solid #aaa; background: #fff; border-radius: 4px; cursor: pointer; padding: 0 8px; white-space: nowrap; }
+  .btn.on { background: #2a6fdb; color: #fff; border-color: #2a6fdb; }
+  .btn.restOn { background: #333; color: #fff; }
+  .btn.blink { animation: blink .35s; }
+  @keyframes blink { 0% { background: #f5c542; } 100% {} }
+  .btn.ghost { border-color: transparent; background: transparent; }
+  .grp { display: inline-flex; gap: 2px; }
+  .hdr { display: flex; align-items: center; gap: 10px; padding: 6px 12px; background: #fff; border-bottom: 1px solid #ccc; flex: none; }
+  .title { font: 700 16px system-ui; border: 1px solid transparent; background: transparent; padding: 2px 4px; border-radius: 3px; min-width: 0; }
+  .title:hover, .title:focus { border-color: #bbb; }
+  .muted { color: #777; font-size: 12px; }
+  .spacer { flex: 1; }
+  /* chart */
+  .chartWrap { overflow: auto; min-height: 0; }
+  .row { display: grid; background: #fff; border-left: 1px solid #bbb; margin-bottom: 0; }
+  .row + .row { border-top: 0; }
+  .slot { border-right: 1px dashed #bbb; border-bottom: 1px solid #999; position: relative; cursor: text; min-width: 0; }
+  .slot.barEnd { border-right: 3px solid #333; }
+  .slot.active { background: #eef4fd; }
+  .slot .sh { display: flex; align-items: baseline; gap: 6px; padding: 0 6px; white-space: nowrap; overflow: hidden; }
+  .slot select.chord { font-weight: 700; border: 0; background: transparent; padding: 0; cursor: pointer; appearance: none; }
+  .slot .sc { color: #777; overflow: hidden; text-overflow: ellipsis; }
+  .slot .bn { position: absolute; left: 3px; bottom: 1px; font-size: 9px; color: #aaa; }
+  .slot svg { display: block; width: 100%; }
+  .ev { cursor: pointer; }
+  .ev:hover .head { stroke: #2a6fdb; stroke-width: 2; }
+  /* dock */
+  .dock { min-height: 0; background: #d9d6ce; position: relative; }
+  .dock svg.hex { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .cell { cursor: pointer; }
+  .cell.inactive { cursor: not-allowed; }
+  .cell text { pointer-events: none; font-weight: 600; }
+  .cell .halo { fill: none; stroke: #2a6fdb; stroke-width: 4; opacity: 0; }
+  .cell.dup .halo { opacity: .9; }
+  .cell.prev .halo { opacity: .55; stroke-dasharray: 4 3; }
+  .cell:hover .face { filter: brightness(.94); }
+  .tools { display: flex; gap: 10px; align-items: center; padding: 5px 12px; background: #f6f5f1; border-top: 1px solid #bbb; border-bottom: 2px solid #999; flex: none; flex-wrap: wrap; }
+  /* B */
+  .bBody { display: flex; min-height: 0; }
+  .mini { width: 170px; flex: none; background: #f6f5f1; border-right: 1px solid #ccc; padding: 6px; overflow: auto; }
+  .mini .mrow { display: grid; gap: 2px; margin-bottom: 2px; padding: 1px; border-radius: 3px; }
+  .mini .mrow.shown { background: #cfdcf3; }
+  .mini .mb { background: #fff; border: 1px solid #ccc; font-size: 9.5px; padding: 2px 2px 5px; cursor: pointer; white-space: nowrap; overflow: hidden; position: relative; border-radius: 2px; }
+  .mini .mb.cur { outline: 2px solid #2a6fdb; }
+  .mini .mb .fillbar { position: absolute; left: 0; bottom: 0; height: 3px; background: #9fbbe6; }
+  .dockCol { position: absolute; top: 8px; bottom: 8px; display: flex; flex-direction: column; gap: 4px; z-index: 2; }
+  .dockCol .btn { width: 64px; }
+  /* C */
+  .cWrap { display: flex; flex: 1; min-height: 0; }
+  .rail { width: 128px; flex: none; background: #fff; border-right: 1px solid #ccc; display: flex; flex-direction: column; gap: 6px; padding: 8px; overflow: auto; }
+  .rail .btn { width: 100%; }
+  .rail .lab { font-size: 10.5px; color: #888; text-transform: uppercase; letter-spacing: .04em; margin-top: 4px; }
+  .rail select { width: 100%; }
+  .cMain { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  /* read */
+  .readHdr { display: flex; align-items: center; gap: 10px; padding: 6px 14px; background: #fff; border-bottom: 1px solid #ccc; flex: none; }
+  .pageBtns { position: absolute; right: 10px; bottom: 14px; display: flex; flex-direction: column; gap: 8px; z-index: 3; }
+  .pageBtns .btn { width: 56px; height: 56px; font-size: 22px; opacity: .85; }
+  /* switcher + metrics */
+  #switch { position: fixed; left: 50%; bottom: 10px; transform: translateX(-50%); background: #111; color: #fff; border-radius: 999px; padding: 5px 8px; display: flex; gap: 8px; align-items: center; box-shadow: 0 4px 18px #0008; z-index: 50; font-size: 12px; opacity: .92; }
+  #switch button, #switch select { background: #333; color: #fff; border: 0; border-radius: 999px; padding: 4px 10px; cursor: pointer; font-size: 12px; }
+  #switch button.on { background: #f5c542; color: #111; }
+  #switch .lbl { min-width: 150px; text-align: center; font-weight: 700; }
+  #switch .tag { background: #c0392b; padding: 1px 6px; border-radius: 3px; font-weight: 700; font-size: 10px; }
+  #metrics { position: fixed; right: 10px; top: 10px; background: #1e1e1e; color: #d6d6d6; font: 11.5px/1.5 ui-monospace, monospace; padding: 8px 10px; border-radius: 6px; white-space: pre; z-index: 50; display: none; opacity: .93; }
+  #toast { position: absolute; left: 50%; top: 48px; transform: translateX(-50%); background: #222; color: #fff; padding: 6px 12px; border-radius: 6px; font-size: 12.5px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 20; }
+  #toast.show { opacity: .95; }
+</style>
+</head>
+<body>
+<div id="stage"><div id="app"></div></div>
+<div id="switch">
+  <span class="tag">PROTOTYPE</span>
+  <button id="vPrev">◀</button><span class="lbl" id="vLbl"></span><button id="vNext">▶</button>
+  <button id="readBtn" title="\">Stand</button>
+  <select id="frame">
+    <option value="fluid">frame: window</option>
+    <option value="1440x900">laptop 1440×900</option>
+    <option value="1280x800">laptop 1280×800</option>
+    <option value="1024x768">tablet 1024×768</option>
+    <option value="768x1024">tablet portrait 768×1024</option>
+  </select>
+  <select id="split"><option value="40">dock 40%</option><option value="50" selected>dock 50%</option><option value="60">dock 60%</option></select>
+  <button id="infoBtn" title="i">ⓘ</button>
+</div>
+<pre id="metrics"></pre>
+<script>
+// ================= music basics (from earlier prototypes) =================
+const LET = 'CDEFGAB', LPC = [0,2,4,5,7,9,11];
+const mod = (x, n) => ((x % n) + n) % n;
+const DEFSET = [['C',0],['C',1],['D',0],['E',-1],['E',0],['F',0],['F',1],['G',0],['A',-1],['A',0],['B',-1],['B',0]];
+const accS = a => a > 0 ? '♯' : a < 0 ? '♭' : '';
+const parsePitch = s => { const m = s.match(/^([A-G])(#|b)?(\d)$/); return 12 * (+m[3] + 1) + LPC[LET.indexOf(m[1])] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0); };
+function spellPc(L, pc) { const a = mod(pc - LPC[L] + 6, 12) - 6; if (Math.abs(a) > 1) { const [l, aa] = DEFSET[mod(pc, 12)]; return { L: LET.indexOf(l), a: aa }; } return { L, a }; }
+const SCALES = {
+  Dorian: [[0,0],[1,2],[2,3],[3,5],[4,7],[5,9],[6,10]], Mixolydian: [[0,0],[1,2],[2,4],[3,5],[4,7],[5,9],[6,10]],
+  Ionian: [[0,0],[1,2],[2,4],[3,5],[4,7],[5,9],[6,11]], altered: [[0,0],[1,1],[2,3],[2,4],[4,6],[5,8],[6,10]],
+  Locrian: [[0,0],[1,1],[2,3],[3,5],[4,6],[5,8],[6,10]],
+};
+const QUAL = { m7: ['Dorian', [0,3,7,10]], '7': ['Mixolydian', [0,4,7,10]], maj7: ['Ionian', [0,4,7,11]], '7alt': ['altered', [0,4,8,10,3]], m7b5: ['Locrian', [0,3,6,10]] };
+const SYMS = ['Cmaj7','Fmaj7','Am7','Dm7','Em7','Gm7','Bm7b5','G7','A7','C7','D7','E7alt','G7alt'];
+function slotDef(sym) { const m = sym.match(/^([A-G][b#]?)(.*)$/); const [scale, chord] = QUAL[m[2]]; return { root: m[1], q: m[2], scale, chord }; }
+const INSTR = [
+  ['Concert', null, null, [0,0]], ['Flute', 'C4', 'C7', [0,0]], ['Violin', 'G3', 'E7', [0,0]], ['Trombone', 'E2', 'Bb4', [0,0]],
+  ['B♭ trumpet', 'F#3', 'C6', [1,2]], ['B♭ tenor sax', 'Bb3', 'F#6', [8,14]], ['E♭ alto sax', 'Bb3', 'F#6', [5,9]],
+  ['Guitar', 'E3', 'E6', [7,12]], ['Double bass / bass guitar', 'E2', 'G4', [7,12]],
+];
+const DEG = ['#e41a1c','#ff7f00','#ffd92f','#4daf4a','#377eb8','#984ea3','#a65628'];
+function buildSlot(s, iv) {
+  const rL = LET.indexOf(s.root[0]), rA = s.root.length > 1 ? (s.root[1] === '#' ? 1 : -1) : 0;
+  const wr = spellPc(mod(rL + iv[0], 7), LPC[rL] + rA + iv[1]), rPc = mod(LPC[wr.L] + wr.a, 12);
+  const degs = SCALES[s.scale].map(([st, se]) => ({ semis: se, step: st, ...spellPc(mod(wr.L + st, 7), rPc + se) }));
+  const wRoot = LET[wr.L] + accS(wr.a);
+  return { ...s, rPc, degs, N: degs.length, pcs: new Set(degs.map(d => mod(rPc + d.semis, 12))), chordPcs: new Set(s.chord.map(x => mod(rPc + x, 12))),
+    sym: wRoot + s.q.replace('b5', '♭5'), scName: wRoot + ' ' + s.scale };
+}
+function cellPitch(sc, t) { const d = mod(t, sc.N), o = Math.floor(t / sc.N), g = sc.degs[d]; const midi = 12 + sc.rPc + g.semis + 12 * o; return { t, deg: g.step, midi, L: g.L, a: g.a, chord: sc.chordPcs.has(mod(midi, 12)) }; }
+const rowOff = r => { let o = 0; for (let i = 0; i < r; i++) o += (i % 2 === 0) ? 3 : 2; return o; };
+function spellWritten(w, sc) {
+  const pc = mod(w, 12), d = sc.degs.find(g => mod(LPC[g.L] + g.a, 12) === pc);
+  let L, a; if (d) ({ L, a } = d); else { const [l, aa] = DEFSET[pc]; L = LET.indexOf(l); a = aa; }
+  const oct = (w - a - LPC[L]) / 12 - 1;
+  return { L, a, oct, name: LET[L] + accS(a) + oct, step: L + 7 * oct, inScale: !!d };
+}
+
+// ================= the tune: 32 bars AABA, split bars =================
+const A1 = [['Cmaj7'],['Am7'],['Dm7'],['G7'],['Em7','A7'],['Dm7','G7'],['Cmaj7'],['Dm7','G7']];
+const A2 = [['Cmaj7'],['Am7'],['Dm7'],['G7'],['Em7','A7'],['Dm7','G7'],['Cmaj7'],['Cmaj7']];
+const BR = [['Gm7'],['C7'],['Fmaj7'],['Fmaj7'],['Bm7b5','E7alt'],['Am7'],['D7'],['Dm7','G7alt']];
+let chords = JSON.parse(JSON.stringify([...A1, ...A2, ...BR, ...A1]));
+const DUR = { w: 16, h: 8, q: 4, e: 2, s: 1 }, DORDER = ['w','h','q','e','s'], BAR = 16;
+function slots() { const out = []; let t = 0; chords.forEach((b, bi) => b.forEach((sym, k) => { const len = BAR / b.length; out.push({ i: out.length, bar: bi, sym, start: t, len, end: t + len, barEnd: k === b.length - 1 }); t += len; })); return out; }
+let SL = slots();
+const formLen = () => SL[SL.length - 1].end;
+const slotAt = t => SL.find(s => t >= s.start && t < s.end) || SL[SL.length - 1];
+const timeline = mel => { let t = 0; return mel.map((ev, i) => { const r = { ev, i, start: t, end: t + DUR[ev.d] }; t = r.end; return r; }); };
+const melEnd = mel => mel.reduce((t, e) => t + DUR[e.d], 0);
+function fillRests(a, b) { const out = []; while (a < b) { const se = slotAt(a).end; const d = DORDER.find(k => DUR[k] <= b - a && a + DUR[k] <= se && a % DUR[k] === 0) || 's'; out.push({ d }); a += DUR[d]; } return out; }
+
+// demo melody over the first 20 bars (deterministic "etude" — eighth-note lines, some quarters, a few rests)
+function genMelody(bars) {
+  const PAT16 = [['q','e','e','q','q'], ['e','e','e','e','h'], ['e','e','q','e','e','q'], ['h','q','q'], ['q','q','e','e','e','e'], ['e','e','e','e','e','e','q']];
+  const PAT8 = [['q','q'], ['e','e','q'], ['e','e','e','e']];
+  let p = 64, seed = 7; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+  const out = [];
+  for (const sl of SL.filter(s => s.bar < bars)) {
+    const sc = buildSlot(slotDef(sl.sym), [0,0]);
+    const pats = sl.len === 16 ? PAT16 : PAT8, pat = pats[Math.floor(rnd() * pats.length)];
+    const ups = [];
+    for (let m = 48; m < 90; m++) if (sc.pcs.has(mod(m, 12))) ups.push(m);
+    let idx = ups.findIndex(m => m >= p); if (idx < 0) idx = ups.length - 1;
+    // land on nearest chord tone at slot start
+    for (let k = 0; k < 3; k++) { if (sc.chordPcs.has(mod(ups[idx], 12))) break; idx += (ups[idx] > 70 ? -1 : 1); }
+    pat.forEach((d, j) => {
+      if (j > 0 && rnd() < 0.07) { out.push({ d }); return; }
+      out.push({ pitch: ups[idx], d });
+      const dir = ups[idx] > 74 ? -1 : ups[idx] < 60 ? 1 : (rnd() < 0.5 ? -1 : 1);
+      idx = Math.max(0, Math.min(ups.length - 1, idx + dir * (rnd() < 0.3 ? 2 : 1)));
+    });
+    p = ups[idx];
+  }
+  return out;
+}
+
+// ================= state =================
+const $ = id => document.getElementById(id);
+const P = new URLSearchParams(location.search);
+const VARS = { A: 'Scroll stack', B: 'Focus rows', C: 'Fit all + rail' };
+let variant = VARS[P.get('variant')] ? P.get('variant') : 'A';
+let read = P.get('read') === '1', readMode = 'fit';
+let frame = P.get('frame') || 'fluid', split = +(P.get('split') || 50);
+let instrIdx = 0, muted = false, bpr = 4, zoomA = 1, title = 'Etude in C (AABA, 32 bars)';
+let melody = genMelody(20);
+let caretT = melEnd(melody), latch = 'e', restOn = false;
+const undoS = [], redoS = [];
+const snap = () => JSON.stringify({ melody, chords, caretT });
+function commit(fn) { const before = snap(); if (fn() === false) return; undoS.push(before); redoS.length = 0; renderAll(); }
+function restore(s) { const o = JSON.parse(s); melody = o.melody; chords = o.chords; caretT = o.caretT; SL = slots(); }
+function undo() { if (!undoS.length) return; redoS.push(snap()); restore(undoS.pop()); renderAll(); }
+function redo() { if (!redoS.length) return; undoS.push(snap()); restore(redoS.pop()); renderAll(); }
+const iv = () => INSTR[instrIdx][3];
+const activeSlot = () => caretT >= formLen() ? SL[SL.length - 1] : slotAt(caretT);
+const scCache = new Map();
+const scOf = s => { const k = s.sym + '|' + instrIdx; if (!scCache.has(k)) scCache.set(k, buildSlot(slotDef(s.sym), iv())); return scCache.get(k); };
+function toast(msg) { const t = $('toast'); if (!t) return; t.textContent = msg; t.classList.add('show'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), 1800); }
+function blink(id) { const b = $(id); if (!b) return; b.classList.remove('blink'); void b.offsetWidth; b.classList.add('blink'); }
+
+// ================= editing (overwrite model) =================
+const LNAME = { w: 'whole', h: 'half', q: 'quarter', e: '8th', s: '16th' };
+function insert(ev) {
+  const T = caretT;
+  if (T >= formLen()) { toast('Caret is at the end of the form'); return; }
+  if (T + DUR[ev.d] > slotAt(T).end) { toast(`A ${LNAME[ev.d]} doesn't fit before the slot ends`); blink('len_' + ev.d); return; }
+  const D = DUR[ev.d];
+  commit(() => {
+    const tl = timeline(melody), end = melEnd(melody), out = [];
+    tl.filter(r => r.end <= T).forEach(r => out.push(r.ev));
+    if (T > end) out.push(...fillRests(end, T));
+    out.push(ev);
+    const over = tl.filter(r => r.end > T && r.start < T + D), last = over[over.length - 1];
+    if (last && last.end > T + D) out.push(...fillRests(T + D, last.end));
+    tl.filter(r => r.start >= T + D && !over.includes(r)).forEach(r => out.push(r.ev));
+    melody = out; caretT = T + D;
+  });
+}
+function del(back) {
+  commit(() => {
+    const tl = timeline(melody), T = caretT, r = back ? tl.find(x => x.end === T) : tl.find(x => x.start === T);
+    if (!r) { if (back) { caretT = Math.max(0, T - DUR[latch]); return; } return false; }
+    if (r.ev.pitch != null) melody[r.i] = { d: r.ev.d }; else if (r.i === melody.length - 1) melody.pop();
+    if (back) caretT = r.start;
+  });
+}
+function moveCaret(dir) {
+  const tl = timeline(melody), end = melEnd(melody), T = caretT;
+  if (dir > 0) { const r = tl.find(x => x.start === T); caretT = Math.min(formLen(), r ? r.end : T + DUR[latch]); }
+  else { const r = tl.find(x => x.end === T); caretT = r ? r.start : Math.max(end > T ? 0 : end, T - DUR[latch]); }
+  renderAll();
+}
+function nudge(dir, octave) {
+  const r = timeline(melody).find(x => x.end === caretT);
+  if (!r || r.ev.pitch == null) { toast('No note just before the caret'); return; }
+  const sc = scOf(slotAt(r.start)), I = iv()[1]; let w = r.ev.pitch + I;
+  if (octave) w += 12 * dir; else { do { w += dir; } while (!sc.pcs.has(mod(w, 12))); }
+  commit(() => { melody[r.i] = { ...r.ev, pitch: w - I }; }); play(w - I);
+}
+function placeCaretAt(slot, frac) {
+  const t = slot.start + frac * slot.len, tl = timeline(melody), end = melEnd(melody);
+  const r = tl.find(x => t >= x.start && t < x.end);
+  caretT = r ? r.start : Math.max(end, Math.floor(t / DUR[latch]) * DUR[latch]);
+  if (!r && caretT > end && slotAt(caretT) !== slot) caretT = Math.max(end, slot.start);
+  renderAll();
+}
+function caretToEvent(i) { caretT = timeline(melody)[i].start; const ev = melody[i]; if (ev.pitch != null) play(ev.pitch); renderAll(); }
+function setLatch(d) { latch = d; if (restOn) { insert({ d }); return; } renderAll(); }
+function restKey() { restOn = !restOn; renderAll(); }
+
+// ================= notation stand-in (scaled by z) =================
+const G = 7, TOPY = 26, SVGH = 100;
+function renderSlotSvg(sl, Wpx, z, interactive) {
+  const W = Wpx / z, sc = scOf(sl), lo = INSTR[instrIdx][1];
+  const bass = lo && parsePitch(lo) < 52, base = bass ? 18 : 30, botY = TOPY + 4 * G;
+  const y = st => botY - (st - base) * G / 2;
+  const padL = 10, padR = 6, inner = W - padL - padR, xT = t => padL + (t - sl.start) / sl.len * inner;
+  let h = `<g transform="scale(${z})">`;
+  for (let k = 0; k < 5; k++) h += `<line x1="0" x2="${W}" y1="${TOPY + k * G}" y2="${TOPY + k * G}" stroke="#999" stroke-width="${1 / z}"/>`;
+  const rowStart = sl.i === 0 || (SL[sl.i - 1].bar !== sl.bar && sl.bar % bpr === 0);
+  if (rowStart) h += `<text x="1" y="${botY - 2}" font-size="30" fill="#555">${bass ? '𝄢' : '𝄞'}</text>`;
+  const tl = timeline(melody), T = caretT, act = interactive && activeSlot() === sl;
+  const range = lo ? [parsePitch(lo), parsePitch(INSTR[instrIdx][2])] : null;
+  for (const r of tl) {
+    if (r.start < sl.start || r.start >= sl.end) continue;
+    const x0 = xT(r.start), x1 = xT(r.end), hx = x0 + 9;
+    h += `<g class="ev" data-i="${r.i}">`;
+    h += `<rect x="${x0}" y="0" width="${Math.max(4, x1 - x0)}" height="${SVGH}" fill="${interactive && r.start === T ? '#2a6fdb22' : 'transparent'}"/>`;
+    if (r.ev.pitch == null) {
+      const L1 = TOPY + G, L2 = TOPY + 2 * G, d = r.ev.d;
+      if (d === 'w') h += `<rect x="${hx - 6}" y="${L1}" width="12" height="4" fill="#333"/>`;
+      else if (d === 'h') h += `<rect x="${hx - 6}" y="${L2 - 4}" width="12" height="4" fill="#333"/>`;
+      else if (d === 'q') h += `<path d="M${hx - 2} ${L1 - 4} l5 6 l-5 5 l5 6 q-6 -2 -3 5" fill="none" stroke="#333" stroke-width="2"/>`;
+      else { const n = d === 'e' ? 1 : 2; h += `<line x1="${hx + 3}" y1="${L1 + 1}" x2="${hx - 3}" y2="${L2 + 10}" stroke="#333" stroke-width="1.5"/>`;
+        for (let f = 0; f < n; f++) h += `<circle cx="${hx - 1 - f * 2}" cy="${L1 + 2 + f * 6}" r="2.2" fill="#333"/>`; }
+    } else {
+      const w = r.ev.pitch + iv()[1], sp = spellWritten(w, sc), yy = y(sp.step);
+      const oos = !sp.inScale, oor = range && (w < range[0] || w > range[1]), col = oos ? '#d62728' : '#111';
+      for (let s = base - 2; s >= sp.step; s -= 2) h += `<line x1="${hx - 8}" x2="${hx + 8}" y1="${y(s)}" y2="${y(s)}" stroke="#777"/>`;
+      for (let s = base + 10; s <= sp.step; s += 2) h += `<line x1="${hx - 8}" x2="${hx + 8}" y1="${y(s)}" y2="${y(s)}" stroke="#777"/>`;
+      if (sp.a) h += `<text x="${hx - 8}" y="${yy + 4}" font-size="12" text-anchor="end" fill="${col}">${accS(sp.a)}</text>`;
+      const hollow = r.ev.d === 'w' || r.ev.d === 'h';
+      h += `<ellipse class="head" cx="${hx}" cy="${yy}" rx="5" ry="3.8" transform="rotate(-20 ${hx} ${yy})" fill="${hollow ? '#fff' : col}" stroke="${col}" stroke-width="1.5" opacity="${oor ? .35 : 1}"/>`;
+      if (r.ev.d !== 'w') {
+        const up = sp.step < base + 4, sx = up ? hx + 4.5 : hx - 4.5, sy2 = up ? yy - 24 : yy + 24;
+        h += `<line x1="${sx}" x2="${sx}" y1="${yy}" y2="${sy2}" stroke="${col}" stroke-width="1.2"/>`;
+        const nf = r.ev.d === 'e' ? 1 : r.ev.d === 's' ? 2 : 0;
+        for (let f = 0; f < nf; f++) { const fy = sy2 + (up ? 1 : -1) * f * 5; h += `<path d="M${sx} ${fy} q 6 ${up ? 5 : -5} 5 ${up ? 11 : -11}" fill="none" stroke="${col}" stroke-width="1.3"/>`; }
+      }
+      if (oos) h += `<circle cx="${hx}" cy="${yy}" r="9" fill="none" stroke="#d62728" stroke-width="1.5"/>`;
+    }
+    h += '</g>';
+  }
+  if (act || (interactive && T === sl.end && sl.i === SL.length - 1)) {
+    const cx = Math.min(W - 2, T >= sl.end ? W - 3 : xT(T) + 1);
+    h += `<line x1="${cx}" x2="${cx}" y1="${TOPY - 12}" y2="${botY + 12}" stroke="#2a6fdb" stroke-width="2.5"/><path d="M${cx - 5} ${TOPY - 16} h10 l-5 5z" fill="#2a6fdb"/>`;
+  }
+  return h + '</g>';
+}
+const rowsOf = () => { const n = Math.ceil(chords.length / bpr); return Array.from({ length: n }, (_, r) => SL.filter(s => Math.floor(s.bar / bpr) === r)); };
+const rowOfSlot = s => Math.floor(s.bar / bpr);
+// chart rows → HTML; z scales staff, header font
+function chartHtml(rowIdxs, z, interactive) {
+  const rows = rowsOf(), act = activeSlot(), fs = Math.max(10, 15 * Math.min(z, 1.6));
+  return rowIdxs.map(ri => `<div class="row" style="grid-template-columns: repeat(${bpr * 2}, minmax(0,1fr))">` + rows[ri].map(sl => {
+    const sc = scOf(sl);
+    const chordEl = interactive
+      ? `<select class="chord" data-s="${sl.i}" style="font-size:${fs}px">${SYMS.map(s => `<option${s === sl.sym ? ' selected' : ''}>${s}</option>`).join('')}</select>`
+      : `<b style="font-size:${fs}px">${sc.sym}</b>`;
+    return `<div class="slot${interactive && sl === act ? ' active' : ''}${sl.barEnd ? ' barEnd' : ''}" data-s="${sl.i}" style="grid-column: span ${sl.len / 8}">
+      <div class="sh" style="padding-top:${3 * z}px">${chordEl}<span class="sc" style="font-size:${Math.max(9, 11 * Math.min(z, 1.5))}px">${sc.scName}</span></div>
+      <svg data-z="${z}" style="height:${SVGH * z}px"></svg>${sl.start % BAR === 0 ? `<span class="bn">${sl.bar + 1}</span>` : ''}</div>`;
+  }).join('') + '</div>').join('');
+}
+function paintSvgs(root, interactive) {
+  root.querySelectorAll('.slot').forEach(el => { const svg = el.querySelector('svg'); svg.innerHTML = renderSlotSvg(SL[+el.dataset.s], svg.clientWidth || 120, +svg.dataset.z, interactive); });
+}
+const SLOT_HDR = 22; // approx header height at z=1
+function rowHeight(z) { return SVGH * z + Math.max(14, SLOT_HDR * Math.min(z, 1.6)) + 1; }
+function zToFit(nRows, H, lo = .35, hi = 1.6) { let z = hi; while (z > lo && nRows * rowHeight(z) > H) z -= .02; return +z.toFixed(2); }
+
+// ================= hex dock =================
+let layout = null, flashMidi = null;
+function rangeOf() { const [, lo, hi] = INSTR[instrIdx]; return lo ? { lo: parsePitch(lo), hi: parsePitch(hi), limited: true } : { lo: 48, hi: 84, limited: false }; }
+function hexPts(cx, cy, R) { let s = ''; for (let i = 0; i < 6; i++) { const a = Math.PI / 180 * (60 * i - 30); s += (cx + R * Math.cos(a)).toFixed(1) + ',' + (cy + R * Math.sin(a)).toFixed(1) + ' '; } return s; }
+function renderDock(svg, padL = 14, padR = 14) {
+  if (!svg) return;
+  const sc = scOf(activeSlot()), R0 = rangeOf();
+  let tLo = 0; while (cellPitch(sc, tLo).midi < R0.lo) tLo++;
+  let tHi = tLo; while (cellPitch(sc, tHi + 1).midi <= R0.hi) tHi++;
+  const W = svg.clientWidth, H = svg.clientHeight, availW = W - padL - padR, availH = H - 20;
+  const fitR = (c, r) => Math.min(availW / (Math.sqrt(3) * (c + 0.5)), availH / (2 + 1.5 * (r - 1)));
+  let best = null;
+  for (let r = 1; r <= 12; r++) { const c = Math.max(4, tHi - tLo - rowOff(r - 1) + 1), rr = fitR(c, r); if (!best || rr > best.R) best = { cols: c, rows: r, R: rr }; }
+  const { cols, rows, R } = best, gridW = Math.sqrt(3) * R * (cols + 0.5), x0 = padL + (availW - gridW) / 2;
+  const prev = timeline(melody).find(x => x.end === caretT), prevW = prev && prev.ev.pitch != null ? prev.ev.pitch + iv()[1] : null;
+  const fs = Math.max(9, R * 0.42); let h = '';
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    const p = cellPitch(sc, tLo + c + rowOff(r));
+    const inR = !R0.limited || (p.midi >= R0.lo && p.midi <= R0.hi);
+    const cx = x0 + Math.sqrt(3) * R * (c + 0.5 + (r % 2) * 0.5), cy = H - 10 - R - r * 1.5 * R;
+    const fill = !inR ? '#bdbab3' : p.chord ? '#fff' : '#141414', ink = !inR ? '#8a877f' : p.chord ? '#111' : '#f4f4f4';
+    h += `<g class="cell${inR ? '' : ' inactive'}${flashMidi === p.midi ? ' dup' : ''}${prevW === p.midi && inR ? ' prev' : ''}" data-midi="${p.midi}" data-in="${inR ? 1 : 0}">
+      <polygon class="face" points="${hexPts(cx, cy, R - 2)}" fill="${fill}" stroke="${DEG[p.deg]}" stroke-opacity="${inR ? 1 : .35}" stroke-width="3"/>
+      <polygon class="halo" points="${hexPts(cx, cy, R + 1)}"/>
+      <text x="${cx}" y="${cy + fs * 0.35}" text-anchor="middle" font-size="${fs}" fill="${ink}">${LET[p.L] + accS(p.a)}</text>
+      <text x="${cx}" y="${cy - R * 0.45}" text-anchor="middle" font-size="${fs * 0.6}" fill="${ink}" opacity=".7">${p.deg + 1}</text></g>`;
+  }
+  svg.innerHTML = h; layout = { R, cols, rows, sc };
+}
+
+// ================= shared control fragments =================
+const instrSel = () => `<select id="instr">${INSTR.map((x, i) => `<option value="${i}"${i === instrIdx ? ' selected' : ''}>${x[0]}</option>`).join('')}</select>`;
+const lenBtns = (vertical) => DORDER.map((d, k) => `<button class="btn" id="len_${d}" data-d="${d}" title="${k + 1}">${vertical ? `${k + 1} · ` : ''}${LNAME[d]}</button>`).join('');
+const restBtn = () => `<button class="btn" id="rest" title="R">Rest</button>`;
+const undoBtns = () => `<span class="grp"><button class="btn" id="undo" title="⌘Z">↶</button><button class="btn" id="redo" title="⇧⌘Z">↷</button></span>`;
+const peekBtns = () => `<button class="btn" id="pChord" title="Space">▶ Chord</button><button class="btn" id="pScale" title="⇧Space">▶ Scale</button>`;
+const muteBtn = () => `<button class="btn" id="mute" title="M">🔈</button>`;
+const bprSel = () => `<select id="bpr" title="bars per row">${[2,4,6,8].map(n => `<option${n === bpr ? ' selected' : ''} value="${n}">${n} bars/row</option>`).join('')}</select>`;
+const libBtn = () => `<button class="btn ghost" id="lib" title="back to library">← Library</button>`;
+const standBtn = () => `<button class="btn" id="stand" title="\\">Stand</button>`;
+const titleIn = () => `<input class="title" id="title" size="${title.length}" value="${title}">`;
+
+// ================= shells per variant =================
+function shell() {
+  const app = $('app');
+  if (read) {
+    app.innerHTML = `<div class="readHdr"><b style="font-size:17px">${title}</b><span class="muted">${INSTR[instrIdx][0]}</span><span class="spacer"></span>
+      <span class="seg"><button class="btn${readMode === 'fit' ? ' on' : ''}" data-rm="fit">Fit page</button><button class="btn${readMode === 'large' ? ' on' : ''}" data-rm="large">Large + page turns</button></span>
+      ${muteBtn()}<button class="btn on" id="stand">✎ Edit</button></div>
+      <div class="chartWrap" id="chartWrap" style="flex:1"><div id="chart"></div></div>
+      ${readMode === 'large' ? '<div class="pageBtns"><button class="btn" id="pgUp">▲</button><button class="btn" id="pgDn">▼</button></div>' : ''}<div id="toast"></div>`;
+  } else if (variant === 'A') {
+    app.innerHTML = `<div class="hdr">${libBtn()}${titleIn()}<span class="spacer"></span>${instrSel()}${muteBtn()}${bprSel()}
+        <span class="grp"><button class="btn" id="zOut">−</button><button class="btn" id="zIn">+</button></span>${standBtn()}</div>
+      <div class="chartWrap" id="chartWrap" style="flex:${100 - split} 1 0"><div id="chart"></div></div>
+      <div class="tools"><span class="grp" id="lens">${lenBtns()}</span>${restBtn()}${undoBtns()}<button class="btn" id="clear">Clear all</button>
+        <span class="grp">${peekBtns()}</span><span class="muted" id="where"></span></div>
+      <div class="dock" style="flex:${split} 1 0"><svg class="hex" id="hex"></svg></div><div id="toast"></div>`;
+  } else if (variant === 'B') {
+    app.innerHTML = `<div class="hdr" style="padding:4px 10px">${libBtn()}${titleIn()}<span class="muted" id="where"></span><span class="spacer"></span>${instrSel()}${muteBtn()}${bprSel()}${standBtn()}</div>
+      <div class="bBody" style="flex:${100 - split} 1 0"><div class="mini" id="mini"></div><div class="chartWrap" id="chartWrap" style="flex:1;overflow:hidden"><div id="chart"></div></div></div>
+      <div class="dock" style="flex:${split} 1 0; border-top:2px solid #999">
+        <div class="dockCol" style="left:8px" id="lens">${lenBtns(true)}${restBtn()}</div>
+        <div class="dockCol" style="right:8px">${undoBtns()}${peekBtns()}<span class="spacer"></span><button class="btn" id="clear">Clear all</button></div>
+        <svg class="hex" id="hex"></svg></div><div id="toast"></div>`;
+  } else {
+    app.innerHTML = `<div class="cWrap"><div class="rail">${libBtn()}<div class="lab">Progression</div><input class="title" id="title" value="${title}" style="font-size:12px;width:100%">
+        <div class="lab">Instrument</div>${instrSel()}${bprSel()}<span class="grp">${muteBtn()}${standBtn()}</span>
+        <div class="lab">Length</div><span id="lens" style="display:flex;flex-direction:column;gap:3px">${lenBtns(true)}</span>${restBtn()}
+        <div class="lab">Edit</div>${undoBtns()}<button class="btn" id="clear">Clear all</button>
+        <div class="lab">Hear</div>${peekBtns()}<div class="muted" id="where" style="margin-top:auto"></div></div>
+      <div class="cMain"><div class="chartWrap" id="chartWrap" style="flex:${100 - split} 1 0; overflow:hidden"><div id="chart"></div></div>
+        <div class="dock" style="flex:${split} 1 0; border-top:2px solid #999"><svg class="hex" id="hex"></svg></div></div></div><div id="toast"></div>`;
+  }
+  wireShell();
+}
+
+// ================= render =================
+let lastZ = 1, shownRows = [];
+function renderChart() {
+  const wrap = $('chartWrap'), chart = $('chart'); if (!wrap) return;
+  const nRows = rowsOf().length, H = wrap.clientHeight, act = activeSlot(), cr = rowOfSlot(act);
+  let idxs = [...Array(nRows).keys()], z = 1, interactive = !read;
+  if (read) z = readMode === 'fit' ? zToFit(nRows, H - 4, .3, 2) : 1.8;
+  else if (variant === 'A') z = zoomA;
+  else if (variant === 'B') {
+    const first = Math.max(0, Math.min(nRows - 3, cr - 1)); idxs = idxs.slice(first, first + 3);
+    z = zToFit(idxs.length, H - 4, .5, 1.5);
+  } else z = zToFit(nRows, H - 2, .3, 1.4);
+  lastZ = z; shownRows = idxs;
+  chart.innerHTML = chartHtml(idxs, z, interactive); paintSvgs(chart, interactive);
+  if (!read && variant === 'A') { // keep the caret's row in view
+    const el = chart.querySelector('.slot.active'); if (el) { const top = el.offsetTop, bot = top + el.offsetHeight;
+      if (top < wrap.scrollTop) wrap.scrollTop = top - 4; else if (bot > wrap.scrollTop + wrap.clientHeight) wrap.scrollTop = bot - wrap.clientHeight + 4; }
+  }
+}
+function renderMini() {
+  const m = $('mini'); if (!m) return; const rows = rowsOf(), act = activeSlot();
+  m.innerHTML = '<div class="muted" style="margin-bottom:4px">Form · click to jump</div>' + rows.map((row, ri) => {
+    const bars = [...new Set(row.map(s => s.bar))];
+    return `<div class="mrow${shownRows.includes(ri) ? ' shown' : ''}" style="grid-template-columns:repeat(${bpr},1fr)">` + bars.map(b => {
+      const ss = row.filter(s => s.bar === b), filled = Math.max(0, Math.min(BAR, melEnd(melody) - b * BAR)) / BAR;
+      return `<div class="mb${act.bar === b ? ' cur' : ''}" data-bar="${b}">${ss.map(s => scOf(s).sym).join(' ')}<span class="fillbar" style="width:${filled * 100}%"></span></div>`;
+    }).join('') + '</div>';
+  }).join('');
+}
+function renderTools() {
+  DORDER.forEach(d => { const b = $('len_' + d); if (b) b.classList.toggle('on', d === latch); });
+  const r = $('rest'); if (r) { r.classList.toggle('restOn', restOn); r.textContent = restOn ? 'Rest ON' : 'Rest (R)'; }
+  const m = $('mute'); if (m) m.textContent = muted ? '🔇' : '🔈';
+  const w = $('where'); if (w) { const sl = activeSlot(), sc = scOf(sl); w.textContent = `bar ${sl.bar + 1} · ${sc.sym} → ${sc.scName}`; }
+}
+function renderMetrics() {
+  const el = $('metrics'); if (el.style.display !== 'block') return;
+  const app = $('app'), wrap = $('chartWrap'), wr = wrap && wrap.getBoundingClientRect();
+  const sc = $('app').getBoundingClientRect().width / app.offsetWidth;
+  let vis = new Set(); document.querySelectorAll('#chart .slot').forEach(s => { const r = s.getBoundingClientRect(); if (r.bottom > wr.top + 10 && r.top < wr.bottom - 10) vis.add(SL[+s.dataset.s].bar); });
+  const slotWs = [...document.querySelectorAll('#chart .slot')].map(s => s.offsetWidth);
+  el.textContent =
+`variant     ${read ? 'STAND · ' + readMode : variant + ' · ' + VARS[variant]}
+frame       ${app.offsetWidth}×${app.offsetHeight}${sc < .999 ? ` (shown at ${Math.round(sc * 100)}%)` : ''}
+chart       ${wrap ? wrap.clientHeight : 0}px tall · zoom ${lastZ}
+staff gap   ${(G * lastZ).toFixed(1)}px  (printed parts ≈ 6–7px @96dpi)
+slot width  ${Math.min(...slotWs)}–${Math.max(...slotWs)}px
+bars shown  ${vis.size} of ${chords.length}
+hex         ${read || !layout ? '— hidden' : `${layout.cols}×${layout.rows} cells, cell ${(Math.sqrt(3) * layout.R).toFixed(0)}px wide`}
+instrument  ${INSTR[instrIdx][0]}
+melody      ${melody.length} events · ${melEnd(melody) / BAR} bars filled`;
+}
+function renderAll() { renderChart(); renderMini(); if (!read) renderDock($('hex'), variant === 'B' ? 90 : 14, variant === 'B' ? 90 : 14); renderTools(); renderMetrics(); renderSwitch(); }
+function renderSwitch() {
+  $('vLbl').textContent = read ? 'Stand mode' : `${variant} — ${VARS[variant]}`;
+  $('readBtn').classList.toggle('on', read); $('frame').value = frame; $('split').value = String(split);
+}
+function applyFrame() {
+  const app = $('app'); document.body.classList.toggle('fluid', frame === 'fluid');
+  if (frame === 'fluid') { app.style.width = '100vw'; app.style.height = '100vh'; app.style.transform = ''; return; }
+  const [w, h] = frame.split('x').map(Number); app.style.width = w + 'px'; app.style.height = h + 'px';
+  const s = Math.min(1, (innerWidth - 20) / w, (innerHeight - 70) / h); app.style.transform = `scale(${s})`;
+}
+function setUrl() { const u = new URL(location); u.searchParams.set('variant', variant); u.searchParams.set('read', read ? '1' : '0'); u.searchParams.set('frame', frame); u.searchParams.set('split', split); history.replaceState(null, '', u); }
+function rebuild() { setUrl(); applyFrame(); shell(); requestAnimationFrame(renderAll); }
+
+// ================= audio =================
+let ctx = null;
+function play(m, when = 0, len = .6) {
+  if (muted) return; ctx = ctx || new AudioContext();
+  const o = ctx.createOscillator(), g = ctx.createGain(), t0 = ctx.currentTime + when;
+  o.type = 'sine'; o.frequency.value = 440 * Math.pow(2, (m - 69) / 12);
+  g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.22, t0 + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t0 + len);
+  o.connect(g).connect(ctx.destination); o.start(t0); o.stop(t0 + len + .05);
+}
+const rootMidi = d => 48 + mod(LPC[LET.indexOf(d.root[0])] + (d.root[1] === 'b' ? -1 : d.root[1] === '#' ? 1 : 0), 12);
+function playChordPeek() { const d = slotDef(activeSlot().sym), r = rootMidi(d); d.chord.forEach(x => play(r + x, 0, 1.2)); }
+function playScalePeek() { const d = slotDef(activeSlot().sym), r = rootMidi(d); SCALES[d.scale].concat([[7, 12]]).forEach(([, s], k) => play(r + s, k * .15, .3)); }
+
+// ================= wiring =================
+function wireShell() {
+  const on = (id, ev, fn) => { const el = $(id); if (el) el['on' + ev] = fn; };
+  on('hex', 'click', e => {
+    const g = e.target.closest('.cell'); if (!g || g.dataset.in !== '1') return;
+    const w = +g.dataset.midi, c = w - iv()[1]; play(c); flashMidi = w;
+    clearTimeout(renderDock.f); renderDock.f = setTimeout(() => { flashMidi = null; renderDock($('hex'), variant === 'B' ? 90 : 14, variant === 'B' ? 90 : 14); }, 600);
+    restOn = false; insert({ pitch: c, d: latch }); renderAll();
+  });
+  on('chart', 'change', e => {
+    if (!e.target.matches('select.chord')) return; const sl = SL[+e.target.dataset.s];
+    commit(() => { const b = chords[sl.bar]; b[b.length === 1 ? 0 : (sl.start % BAR ? 1 : 0)] = e.target.value; SL = slots(); }); e.target.blur();
+  });
+  on('chart', 'click', e => {
+    if (read) { if (readMode === 'large') page(e.clientY > $('chartWrap').getBoundingClientRect().top + $('chartWrap').getBoundingClientRect().height / 2 ? 1 : -1); return; }
+    if (e.target.closest('select')) return;
+    const ev = e.target.closest('.ev'); if (ev) { caretToEvent(+ev.dataset.i); return; }
+    const el = e.target.closest('.slot'); if (!el) return;
+    const rect = el.querySelector('svg').getBoundingClientRect(), z = lastZ * rect.width / el.querySelector('svg').clientWidth;
+    placeCaretAt(SL[+el.dataset.s], Math.max(0, Math.min(.999, (e.clientX - rect.left - 10 * z) / (rect.width - 16 * z))));
+  });
+  on('mini', 'click', e => { const b = e.target.closest('.mb'); if (!b) return; const bar = +b.dataset.bar, s = SL.find(x => x.bar === bar); placeCaretAt(s, 0); });
+  on('lens', 'click', e => { const b = e.target.closest('button[data-d]'); if (b) setLatch(b.dataset.d); });
+  on('rest', 'click', restKey); on('undo', 'click', undo); on('redo', 'click', redo);
+  on('clear', 'click', () => commit(() => { if (!melody.length) return false; melody = []; caretT = 0; }));
+  on('pChord', 'click', playChordPeek); on('pScale', 'click', playScalePeek);
+  on('mute', 'click', () => { muted = !muted; renderTools(); });
+  on('stand', 'click', toggleRead);
+  on('lib', 'click', () => toast('(library screen — not in this prototype)'));
+  on('title', 'input', e => { title = e.target.value; });
+  on('instr', 'change', e => { instrIdx = +e.target.value; renderAll(); e.target.blur(); });
+  on('bpr', 'change', e => { bpr = +e.target.value; renderAll(); e.target.blur(); });
+  on('zIn', 'click', () => { zoomA = Math.min(2, +(zoomA + .15).toFixed(2)); renderAll(); });
+  on('zOut', 'click', () => { zoomA = Math.max(.4, +(zoomA - .15).toFixed(2)); renderAll(); });
+  on('pgUp', 'click', () => page(-1)); on('pgDn', 'click', () => page(1));
+  document.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { readMode = b.dataset.rm; rebuild(); });
+}
+function page(dir) { const w = $('chartWrap'); w.scrollBy({ top: dir * (w.clientHeight - rowHeight(lastZ) * .5), behavior: 'smooth' }); }
+function toggleRead() { read = !read; rebuild(); }
+function cycle(dir) { const ks = Object.keys(VARS); if (read) read = false; else variant = ks[mod(ks.indexOf(variant) + dir, ks.length)]; rebuild(); }
+$('vPrev').onclick = () => cycle(-1); $('vNext').onclick = () => cycle(1);
+$('readBtn').onclick = toggleRead;
+$('frame').onchange = e => { frame = e.target.value; rebuild(); e.target.blur(); };
+$('split').onchange = e => { split = +e.target.value; rebuild(); e.target.blur(); };
+$('infoBtn').onclick = () => { const m = $('metrics'); m.style.display = m.style.display === 'block' ? 'none' : 'block'; $('infoBtn').classList.toggle('on'); renderMetrics(); };
+document.addEventListener('keydown', e => {
+  if (e.target.matches('select, input')) return;
+  const k = e.key, mac = e.metaKey || e.ctrlKey;
+  if (mac && k.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if (mac) return;
+  if (k === '[' || k === ']') { cycle(k === ']' ? 1 : -1); return; }
+  if (k === '\\') { toggleRead(); return; }
+  if (k === 'i') { $('infoBtn').click(); return; }
+  if (k === 'm' || k === 'M') { muted = !muted; renderTools(); return; }
+  if (read) { if (k === 'ArrowDown' || k === 'PageDown' || k === ' ') { e.preventDefault(); page(1); } else if (k === 'ArrowUp' || k === 'PageUp') { e.preventDefault(); page(-1); } return; }
+  if ('12345'.includes(k) && k.length === 1) setLatch(DORDER[+k - 1]);
+  else if (k === 'r' || k === 'R') restKey();
+  else if (k === 'Backspace') { e.preventDefault(); del(true); }
+  else if (k === 'Delete') { e.preventDefault(); del(false); }
+  else if (k === 'ArrowLeft' || k === 'ArrowRight') { e.preventDefault(); moveCaret(k === 'ArrowRight' ? 1 : -1); }
+  else if (k === 'ArrowUp' || k === 'ArrowDown') { e.preventDefault(); nudge(k === 'ArrowUp' ? 1 : -1, e.shiftKey); }
+  else if (k === ' ') { e.preventDefault(); e.shiftKey ? playScalePeek() : playChordPeek(); }
+});
+let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { applyFrame(); renderAll(); }, 80); });
+rebuild();
+</script>
+</body>
+</html>

@@ -1,0 +1,521 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway. Answers ticket "Lattice editing interaction" (issues/008).
+  Three structurally different ways to build a lattice, switchable via ?variant=A|B|C
+  and the floating bar at the bottom (or ← / → keys). All variants edit the SAME
+  in-memory lattice, so you can build in one and look at it in another.
+  No persistence, no tests, simplified theory (small chord table, fixed scale per quality).
+  Run: open prototypes/lattice-editing/index.html
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<title>PROTOTYPE — Lattice editing</title>
+<style>
+  body { margin: 0; font: 13px system-ui, sans-serif; background: #f4f3ef; color: #222; padding-bottom: 80px; }
+  #banner { padding: 8px 16px; background: #fffbe6; border-bottom: 1px solid #e5d9a8; }
+  #banner .tag { background: #c0392b; color: #fff; font-weight: 700; padding: 1px 6px; border-radius: 3px; margin-right: 8px; font-size: 11px; }
+  #banner .how { color: #555; margin-top: 3px; }
+  #wrap { position: relative; margin: 12px 16px; width: max-content; }
+  svg { background: #fff; border: 1px solid #ddd; display: block; user-select: none; touch-action: none; }
+  .handle { opacity: 0; transition: opacity .1s; cursor: crosshair; }
+  g.note:hover .handle, g.note.sel .handle { opacity: 1; }
+  g.note { cursor: pointer; }
+  .palette { position: absolute; background: #fff; border: 1px solid #bbb; border-radius: 8px; box-shadow: 0 6px 18px #0003; padding: 8px 10px; z-index: 5; width: 270px; }
+  .palette h4 { margin: 0 0 6px; font-size: 12px; display: flex; justify-content: space-between; align-items: center; }
+  .palette .row { margin: 4px 0; }
+  .palette .lbl { font-size: 10px; color: #888; }
+  .chip { display: inline-block; padding: 3px 7px; margin: 2px; border-radius: 12px; color: #fff; cursor: pointer; font-weight: 600; font-size: 12px; border: 0; }
+  .chip:hover { filter: brightness(1.15); }
+  .octbtn { border: 1px solid #ccc; background: #f6f6f6; border-radius: 4px; cursor: pointer; padding: 0 6px; }
+  .chordInput { position: absolute; font: 700 14px system-ui; padding: 2px 4px; border: 2px solid #3a7bd5; border-radius: 4px; z-index: 6; box-sizing: border-box; }
+  #cpanel { margin: 0 16px 12px; background: #fff; border: 1px solid #ddd; padding: 8px 10px; width: max-content; max-width: calc(100vw - 54px); }
+  #cpanel .zb { border: 1px solid #bbb; background: #f6f6f6; padding: 2px 10px; cursor: pointer; border-radius: 4px; margin-right: 4px; }
+  #cpanel .zb.on { background: #222; color: #fff; border-color: #222; }
+  #keys { display: flex; margin-top: 8px; }
+  .key { width: 34px; height: 56px; border: 1px solid #999; margin-right: -1px; display: flex; align-items: flex-end; justify-content: center; font-size: 10px; font-weight: 600; cursor: pointer; padding-bottom: 3px; box-sizing: border-box; }
+  .key.black { height: 40px; background: #333 !important; color: #fff; border-color: #333; }
+  .key.black.chord { box-shadow: inset 0 -6px 0 #2e9e5b; } .key.black.scale { box-shadow: inset 0 -6px 0 #3a7bd5; }
+  .key:hover { outline: 2px solid #e67e22; z-index: 1; }
+  #cinput { font: 14px ui-monospace, monospace; padding: 3px 6px; width: 220px; margin-left: 10px; }
+  #state { margin: 0 16px; background: #fff; border: 1px solid #ddd; padding: 8px 10px; font: 12px ui-monospace, monospace; white-space: pre-wrap; max-width: 1200px; }
+  #switcher { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: #111; color: #fff; border-radius: 999px; padding: 6px 10px; display: flex; gap: 12px; align-items: center; box-shadow: 0 4px 14px #0006; z-index: 10; font-weight: 600; }
+  #switcher button { background: #333; color: #fff; border: 0; border-radius: 50%; width: 28px; height: 28px; cursor: pointer; font-size: 14px; }
+  #switcher button:hover { background: #555; }
+</style>
+</head>
+<body>
+<div id="banner"></div>
+<div id="wrap"><svg id="svg"><g id="content"></g></svg></div>
+<div id="cpanel">
+  <div>
+    <b id="ctarget"></b>
+    &nbsp; zone for new notes:
+    <button class="zb" data-z="entry">1 · entry</button><button class="zb" data-z="body">2 · body</button><button class="zb" data-z="exit">3 · exit</button>
+    <input id="cinput" placeholder="type E4  or  d5 f5 a5  then Enter" autocomplete="off">
+  </div>
+  <div id="keys"></div>
+</div>
+<div id="state"></div>
+<div id="switcher"><button id="prev">←</button><span id="vlabel"></span><button id="next">→</button></div>
+
+<script>
+// ---------- theory (simplified, prototype-grade) ----------
+const LET = 'CDEFGAB', LPC = [0, 2, 4, 5, 7, 9, 11];
+const DEF = ['C','C#','D','Eb','E','F','F#','G','Ab','A','Bb','B'];
+const SHARP = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const FLAT = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+const COL = { chord: '#2e9e5b', scale: '#3a7bd5', passing: '#8b5a2b', grey: '#9a9a9a' };
+const mod = x => ((x % 12) + 12) % 12;
+const SC = {
+  ionian: ['Ionian', [[0,0],[2,1],[4,2],[5,3],[7,4],[9,5],[11,6]]],
+  dorian: ['Dorian', [[0,0],[2,1],[3,2],[5,3],[7,4],[9,5],[10,6]]],
+  mixolydian: ['Mixolydian', [[0,0],[2,1],[4,2],[5,3],[7,4],[9,5],[10,6]]],
+  locrian: ['Locrian', [[0,0],[1,1],[3,2],[5,3],[6,4],[8,5],[10,6]]],
+  lydian: ['Lydian', [[0,0],[2,1],[4,2],[6,3],[7,4],[9,5],[11,6]]],
+  halfwhole: ['half-whole', [[0,0],[1,1],[3,1],[4,2],[6,3],[7,4],[9,5],[10,6]]],
+  wholehalf: ['whole-half', [[0,0],[2,1],[3,2],[5,3],[6,4],[8,5],[9,5],[11,6]]],
+  altered: ['altered', [[0,0],[1,1],[3,1],[4,2],[6,4],[8,5],[10,6]]],
+};
+const T = { R:[0,0], m3:[3,2], M3:[4,2], P4:[5,3], P5:[7,4], d5:[6,4], A5:[8,4], M6:[9,5], m7:[10,6], M7:[11,6], d7:[9,6], M9:[2,1], b9:[1,1], s9:[3,1], s11:[6,3], M13:[9,5] };
+const Q = {
+  '': [['R','M3','P5'], 'ionian'], m: [['R','m3','P5'], 'dorian'],
+  '7': [['R','M3','P5','m7'], 'mixolydian'], maj7: [['R','M3','P5','M7'], 'ionian'],
+  m7: [['R','m3','P5','m7'], 'dorian'], m7b5: [['R','m3','d5','m7'], 'locrian'],
+  dim7: [['R','m3','d5','d7'], 'wholehalf'], dim: [['R','m3','d5'], 'wholehalf'],
+  '6': [['R','M3','P5','M6'], 'ionian'], m6: [['R','m3','P5','M6'], 'dorian'],
+  '9': [['R','M3','P5','m7','M9'], 'mixolydian'], m9: [['R','m3','P5','m7','M9'], 'dorian'],
+  maj9: [['R','M3','P5','M7','M9'], 'ionian'], '13': [['R','M3','P5','m7','M9','M13'], 'mixolydian'],
+  '7b9': [['R','M3','P5','m7','b9'], 'halfwhole'], '7#9': [['R','M3','P5','m7','s9'], 'halfwhole'],
+  '7alt': [['R','M3','A5','m7','s9'], 'altered'], 'maj7#11': [['R','M3','P5','M7','s11'], 'lydian'],
+  sus4: [['R','P4','P5'], 'mixolydian'], '7sus4': [['R','P4','P5','m7'], 'mixolydian'],
+};
+const AL = { '-':'m', min:'m', '-7':'m7', min7:'m7', M7:'maj7', 'Δ':'maj7', 'Δ7':'maj7', ma7:'maj7', 'ø':'m7b5', 'ø7':'m7b5', '-7b5':'m7b5', o:'dim', '°':'dim', o7:'dim7', '°7':'dim7', alt:'7alt', sus:'sus4', '-9':'m9', M:'', maj:'' };
+const acc = s => s === '#' ? 1 : s === 'b' ? -1 : 0;
+const fromName = n => { const L = LET.indexOf(n[0]); const a = n.length > 1 ? acc(n[1]) : 0; return { pc: mod(LPC[L] + a), L, a }; };
+function spell(rl, ra, s, d) {
+  const L = (rl + d) % 7, pc = mod(LPC[rl] + ra + s);
+  const a = mod(pc - LPC[L] + 6) - 6;
+  return Math.abs(a) > 1 ? fromName(DEF[pc]) : { pc, L, a };
+}
+const infoCache = {};
+function info(sym) {
+  const s = (sym || '').trim();
+  if (s in infoCache) return infoCache[s];
+  let r;
+  if (!s) r = { kind: 'empty' };
+  else if (/^n\.?c\.?$/i.test(s)) r = { kind: 'nc' };
+  else {
+    const m = /^([A-G])([#b]?)([^\/\s]*)(?:\/([A-G])([#b]?))?$/.exec(s);
+    const q = m ? (m[3] in AL ? AL[m[3]] : m[3]) : null;
+    if (!m || !Q[q]) r = { kind: 'bad' };
+    else {
+      const rl = LET.indexOf(m[1]), ra = acc(m[2]), chord = new Map(), scale = new Map();
+      for (const k of Q[q][0]) { const sp = spell(rl, ra, ...T[k]); chord.set(sp.pc, sp); }
+      if (m[4]) { const bl = LET.indexOf(m[4]), ba = acc(m[5]), pc = mod(LPC[bl] + ba); if (!chord.has(pc)) chord.set(pc, { pc, L: bl, a: ba }); }
+      const [sname, ivs] = SC[Q[q][1]];
+      for (const iv of ivs) { const sp = spell(rl, ra, ...iv); if (!scale.has(sp.pc)) scale.set(sp.pc, sp); }
+      let f = 0, sh = 0; for (const sp of scale.values()) { if (sp.a < 0) f++; if (sp.a > 0) sh++; }
+      r = { kind: 'ok', chord, scale, lean: f > sh ? FLAT : sh > f ? SHARP : DEF, scaleName: m[1] + m[2] + ' ' + sname };
+    }
+  }
+  return (infoCache[s] = r);
+}
+function nameOf(midi, sid) {
+  const inf = info(S.slots[sid].chord), pc = mod(midi);
+  let sp, role;
+  if (inf.kind !== 'ok') { role = 'grey'; sp = fromName(DEF[pc]); }
+  else if (inf.chord.has(pc)) { role = 'chord'; sp = inf.chord.get(pc); }
+  else if (inf.scale.has(pc)) { role = 'scale'; sp = inf.scale.get(pc); }
+  else { role = 'passing'; sp = fromName(inf.lean[pc]); }
+  const oct = Math.round((midi - sp.a - LPC[sp.L]) / 12) - 1;
+  return { name: LET[sp.L] + (sp.a > 0 ? '#' : sp.a < 0 ? 'b' : '') + oct, role };
+}
+function parseNote(t) {
+  const m = /^([a-g])([#b]?)(-?\d)$/i.exec(t.trim()); if (!m) return null;
+  return (+m[3] + 1) * 12 + LPC[LET.indexOf(m[1].toUpperCase())] + acc(m[2]);
+}
+
+// ---------- model ----------
+const S = {
+  bars: [['s1'], ['s2'], ['s3'], ['s4', 's5'], ['s6'], ['s7'], ['s8'], ['s9']],
+  slots: { s1: { chord: 'Dm7' }, s2: { chord: 'G7' }, s3: { chord: 'Cmaj7' }, s4: { chord: 'Em7' }, s5: { chord: 'A7' }, s6: { chord: 'Dm7' }, s7: { chord: 'G7alt' }, s8: { chord: 'Cmaj7' }, s9: { chord: 'N.C.' } },
+  notes: {}, links: [], bridges: [], sel: null,
+};
+let nid = 0, sidN = 9;
+const add = (slot, zone, midi, rx = 150, ry = 110) => { const id = 'n' + (++nid); S.notes[id] = { id, slot, zone, midi, rx, ry }; return id; };
+(() => { // seed
+  const n1 = add('s1','entry',65,0,120), n2 = add('s1','body',69,110,95), n3 = add('s1','body',72,190,70), n4 = add('s1','body',76,140,48), n5 = add('s1','exit',72,0,100);
+  const n6 = add('s2','entry',71,0,105), n7 = add('s2','body',74,120,70), n8 = add('s2','body',77,200,48), n9 = add('s2','body',67,160,150), n10 = add('s2','exit',65,0,150);
+  const n11 = add('s3','entry',64,0,155), n12 = add('s3','body',67,110,125), n13 = add('s3','body',71,170,90), n14 = add('s3','body',69,225,145);
+  const n15 = add('s5','entry',73,0,80), n16 = add('s5','exit',67,0,140);
+  const n17 = add('s6','entry',65,0,120);
+  const n18 = add('s9','body',70,150,90), n19 = add('s9','exit',69,0,130);
+  S.links.push(...[[n1,n2],[n2,n3],[n3,n4],[n3,n5],[n2,n5],[n6,n7],[n7,n8],[n6,n9],[n9,n10],[n8,n10],[n11,n12],[n12,n13],[n13,n14],[n15,n16],[n18,n19]].map(([a,b]) => ({ a, b })));
+  S.bridges.push(...[[n5,n6],[n10,n11],[n16,n17],[n19,n1]].map(([from,to]) => ({ from, to })));
+})();
+const order = () => S.bars.flat();
+const notesIn = sid => Object.values(S.notes).filter(n => n.slot === sid);
+const nextSlot = sid => { const o = order(); return o[(o.indexOf(sid) + 1) % o.length]; };
+function relation(a, b) {
+  if (a.id === b.id) return null;
+  if (a.slot === b.slot) return { kind: 'link' };
+  if (a.zone === 'exit' && b.zone === 'entry' && nextSlot(a.slot) === b.slot) return { kind: 'bridge', from: a.id, to: b.id };
+  if (b.zone === 'exit' && a.zone === 'entry' && nextSlot(b.slot) === a.slot) return { kind: 'bridge', from: b.id, to: a.id };
+  return null;
+}
+function toggle(a, b) {
+  const r = relation(a, b); if (!r) return;
+  if (r.kind === 'link') {
+    const i = S.links.findIndex(l => (l.a === a.id && l.b === b.id) || (l.a === b.id && l.b === a.id));
+    i >= 0 ? S.links.splice(i, 1) : S.links.push({ a: a.id, b: b.id });
+  } else {
+    const i = S.bridges.findIndex(x => x.from === r.from && x.to === r.to);
+    i >= 0 ? S.bridges.splice(i, 1) : S.bridges.push({ from: r.from, to: r.to });
+  }
+}
+function setZone(n, z) {
+  if (n.zone === z) return;
+  n.zone = z;
+  S.bridges = S.bridges.filter(b => !((b.from === n.id && z !== 'exit') || (b.to === n.id && z !== 'entry')));
+}
+function delNote(id) { delete S.notes[id]; S.links = S.links.filter(l => l.a !== id && l.b !== id); S.bridges = S.bridges.filter(b => b.from !== id && b.to !== id); }
+const pruneBridges = () => { S.bridges = S.bridges.filter(b => { const a = S.notes[b.from], c = S.notes[b.to]; return a && c && nextSlot(a.slot) === c.slot; }); };
+
+// ---------- variants ----------
+const VARIANTS = {
+  A: { name: 'Palette + free layout', how: 'Click empty space in a slot → palette of that slot\'s chord / scale / other tones (octave from click height). Drag a note to move it; drag across the shaded edge strips to change zone. Hover a note → drag its small orange handle to another note to link (same slot) or bridge (exit → next entry). Click a link to select. Backspace deletes. ↑/↓ nudges pitch.' },
+  B: { name: 'Pitch axis · drag = connect', how: 'Height IS pitch: each row is a semitone (G3–C6), faint green/blue rows show the slot\'s chord/scale tones. Click an empty row in a zone column to add that pitch. Dragging a note always connects (link / bridge). Change zone with [ and ], pitch with ↑/↓ (Shift = octave). Backspace deletes.' },
+  C: { name: 'Keyboard + auto-stack', how: 'Click a slot (or a zone in it) to target it; press 1/2/3 to pick the zone; type note names (a–g focuses the box: "e4", "d5 f5 a5") + Enter, or click the piano strip. Notes stack by pitch automatically — no positions stored. Click a note to select (valid targets ring orange), Shift+click another to link/bridge (again to unlink). 1/2/3 moves a selected note between zones, ↑/↓ changes pitch.' },
+};
+const KEYS = Object.keys(VARIANTS);
+let V = new URLSearchParams(location.search).get('variant'); if (!VARIANTS[V]) V = 'A';
+const cT = { slot: 's1', zone: 'body' };
+
+// ---------- layout ----------
+const BARW = 300, EZ = 34, HEAD = 26, TOP = 10, RGAP = 22, PER = 4, PTOP = 84, PBOT = 55, RH = 12;
+const GUT = () => V === 'B' ? 40 : 14;
+const R = () => V === 'B' ? 11 : 15;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+let LAY;
+function layout() {
+  const rows = Math.ceil(S.bars.length / PER), rowH = [];
+  for (let r = 0; r < rows; r++) {
+    let h;
+    if (V === 'A') h = 210;
+    else if (V === 'B') h = HEAD + (PTOP - PBOT + 1) * RH + 8;
+    else {
+      let mx = 3;
+      for (const b of S.bars.slice(r * PER, (r + 1) * PER)) for (const sid of b) {
+        const c = { entry: 0, body: 0, exit: 0 }; for (const n of notesIn(sid)) c[n.zone]++;
+        mx = Math.max(mx, c.entry, c.body, c.exit);
+      }
+      h = Math.max(160, HEAD + 20 + mx * 28 + 6);
+    }
+    rowH.push(h);
+  }
+  let y = TOP; const rowY = [];
+  for (let r = 0; r < rows; r++) { rowY.push(y); y += rowH[r] + RGAP; }
+  const g = {};
+  S.bars.forEach((b, bi) => {
+    const r = Math.floor(bi / PER), bx = GUT() + (bi % PER) * BARW, w = BARW / b.length;
+    b.forEach((sid, k) => { g[sid] = { x: bx + k * w, y: rowY[r], w, h: rowH[r], row: r }; });
+  });
+  return { g, W: GUT() + PER * BARW + 70, H: y };
+}
+function pos(n) {
+  const s = LAY.g[n.slot];
+  const zx = n.zone === 'entry' ? s.x + EZ / 2 : n.zone === 'exit' ? s.x + s.w - EZ / 2 : null;
+  if (V === 'A') return { x: zx ?? s.x + clamp(n.rx, EZ + 15, s.w - EZ - 15), y: s.y + clamp(n.ry, HEAD + 16, s.h - 16) };
+  if (V === 'B') {
+    const y = s.y + HEAD + (PTOP - clamp(n.midi, PBOT, PTOP)) * RH + RH / 2;
+    if (zx != null) return { x: zx, y };
+    const body = notesIn(n.slot).filter(m => m.zone === 'body'), k = body.indexOf(n);
+    return { x: s.x + EZ + (s.w - 2 * EZ) * (k + 1) / (body.length + 1), y };
+  }
+  const col = notesIn(n.slot).filter(m => m.zone === n.zone).sort((a, b) => b.midi - a.midi), k = col.indexOf(n);
+  return { x: zx ?? s.x + s.w / 2 + (k % 2 ? 14 : -14), y: s.y + HEAD + 20 + k * 28 };
+}
+const zoneAt = (s, px) => { const rel = px - s.x; return rel < EZ ? 'entry' : rel > s.w - EZ ? 'exit' : 'body'; };
+
+// ---------- render ----------
+const svg = document.getElementById('svg'), content = document.getElementById('content');
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+let drag = null;
+function render() {
+  LAY = layout();
+  svg.setAttribute('width', LAY.W); svg.setAttribute('height', LAY.H);
+  let h = '';
+  const selNote = S.sel?.kind === 'note' ? S.notes[S.sel.id] : null;
+  // slots
+  for (const sid of order()) {
+    const s = LAY.g[sid], inf = info(S.slots[sid].chord), ns = notesIn(sid);
+    const dead = !ns.some(n => n.zone === 'entry') || !ns.some(n => n.zone === 'exit');
+    h += `<rect data-slot="${sid}" x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" fill="${dead ? '#fbf1df' : '#fff'}"/>`;
+    if (V === 'B' && inf.kind === 'ok') for (let m = PBOT; m <= PTOP; m++) {
+      const pc = mod(m), fill = inf.chord.has(pc) ? '#2e9e5b22' : inf.scale.has(pc) ? '#3a7bd512' : null;
+      if (fill) h += `<rect x="${s.x}" y="${s.y + HEAD + (PTOP - m) * RH}" width="${s.w}" height="${RH}" fill="${fill}" pointer-events="none"/>`;
+    }
+    if (V === 'B') for (let m = PBOT; m <= PTOP; m++) if (mod(m) === 0) h += `<line x1="${s.x}" x2="${s.x + s.w}" y1="${s.y + HEAD + (PTOP - m + 1) * RH}" y2="${s.y + HEAD + (PTOP - m + 1) * RH}" stroke="#0000001a" pointer-events="none"/>`;
+    h += `<rect x="${s.x}" y="${s.y + HEAD}" width="${EZ}" height="${s.h - HEAD}" fill="#0000000a" pointer-events="none"/>`;
+    h += `<rect x="${s.x + s.w - EZ}" y="${s.y + HEAD}" width="${EZ}" height="${s.h - HEAD}" fill="#0000000a" pointer-events="none"/>`;
+    h += `<text x="${s.x + EZ / 2}" y="${s.y + s.h - 4}" font-size="9" fill="#aaa" text-anchor="middle" pointer-events="none">in</text>`;
+    h += `<text x="${s.x + s.w - EZ / 2}" y="${s.y + s.h - 4}" font-size="9" fill="#aaa" text-anchor="middle" pointer-events="none">out</text>`;
+    if (drag?.kind === 'move' && S.notes[drag.id]?.slot === sid) {
+      const z = S.notes[drag.id].zone, zx = z === 'entry' ? s.x : z === 'exit' ? s.x + s.w - EZ : s.x + EZ, zw = z === 'body' ? s.w - 2 * EZ : EZ;
+      h += `<rect x="${zx}" y="${s.y + HEAD}" width="${zw}" height="${s.h - HEAD}" fill="#e67e2218" stroke="#e67e22" stroke-dasharray="4 3" pointer-events="none"/>`;
+    }
+    if (V === 'C' && cT.slot === sid) {
+      const z = cT.zone, zx = z === 'entry' ? s.x : z === 'exit' ? s.x + s.w - EZ : s.x + EZ, zw = z === 'body' ? s.w - 2 * EZ : EZ;
+      h += `<rect x="${s.x + 1}" y="${s.y + 1}" width="${s.w - 2}" height="${s.h - 2}" fill="none" stroke="#3a7bd5" stroke-width="2" pointer-events="none"/>`;
+      if (!selNote) h += `<rect x="${zx}" y="${s.y + HEAD}" width="${zw}" height="${s.h - HEAD}" fill="#3a7bd514" pointer-events="none"/>`;
+    }
+    const lab = S.slots[sid].chord || '—';
+    h += `<g data-label="${sid}" style="cursor:text"><rect x="${s.x}" y="${s.y}" width="${s.w}" height="${HEAD}" fill="transparent"/>
+      <text x="${s.x + 8}" y="${s.y + 18}" font-weight="700" font-size="14" fill="${inf.kind === 'bad' ? '#c0392b' : S.slots[sid].chord ? '#222' : '#bbb'}">${esc(lab)}</text>
+      ${inf.kind === 'ok' ? `<text x="${s.x + s.w - 6}" y="${s.y + 17}" text-anchor="end" font-size="10" fill="#999">${esc(inf.scaleName)}</text>` : ''}</g>`;
+  }
+  // bar lines + slot dividers + pitch gutter
+  S.bars.forEach((b, bi) => {
+    const s0 = LAY.g[b[0]], x0 = s0.x, x1 = x0 + BARW;
+    h += `<line x1="${x0}" x2="${x0}" y1="${s0.y}" y2="${s0.y + s0.h}" stroke="#333" stroke-width="2.5"/>`;
+    h += `<line x1="${x1}" x2="${x1}" y1="${s0.y}" y2="${s0.y + s0.h}" stroke="#333" stroke-width="2.5"/>`;
+    h += `<line x1="${x0}" x2="${x1}" y1="${s0.y}" y2="${s0.y}" stroke="#ccc"/><line x1="${x0}" x2="${x1}" y1="${s0.y + s0.h}" y2="${s0.y + s0.h}" stroke="#ccc"/>`;
+    if (b.length > 1) { const xd = LAY.g[b[1]].x; h += `<line x1="${xd}" x2="${xd}" y1="${s0.y}" y2="${s0.y + s0.h}" stroke="#aaa" stroke-dasharray="3 3"/>`; }
+    if (V === 'B' && bi % PER === 0) for (let m = PBOT; m <= PTOP; m++)
+      h += `<text x="${GUT() - 4}" y="${s0.y + HEAD + (PTOP - m) * RH + RH - 3}" font-size="8" text-anchor="end" fill="${mod(m) === 0 ? '#555' : '#aaa'}">${DEF[mod(m)]}${Math.floor(m / 12) - 1}</text>`;
+  });
+  // links
+  S.links.forEach((l, i) => {
+    const a = pos(S.notes[l.a]), b = pos(S.notes[l.b]), sel = S.sel?.kind === 'link' && S.sel.i === i;
+    h += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${sel ? '#e67e22' : '#666'}" stroke-width="${sel ? 3.5 : 2}"/>`;
+    h += `<line data-link="${i}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="transparent" stroke-width="10" style="cursor:pointer"/>`;
+  });
+  // bridges
+  S.bridges.forEach((br, i) => {
+    const na = S.notes[br.from], nb = S.notes[br.to], a = pos(na), b = pos(nb), sa = LAY.g[na.slot], sb = LAY.g[nb.slot];
+    const sel = S.sel?.kind === 'bridge' && S.sel.i === i, st = `stroke="${sel ? '#e67e22' : '#666'}" stroke-width="${sel ? 3.5 : 2}" stroke-dasharray="6 3"`;
+    const hit = (x1, y1, x2, y2) => `<line data-bridge="${i}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="transparent" stroke-width="10" style="cursor:pointer"/>`;
+    if (sa.row === sb.row && Math.abs(sa.x + sa.w - sb.x) < 1) {
+      h += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" ${st}/>` + hit(a.x, a.y, b.x, b.y);
+    } else { // row break or wrap → matching stubs
+      const ex = sa.x + sa.w + 14, sx = sb.x - 14;
+      h += `<line x1="${a.x}" y1="${a.y}" x2="${ex}" y2="${a.y}" ${st}/>` + hit(a.x, a.y, ex, a.y);
+      h += `<text x="${ex + 2}" y="${a.y + 3}" font-size="9" fill="#666">${nameOf(nb.midi, nb.slot).name}</text>`;
+      h += `<line x1="${sx}" y1="${b.y}" x2="${b.x}" y2="${b.y}" ${st}/>` + hit(sx, b.y, b.x, b.y);
+      h += `<text x="${sx - 2}" y="${b.y + 3}" font-size="9" fill="#666" text-anchor="end">${nameOf(na.midi, na.slot).name}</text>`;
+    }
+  });
+  // connect preview
+  const src = drag?.kind === 'connect' ? S.notes[drag.src] : V === 'C' ? selNote : null;
+  if (drag?.kind === 'connect' && drag.moved) { const a = pos(src); h += `<line x1="${a.x}" y1="${a.y}" x2="${drag.p.x}" y2="${drag.p.y}" stroke="#e67e22" stroke-width="2" stroke-dasharray="4 3" pointer-events="none"/>`; }
+  // notes
+  const r = R();
+  for (const n of Object.values(S.notes)) {
+    const p = pos(n), { name, role } = nameOf(n.midi, n.slot), sel = selNote === n;
+    const valid = src && (drag?.moved || V === 'C') && relation(src, n);
+    h += `<g class="note${sel ? ' sel' : ''}" data-note="${n.id}">`;
+    if (valid) h += `<circle cx="${p.x}" cy="${p.y}" r="${r + 5}" fill="#e67e2230" stroke="#e67e22" stroke-width="2"/>`;
+    if (sel) h += `<circle cx="${p.x}" cy="${p.y}" r="${r + 3}" fill="none" stroke="#111" stroke-width="2.5"/>`;
+    h += `<circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${COL[role]}" stroke="#fff" stroke-width="1.5"/>`;
+    h += `<text x="${p.x}" y="${p.y + (V === 'B' ? 3 : 3.5)}" font-size="${V === 'B' ? 8.5 : 10}" font-weight="700" fill="#fff" text-anchor="middle" pointer-events="none">${name}</text>`;
+    if (V === 'A') h += `<circle class="handle" data-handle="${n.id}" cx="${p.x + r * 0.8}" cy="${p.y - r * 0.8}" r="5" fill="#e67e22" stroke="#fff" stroke-width="1.5"/>`;
+    h += `</g>`;
+  }
+  content.innerHTML = h;
+  renderChrome();
+}
+function renderChrome() {
+  document.getElementById('banner').innerHTML = `<span class="tag">PROTOTYPE</span><b>${V} — ${VARIANTS[V].name}</b><div class="how">${VARIANTS[V].how}</div>`;
+  document.getElementById('vlabel').textContent = `${V} — ${VARIANTS[V].name}`;
+  // C panel
+  const cp = document.getElementById('cpanel');
+  cp.style.display = V === 'C' ? 'block' : 'none';
+  if (V === 'C') {
+    if (!S.slots[cT.slot]) cT.slot = order()[0];
+    const sid = cT.slot, inf = info(S.slots[sid].chord);
+    document.getElementById('ctarget').textContent = `Slot ${order().indexOf(sid) + 1} · ${S.slots[sid].chord || '(empty)'}`;
+    cp.querySelectorAll('.zb').forEach(b => b.classList.toggle('on', b.dataset.z === cT.zone));
+    let k = '';
+    for (let m = PBOT; m <= PTOP; m++) {
+      const { name, role } = nameOf(m, sid), black = [1, 3, 6, 8, 10].includes(mod(m));
+      const bg = role === 'chord' ? '#c9ecd6' : role === 'scale' ? '#cfe0f7' : '#fff';
+      k += `<div class="key ${black ? 'black' : ''} ${role}" data-midi="${m}" style="background:${bg}" title="${name}">${role === 'chord' || role === 'scale' || mod(m) === 0 ? name : ''}</div>`;
+    }
+    document.getElementById('keys').innerHTML = k;
+  }
+  // state readout
+  const sn = S.sel?.kind === 'note' ? S.notes[S.sel.id] : null;
+  let sel = 'nothing';
+  if (sn) { const { name, role } = nameOf(sn.midi, sn.slot); sel = `note ${name} (MIDI ${sn.midi}) · ${role} · ${sn.zone} · slot ${order().indexOf(sn.slot) + 1} ${S.slots[sn.slot].chord}`; }
+  else if (S.sel?.kind === 'link') { const l = S.links[S.sel.i]; sel = `link ${nameOf(S.notes[l.a].midi, S.notes[l.a].slot).name} — ${nameOf(S.notes[l.b].midi, S.notes[l.b].slot).name}`; }
+  else if (S.sel?.kind === 'bridge') { const b = S.bridges[S.sel.i]; sel = `bridge ${nameOf(S.notes[b.from].midi, S.notes[b.from].slot).name} → ${nameOf(S.notes[b.to].midi, S.notes[b.to].slot).name}`; }
+  const lines = order().map((sid, i) => {
+    const inf = info(S.slots[sid].chord);
+    const z = ['entry', 'body', 'exit'].map(zz => zz[0] + ':' + notesIn(sid).filter(n => n.zone === zz).sort((a, b) => a.midi - b.midi).map(n => nameOf(n.midi, sid).name).join(',')).join('  ');
+    return `${String(i + 1).padStart(2)} ${(S.slots[sid].chord || '—').padEnd(8)} ${(inf.kind === 'ok' ? inf.scaleName : inf.kind).padEnd(18)} ${z}`;
+  });
+  document.getElementById('state').textContent =
+    `selected: ${sel}\nlattice: ${Object.keys(S.notes).length} notes · ${S.links.length} links · ${S.bridges.length} bridges` +
+    (V === 'A' ? '   (A stores x/y per note)' : '   (no positions used in this variant)') + '\n\n' + lines.join('\n');
+}
+
+// ---------- interaction ----------
+const pt = e => { const r = svg.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+function hit(p) {
+  let best = null, bd = 1e9;
+  for (const n of Object.values(S.notes)) { const q = pos(n), d = Math.hypot(q.x - p.x, q.y - p.y); if (d < R() + 5 && d < bd) { bd = d; best = n; } }
+  return best;
+}
+svg.addEventListener('pointerdown', e => {
+  closePalette();
+  const t = e.target.closest('[data-handle],[data-note],[data-link],[data-bridge],[data-label],[data-slot]'), p = pt(e);
+  if (!t) { S.sel = null; render(); return; }
+  const d = t.dataset;
+  if (d.handle) { drag = { kind: 'connect', src: d.handle, p, start: p, moved: false }; S.sel = { kind: 'note', id: d.handle }; }
+  else if (d.note) {
+    const n = S.notes[d.note];
+    if (V === 'C') {
+      const cur = S.sel?.kind === 'note' && S.notes[S.sel.id];
+      if (e.shiftKey && cur) toggle(cur, n); else S.sel = { kind: 'note', id: n.id };
+      cT.slot = n.slot; render(); return;
+    }
+    if (V === 'B') drag = { kind: 'connect', src: n.id, p, start: p, moved: false };
+    if (V === 'A') drag = { kind: 'move', id: n.id, start: p, moved: false };
+    S.sel = { kind: 'note', id: n.id };
+  }
+  else if (d.link !== undefined) S.sel = { kind: 'link', i: +d.link };
+  else if (d.bridge !== undefined) S.sel = { kind: 'bridge', i: +d.bridge };
+  else if (d.label) { editChord(d.label); return; }
+  else if (d.slot) { slotClick(d.slot, p); return; }
+  if (drag) svg.setPointerCapture(e.pointerId);
+  render();
+});
+svg.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const p = pt(e);
+  if (Math.hypot(p.x - drag.start.x, p.y - drag.start.y) > 3) drag.moved = true;
+  if (!drag.moved) return;
+  if (drag.kind === 'move') {
+    const n = S.notes[drag.id], s = LAY.g[n.slot];
+    const x = clamp(p.x, s.x + 1, s.x + s.w - 1);
+    n.rx = x - s.x; n.ry = p.y - s.y;
+    setZone(n, zoneAt(s, x));
+  } else drag.p = p;
+  render();
+});
+svg.addEventListener('pointerup', e => {
+  if (!drag) return;
+  if (drag.kind === 'connect' && drag.moved) { const t = hit(pt(e)), s = S.notes[drag.src]; if (t && s) toggle(s, t); }
+  drag = null; render();
+});
+function slotClick(sid, p) {
+  const s = LAY.g[sid], zone = zoneAt(s, p.x);
+  if (V === 'A') {
+    const f = (p.y - s.y - HEAD) / (s.h - HEAD);
+    openPalette(sid, zone, f < 0.33 ? 5 : f < 0.66 ? 4 : 3, p);
+  } else if (V === 'B') {
+    const midi = PTOP - Math.floor((p.y - s.y - HEAD) / RH);
+    if (p.y > s.y + HEAD && midi >= PBOT && midi <= PTOP) S.sel = { kind: 'note', id: add(sid, zone, midi) };
+    else S.sel = null;
+    render();
+  } else { cT.slot = sid; cT.zone = zone; S.sel = null; render(); }
+}
+
+// palette (A)
+let pal = null;
+function closePalette() { pal?.remove(); pal = null; }
+function openPalette(sid, zone, oct, p) {
+  closePalette();
+  const s = LAY.g[sid];
+  pal = document.createElement('div'); pal.className = 'palette';
+  pal.style.left = Math.min(p.x, LAY.W - 280) + 'px'; pal.style.top = (p.y + 8) + 'px';
+  const draw = () => {
+    const groups = { chord: [], scale: [], passing: [], grey: [] };
+    for (let m = (oct + 1) * 12; m < (oct + 2) * 12; m++) { const nn = nameOf(m, sid); groups[nn.role].push([m, nn.name]); }
+    const row = (k, label) => groups[k].length ? `<div class="row"><div class="lbl">${label}</div>${groups[k].map(([m, nm]) => `<button class="chip" data-m="${m}" style="background:${COL[k]}">${nm}</button>`).join('')}</div>` : '';
+    pal.innerHTML = `<h4><span>Add to <i>${zone}</i> · ${esc(S.slots[sid].chord || 'empty')}</span>
+      <span><button class="octbtn" data-o="-1">‹</button> oct ${oct} <button class="octbtn" data-o="1">›</button></span></h4>
+      ${row('chord', 'chord tones')}${row('scale', 'scale tones')}${row('passing', 'other')}${row('grey', 'no chord — uncoloured')}`;
+  };
+  draw();
+  pal.addEventListener('pointerdown', e => e.stopPropagation());
+  pal.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.o) { oct = clamp(oct + +b.dataset.o, 1, 7); draw(); return; }
+    S.sel = { kind: 'note', id: add(sid, zone, +b.dataset.m, p.x - s.x, p.y - s.y) };
+    closePalette(); render();
+  });
+  document.getElementById('wrap').appendChild(pal);
+}
+
+// chord editing (shared)
+let editing = null;
+function editChord(sid) {
+  if (editing) editing.commit();
+  const s = LAY.g[sid], inp = document.createElement('input');
+  inp.className = 'chordInput'; inp.value = S.slots[sid].chord;
+  Object.assign(inp.style, { left: s.x + 2 + 'px', top: s.y + 1 + 'px', width: s.w - 4 + 'px' });
+  let done = false;
+  const finish = (save, move) => {
+    if (done) return; done = true; editing = null;
+    if (save) {
+      const parts = inp.value.trim().split(/\s+/).filter(Boolean), bar = S.bars.find(b => b.includes(sid));
+      if (parts.length >= 2 && bar.length === 1) { const ns = 's' + (++sidN); S.slots[sid].chord = parts[0]; S.slots[ns] = { chord: parts[1] }; bar.push(ns); pruneBridges(); }
+      else S.slots[sid].chord = inp.value.trim();
+    }
+    inp.remove(); render();
+    if (move) { const o = order(), i = o.indexOf(sid) + move; if (i >= 0 && i < o.length) editChord(o[i]); }
+  };
+  editing = { commit: () => finish(true, 0) };
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); finish(true, e.shiftKey ? -1 : 1); }
+    else if (e.key === 'Escape') finish(false, 0);
+  });
+  inp.addEventListener('blur', () => finish(true, 0));
+  document.getElementById('wrap').appendChild(inp); inp.focus(); inp.select();
+}
+
+// C panel
+document.querySelectorAll('#cpanel .zb').forEach(b => b.addEventListener('click', () => { cT.zone = b.dataset.z; render(); }));
+document.getElementById('keys').addEventListener('click', e => { const k = e.target.closest('.key'); if (k) { add(cT.slot, cT.zone, +k.dataset.midi); render(); } });
+const cinput = document.getElementById('cinput');
+cinput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const ms = cinput.value.split(/[\s,]+/).filter(Boolean).map(parseNote);
+    if (ms.every(m => m != null)) { ms.forEach(m => add(cT.slot, cT.zone, m)); cinput.value = ''; S.sel = null; render(); }
+    else cinput.style.outline = '2px solid #c0392b', setTimeout(() => cinput.style.outline = '', 600);
+  } else if (e.key === 'Escape') cinput.blur();
+});
+
+// keyboard
+document.addEventListener('keydown', e => {
+  if (e.target.closest('input,textarea,[contenteditable]')) return;
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); cycle(e.key === 'ArrowLeft' ? -1 : 1); return; }
+  if (e.key === 'Escape') { closePalette(); S.sel = null; render(); return; }
+  if (e.key === 'Backspace' || e.key === 'Delete') {
+    e.preventDefault();
+    if (S.sel?.kind === 'note') delNote(S.sel.id);
+    else if (S.sel?.kind === 'link') S.links.splice(S.sel.i, 1);
+    else if (S.sel?.kind === 'bridge') S.bridges.splice(S.sel.i, 1);
+    S.sel = null; render(); return;
+  }
+  const n = S.sel?.kind === 'note' ? S.notes[S.sel.id] : null;
+  if (n && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); n.midi += (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 12 : 1); render(); return; }
+  if (V === 'B' && n && (e.key === '[' || e.key === ']')) { const zs = ['entry', 'body', 'exit'], i = zs.indexOf(n.zone) + (e.key === ']' ? 1 : -1); if (i >= 0 && i < 3) setZone(n, zs[i]); render(); return; }
+  if (V === 'C' && ['1', '2', '3'].includes(e.key)) { const z = ['entry', 'body', 'exit'][+e.key - 1]; if (n) setZone(n, z); else cT.zone = z; render(); return; }
+  if (V === 'C' && /^[a-g]$/i.test(e.key) && !e.metaKey && !e.ctrlKey) cinput.focus();
+});
+
+// switcher
+function cycle(d) {
+  V = KEYS[(KEYS.indexOf(V) + d + KEYS.length) % KEYS.length];
+  history.replaceState(null, '', '?variant=' + V);
+  closePalette(); drag = null; render();
+}
+document.getElementById('prev').onclick = () => cycle(-1);
+document.getElementById('next').onclick = () => cycle(1);
+render();
+</script>
+</body>
+</html>

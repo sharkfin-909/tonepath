@@ -1,0 +1,309 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway. Ticket "Lattice editing interaction" (issues/008), round 3 (round 2 = index-v2-spread.html).
+  Round 3: octave shown by column inside each slot, octave numbers dropped from notes.
+  Variant C from round 1 (index-v1-abc.html) won; this round applies the user's changes:
+  no links/bridges, no zones (one area per slot), crowded slots spread notes sideways,
+  click to audition (plain Web Audio sine), keyboard strip 3x taller.
+  No persistence, no tests, simplified theory (small chord table, fixed scale per quality).
+  Run: open index.html
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<title>PROTOTYPE — Lattice editing (round 3)</title>
+<style>
+  body { margin: 0; font: 13px system-ui, sans-serif; background: #f4f3ef; color: #222; padding-bottom: 40px; }
+  #banner { padding: 8px 16px; background: #fffbe6; border-bottom: 1px solid #e5d9a8; }
+  #banner .tag { background: #c0392b; color: #fff; font-weight: 700; padding: 1px 6px; border-radius: 3px; margin-right: 8px; font-size: 11px; }
+  #banner .how { color: #555; margin-top: 3px; }
+  #wrap { position: relative; margin: 12px 16px; width: max-content; }
+  svg { background: #fff; border: 1px solid #ddd; display: block; user-select: none; }
+  g.note { cursor: pointer; }
+  .chordInput { position: absolute; font: 700 14px system-ui; padding: 2px 4px; border: 2px solid #3a7bd5; border-radius: 4px; z-index: 6; box-sizing: border-box; }
+  #cpanel { margin: 0 16px 12px; background: #fff; border: 1px solid #ddd; padding: 8px 10px; width: max-content; }
+  #keys { display: flex; margin-top: 8px; user-select: none; }
+  .key { width: 34px; height: 168px; border: 1px solid #999; margin-right: -1px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; font-size: 11px; font-weight: 600; cursor: pointer; padding-bottom: 6px; box-sizing: border-box; gap: 4px; }
+  .key.black { height: 112px; background: #333 !important; color: #fff; border-color: #333; }
+  .key.black.chord { box-shadow: inset 0 -8px 0 #2e9e5b; } .key.black.scale { box-shadow: inset 0 -8px 0 #3a7bd5; }
+  .key .dot { width: 12px; height: 12px; border-radius: 50%; background: #111; }
+  .key.black .dot { background: #fff; }
+  .key:hover { outline: 2px solid #e67e22; z-index: 1; }
+  #cinput { font: 14px ui-monospace, monospace; padding: 3px 6px; width: 240px; margin-left: 10px; }
+  #state { margin: 0 16px; background: #fff; border: 1px solid #ddd; padding: 8px 10px; font: 12px ui-monospace, monospace; white-space: pre-wrap; width: max-content; }
+</style>
+</head>
+<body>
+<div id="banner"><span class="tag">PROTOTYPE</span><b>Round 3 — one column per octave, no octave numbers on notes</b> <span style="color:#888">(faint numbers at the foot of each column are the octave)</span>
+  <div class="how">Click a slot to target it (or <b>[</b> / <b>]</b>). Add notes by typing (a–g focuses the box: <code>e4</code>, <code>d5 f5 a5</code>) + Enter, or click the piano strip — a key toggles that pitch in the slot (dot = already there). Click a note to hear it and select it; ↑/↓ moves its pitch (Shift = octave); Backspace deletes. Click a chord label to type a chord (Tab = next slot; <code>Dm7 G7</code> splits a bar).</div>
+</div>
+<div id="wrap"><svg id="svg"><g id="content"></g></svg></div>
+<div id="cpanel">
+  <div><b id="ctarget"></b><input id="cinput" placeholder="type E4  or  d5 f5 a5  then Enter" autocomplete="off"></div>
+  <div id="keys"></div>
+</div>
+<div id="state"></div>
+
+<script>
+// ---------- theory (simplified, prototype-grade; same as round 1) ----------
+const LET = 'CDEFGAB', LPC = [0, 2, 4, 5, 7, 9, 11];
+const DEF = ['C','C#','D','Eb','E','F','F#','G','Ab','A','Bb','B'];
+const SHARP = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const FLAT = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+const COL = { chord: '#2e9e5b', scale: '#3a7bd5', passing: '#8b5a2b', grey: '#9a9a9a' };
+const mod = x => ((x % 12) + 12) % 12;
+const SC = {
+  ionian: ['Ionian', [[0,0],[2,1],[4,2],[5,3],[7,4],[9,5],[11,6]]],
+  dorian: ['Dorian', [[0,0],[2,1],[3,2],[5,3],[7,4],[9,5],[10,6]]],
+  mixolydian: ['Mixolydian', [[0,0],[2,1],[4,2],[5,3],[7,4],[9,5],[10,6]]],
+  locrian: ['Locrian', [[0,0],[1,1],[3,2],[5,3],[6,4],[8,5],[10,6]]],
+  lydian: ['Lydian', [[0,0],[2,1],[4,2],[6,3],[7,4],[9,5],[11,6]]],
+  halfwhole: ['half-whole', [[0,0],[1,1],[3,1],[4,2],[6,3],[7,4],[9,5],[10,6]]],
+  wholehalf: ['whole-half', [[0,0],[2,1],[3,2],[5,3],[6,4],[8,5],[9,5],[11,6]]],
+  altered: ['altered', [[0,0],[1,1],[3,1],[4,2],[6,4],[8,5],[10,6]]],
+};
+const T = { R:[0,0], m3:[3,2], M3:[4,2], P4:[5,3], P5:[7,4], d5:[6,4], A5:[8,4], M6:[9,5], m7:[10,6], M7:[11,6], d7:[9,6], M9:[2,1], b9:[1,1], s9:[3,1], s11:[6,3], M13:[9,5] };
+const Q = {
+  '': [['R','M3','P5'], 'ionian'], m: [['R','m3','P5'], 'dorian'],
+  '7': [['R','M3','P5','m7'], 'mixolydian'], maj7: [['R','M3','P5','M7'], 'ionian'],
+  m7: [['R','m3','P5','m7'], 'dorian'], m7b5: [['R','m3','d5','m7'], 'locrian'],
+  dim7: [['R','m3','d5','d7'], 'wholehalf'], dim: [['R','m3','d5'], 'wholehalf'],
+  '6': [['R','M3','P5','M6'], 'ionian'], m6: [['R','m3','P5','M6'], 'dorian'],
+  '9': [['R','M3','P5','m7','M9'], 'mixolydian'], m9: [['R','m3','P5','m7','M9'], 'dorian'],
+  maj9: [['R','M3','P5','M7','M9'], 'ionian'], '13': [['R','M3','P5','m7','M9','M13'], 'mixolydian'],
+  '7b9': [['R','M3','P5','m7','b9'], 'halfwhole'], '7#9': [['R','M3','P5','m7','s9'], 'halfwhole'],
+  '7alt': [['R','M3','A5','m7','s9'], 'altered'], 'maj7#11': [['R','M3','P5','M7','s11'], 'lydian'],
+  sus4: [['R','P4','P5'], 'mixolydian'], '7sus4': [['R','P4','P5','m7'], 'mixolydian'],
+};
+const AL = { '-':'m', min:'m', '-7':'m7', min7:'m7', M7:'maj7', 'Δ':'maj7', 'Δ7':'maj7', ma7:'maj7', 'ø':'m7b5', 'ø7':'m7b5', '-7b5':'m7b5', o:'dim', '°':'dim', o7:'dim7', '°7':'dim7', alt:'7alt', sus:'sus4', '-9':'m9', M:'', maj:'' };
+const acc = s => s === '#' ? 1 : s === 'b' ? -1 : 0;
+const fromName = n => { const L = LET.indexOf(n[0]); const a = n.length > 1 ? acc(n[1]) : 0; return { pc: mod(LPC[L] + a), L, a }; };
+function spell(rl, ra, s, d) {
+  const L = (rl + d) % 7, pc = mod(LPC[rl] + ra + s);
+  const a = mod(pc - LPC[L] + 6) - 6;
+  return Math.abs(a) > 1 ? fromName(DEF[pc]) : { pc, L, a };
+}
+const infoCache = {};
+function info(sym) {
+  const s = (sym || '').trim();
+  if (s in infoCache) return infoCache[s];
+  let r;
+  if (!s) r = { kind: 'empty' };
+  else if (/^n\.?c\.?$/i.test(s)) r = { kind: 'nc' };
+  else {
+    const m = /^([A-G])([#b]?)([^\/\s]*)(?:\/([A-G])([#b]?))?$/.exec(s);
+    const q = m ? (m[3] in AL ? AL[m[3]] : m[3]) : null;
+    if (!m || !Q[q]) r = { kind: 'bad' };
+    else {
+      const rl = LET.indexOf(m[1]), ra = acc(m[2]), chord = new Map(), scale = new Map();
+      for (const k of Q[q][0]) { const sp = spell(rl, ra, ...T[k]); chord.set(sp.pc, sp); }
+      if (m[4]) { const bl = LET.indexOf(m[4]), ba = acc(m[5]), pc = mod(LPC[bl] + ba); if (!chord.has(pc)) chord.set(pc, { pc, L: bl, a: ba }); }
+      const [sname, ivs] = SC[Q[q][1]];
+      for (const iv of ivs) { const sp = spell(rl, ra, ...iv); if (!scale.has(sp.pc)) scale.set(sp.pc, sp); }
+      let f = 0, sh = 0; for (const sp of scale.values()) { if (sp.a < 0) f++; if (sp.a > 0) sh++; }
+      r = { kind: 'ok', chord, scale, lean: f > sh ? FLAT : sh > f ? SHARP : DEF, scaleName: m[1] + m[2] + ' ' + sname };
+    }
+  }
+  return (infoCache[s] = r);
+}
+function nameOf(midi, sid) {
+  const inf = info(S.slots[sid].chord), pc = mod(midi);
+  let sp, role;
+  if (inf.kind !== 'ok') { role = 'grey'; sp = fromName(DEF[pc]); }
+  else if (inf.chord.has(pc)) { role = 'chord'; sp = inf.chord.get(pc); }
+  else if (inf.scale.has(pc)) { role = 'scale'; sp = inf.scale.get(pc); }
+  else { role = 'passing'; sp = fromName(inf.lean[pc]); }
+  const oct = Math.round((midi - sp.a - LPC[sp.L]) / 12) - 1;
+  const letter = LET[sp.L] + (sp.a > 0 ? '#' : sp.a < 0 ? 'b' : '');
+  return { name: letter + oct, letter, oct, role };
+}
+function parseNote(t) {
+  const m = /^([a-g])([#b]?)(-?\d)$/i.exec(t.trim()); if (!m) return null;
+  return (+m[3] + 1) * 12 + LPC[LET.indexOf(m[1].toUpperCase())] + acc(m[2]);
+}
+
+// ---------- audio: plain sine, no library ----------
+let ac = null;
+function play(midi, delay = 0) {
+  ac ??= new AudioContext();
+  const t = ac.currentTime + delay, o = ac.createOscillator(), g = ac.createGain();
+  o.type = 'sine'; o.frequency.value = 440 * 2 ** ((midi - 69) / 12);
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.25, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+  o.connect(g).connect(ac.destination); o.start(t); o.stop(t + 0.95);
+}
+
+// ---------- model: a slot is just a set of pitches ----------
+const S = {
+  bars: [['s1'], ['s2'], ['s3'], ['s4', 's5'], ['s6'], ['s7'], ['s8'], ['s9']],
+  slots: { s1: { chord: 'Dm7' }, s2: { chord: 'G7' }, s3: { chord: 'Cmaj7' }, s4: { chord: 'Em7' }, s5: { chord: 'A7' }, s6: { chord: 'Dm7' }, s7: { chord: 'G7alt' }, s8: { chord: 'Cmaj7' }, s9: { chord: 'N.C.' } },
+  notes: {}, sel: null,
+};
+let nid = 0, sidN = 9;
+const has = (slot, midi) => Object.values(S.notes).some(n => n.slot === slot && n.midi === midi);
+const add = (slot, midi) => { if (has(slot, midi)) return null; const id = 'n' + (++nid); S.notes[id] = { id, slot, midi }; return id; };
+// seed: G7 and A7 deliberately crowded to show sideways spreading
+[['s1', [62, 65, 69, 72, 76]], ['s2', [67, 71, 74, 77, 79, 81, 69, 64, 76]], ['s3', [64, 67, 71, 69]],
+ ['s4', [64, 67]], ['s5', [61, 64, 67, 69, 73, 76, 66]], ['s6', [65]], ['s7', [68, 70, 73]], ['s9', [70]]]
+  .forEach(([s, ms]) => ms.forEach(m => add(s, m)));
+const order = () => S.bars.flat();
+const notesIn = sid => Object.values(S.notes).filter(n => n.slot === sid);
+const cT = { slot: 's1' };
+
+// ---------- layout ----------
+const BARW = 300, HEAD = 26, TOP = 10, RGAP = 18, PER = 4, ROWH = 200, R = 15, PAD = 20, PBOT = 55, PTOP = 84;
+let LAY;
+function layout() {
+  const g = {}, rows = Math.ceil(S.bars.length / PER);
+  S.bars.forEach((b, bi) => {
+    const r = Math.floor(bi / PER), bx = 14 + (bi % PER) * BARW, w = BARW / b.length, y = TOP + r * (ROWH + RGAP);
+    b.forEach((sid, k) => { g[sid] = { x: bx + k * w, y, w, h: ROWH }; });
+  });
+  // positions: one column per octave (same columns in every slot, low → high left → right);
+  // inside a column notes stack bottom-up by pitch; if they'd overlap, squeeze and zigzag sideways.
+  // Octave = the spelled name's octave, so B#3 sits in column 3 and Cb4 in column 4.
+  const octs = new Set([3, 4, 5]);
+  for (const n of Object.values(S.notes)) octs.add(nameOf(n.midi, n.slot).oct);
+  const cols = [...octs].sort((a, b) => a - b), p = {};
+  for (const sid of order()) {
+    const s = g[sid], cw = s.w / cols.length, bottom = s.y + s.h - PAD - 8, top = s.y + HEAD + PAD - 4, avail = bottom - top;
+    cols.forEach((o, c) => {
+      const ns = notesIn(sid).filter(n => nameOf(n.midi, sid).oct === o).sort((a, b) => a.midi - b.midi), k = ns.length;
+      const dy = k > 1 ? Math.min(30, avail / (k - 1)) : 0, tight = dy < 2 * R + 2, off = Math.max(0, Math.min(cw / 2 - R - 2, 11));
+      ns.forEach((note, i) => { p[note.id] = { x: s.x + cw * (c + 0.5) + (tight ? (i % 2 ? off : -off) : 0), y: bottom - i * dy }; });
+    });
+  }
+  g.cols = cols;
+  return { g, p, W: 14 + PER * BARW + 14, H: TOP + rows * (ROWH + RGAP) - RGAP + TOP };
+}
+
+// ---------- render ----------
+const svg = document.getElementById('svg'), content = document.getElementById('content');
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function render() {
+  LAY = layout();
+  svg.setAttribute('width', LAY.W); svg.setAttribute('height', LAY.H);
+  let h = '';
+  const selNote = S.sel ? S.notes[S.sel] : null;
+  for (const sid of order()) {
+    const s = LAY.g[sid], inf = info(S.slots[sid].chord), lab = S.slots[sid].chord || '—';
+    h += `<rect data-slot="${sid}" x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" fill="#fff"/>`;
+    const cw = s.w / LAY.g.cols.length;
+    LAY.g.cols.forEach((o, c) => {
+      if (c) h += `<line x1="${s.x + c * cw}" x2="${s.x + c * cw}" y1="${s.y + HEAD + 4}" y2="${s.y + s.h - 4}" stroke="#0000001c" stroke-dasharray="2 4" pointer-events="none"/>`;
+      h += `<text x="${s.x + cw * (c + 0.5)}" y="${s.y + s.h - 5}" font-size="9" fill="#bbb" text-anchor="middle" pointer-events="none">${o}</text>`;
+    });
+    if (cT.slot === sid) h += `<rect x="${s.x + 1.5}" y="${s.y + 1.5}" width="${s.w - 3}" height="${s.h - 3}" fill="#3a7bd50c" stroke="#3a7bd5" stroke-width="2" pointer-events="none"/>`;
+    h += `<g data-label="${sid}" style="cursor:text"><rect x="${s.x}" y="${s.y}" width="${s.w}" height="${HEAD}" fill="transparent"/>
+      <text x="${s.x + 8}" y="${s.y + 18}" font-weight="700" font-size="14" fill="${inf.kind === 'bad' ? '#c0392b' : S.slots[sid].chord ? '#222' : '#bbb'}">${esc(lab)}</text>
+      ${inf.kind === 'ok' ? `<text x="${s.x + s.w - 6}" y="${s.y + 17}" text-anchor="end" font-size="10" fill="#999">${esc(inf.scaleName)}</text>` : ''}</g>`;
+  }
+  S.bars.forEach(b => {
+    const s0 = LAY.g[b[0]], x0 = s0.x, x1 = x0 + BARW;
+    h += `<line x1="${x0}" x2="${x0}" y1="${s0.y}" y2="${s0.y + s0.h}" stroke="#333" stroke-width="2.5"/><line x1="${x1}" x2="${x1}" y1="${s0.y}" y2="${s0.y + s0.h}" stroke="#333" stroke-width="2.5"/>`;
+    h += `<line x1="${x0}" x2="${x1}" y1="${s0.y}" y2="${s0.y}" stroke="#ccc"/><line x1="${x0}" x2="${x1}" y1="${s0.y + s0.h}" y2="${s0.y + s0.h}" stroke="#ccc"/>`;
+    if (b.length > 1) { const xd = LAY.g[b[1]].x; h += `<line x1="${xd}" x2="${xd}" y1="${s0.y}" y2="${s0.y + s0.h}" stroke="#aaa" stroke-dasharray="3 3"/>`; }
+  });
+  for (const n of Object.values(S.notes)) {
+    const p = LAY.p[n.id], { letter, role } = nameOf(n.midi, n.slot);
+    h += `<g class="note" data-note="${n.id}">`;
+    if (selNote === n) h += `<circle cx="${p.x}" cy="${p.y}" r="${R + 3}" fill="none" stroke="#111" stroke-width="2.5"/>`;
+    h += `<circle cx="${p.x}" cy="${p.y}" r="${R}" fill="${COL[role]}" stroke="#fff" stroke-width="1.5"/>`;
+    h += `<text x="${p.x}" y="${p.y + 3.5}" font-size="12" font-weight="700" fill="#fff" text-anchor="middle" pointer-events="none">${letter}</text></g>`;
+  }
+  content.innerHTML = h;
+  renderPanel();
+}
+function renderPanel() {
+  if (!S.slots[cT.slot]) cT.slot = order()[0];
+  const sid = cT.slot;
+  document.getElementById('ctarget').textContent = `Slot ${order().indexOf(sid) + 1} · ${S.slots[sid].chord || '(empty)'}`;
+  let k = '';
+  for (let m = PBOT; m <= PTOP; m++) {
+    const { name, role } = nameOf(m, sid), black = [1, 3, 6, 8, 10].includes(mod(m));
+    const bg = role === 'chord' ? '#c9ecd6' : role === 'scale' ? '#cfe0f7' : '#fff';
+    k += `<div class="key ${black ? 'black' : ''} ${role}" data-midi="${m}" style="background:${bg}" title="${name}">${has(sid, m) ? '<span class="dot"></span>' : ''}<span>${role === 'chord' || role === 'scale' || mod(m) === 0 ? name : ''}</span></div>`;
+  }
+  document.getElementById('keys').innerHTML = k;
+  const sn = S.sel ? S.notes[S.sel] : null;
+  const sel = sn ? (() => { const { name, role } = nameOf(sn.midi, sn.slot); return `note ${name} (MIDI ${sn.midi}) · ${role} · slot ${order().indexOf(sn.slot) + 1} ${S.slots[sn.slot].chord}`; })() : 'nothing';
+  const lines = order().map((sid, i) => {
+    const inf = info(S.slots[sid].chord);
+    const ns = notesIn(sid).sort((a, b) => a.midi - b.midi).map(n => nameOf(n.midi, sid).name).join(' ');
+    return `${String(i + 1).padStart(2)} ${(S.slots[sid].chord || '—').padEnd(8)} ${(inf.kind === 'ok' ? inf.scaleName : inf.kind).padEnd(18)} ${ns}`;
+  });
+  document.getElementById('state').textContent = `selected: ${sel}\nlattice: ${Object.keys(S.notes).length} notes (stored: slot + MIDI pitch only)\n\n` + lines.join('\n');
+}
+
+// ---------- interaction ----------
+svg.addEventListener('pointerdown', e => {
+  const t = e.target.closest('[data-note],[data-label],[data-slot]');
+  if (!t) { S.sel = null; render(); return; }
+  const d = t.dataset;
+  if (d.note) { const n = S.notes[d.note]; S.sel = n.id; cT.slot = n.slot; play(n.midi); }
+  else if (d.label) { editChord(d.label); return; }
+  else if (d.slot) { cT.slot = d.slot; S.sel = null; }
+  render();
+});
+
+let editing = null;
+function editChord(sid) {
+  if (editing) editing.commit();
+  cT.slot = sid;
+  const s = LAY.g[sid], inp = document.createElement('input');
+  inp.className = 'chordInput'; inp.value = S.slots[sid].chord;
+  Object.assign(inp.style, { left: s.x + 2 + 'px', top: s.y + 1 + 'px', width: s.w - 4 + 'px' });
+  let done = false;
+  const finish = (save, move) => {
+    if (done) return; done = true; editing = null;
+    if (save) {
+      const parts = inp.value.trim().split(/\s+/).filter(Boolean), bar = S.bars.find(b => b.includes(sid));
+      if (parts.length >= 2 && bar.length === 1) { const ns = 's' + (++sidN); S.slots[sid].chord = parts[0]; S.slots[ns] = { chord: parts[1] }; bar.push(ns); }
+      else S.slots[sid].chord = inp.value.trim();
+    }
+    inp.remove(); render();
+    if (move) { const o = order(), i = o.indexOf(sid) + move; if (i >= 0 && i < o.length) editChord(o[i]); }
+  };
+  editing = { commit: () => finish(true, 0) };
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); finish(true, e.shiftKey ? -1 : 1); }
+    else if (e.key === 'Escape') finish(false, 0);
+  });
+  inp.addEventListener('blur', () => finish(true, 0));
+  render(); document.getElementById('wrap').appendChild(inp); inp.focus(); inp.select();
+}
+
+document.getElementById('keys').addEventListener('pointerdown', e => {
+  const k = e.target.closest('.key'); if (!k) return;
+  const m = +k.dataset.midi, existing = Object.values(S.notes).find(n => n.slot === cT.slot && n.midi === m);
+  play(m);
+  if (existing) { delete S.notes[existing.id]; if (S.sel === existing.id) S.sel = null; }
+  else add(cT.slot, m);
+  render();
+});
+const cinput = document.getElementById('cinput');
+cinput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const ms = cinput.value.split(/[\s,]+/).filter(Boolean).map(parseNote);
+    if (ms.length && ms.every(m => m != null)) { ms.forEach((m, i) => { add(cT.slot, m); play(m, i * 0.15); }); cinput.value = ''; S.sel = null; render(); }
+    else { cinput.style.outline = '2px solid #c0392b'; setTimeout(() => cinput.style.outline = '', 600); }
+  } else if (e.key === 'Escape') cinput.blur();
+});
+
+document.addEventListener('keydown', e => {
+  if (e.target.closest('input,textarea,[contenteditable]')) return;
+  if (e.key === 'Escape') { S.sel = null; render(); return; }
+  if (e.key === '[' || e.key === ']') { const o = order(), i = o.indexOf(cT.slot) + (e.key === ']' ? 1 : -1); cT.slot = o[(i + o.length) % o.length]; S.sel = null; render(); return; }
+  if ((e.key === 'Backspace' || e.key === 'Delete') && S.sel) { e.preventDefault(); delete S.notes[S.sel]; S.sel = null; render(); return; }
+  const n = S.sel ? S.notes[S.sel] : null;
+  if (n && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+    e.preventDefault();
+    const m = n.midi + (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 12 : 1);
+    if (!has(n.slot, m)) { n.midi = m; play(m); render(); }
+    return;
+  }
+  if (/^[a-g]$/i.test(e.key) && !e.metaKey && !e.ctrlKey) cinput.focus();
+});
+render();
+</script>
+</body>
+</html>

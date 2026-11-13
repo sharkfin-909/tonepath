@@ -1,0 +1,288 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway. Ticket "VexFlow notation spike" (issues/040).
+  Question: does VexFlow 5 (vexflow/core + Bravura) handle Honeycomb's in-slot staves at real scale?
+  Proves (checklist in the side panel, measured live):
+    1 slice fidelity (one melody, half-bar slots)     5 chord/scale chrome above the stave, bar vs slot lines
+    2 five durations + beams at full / half width     6 ~32 bars × split slots redraw time on edit
+    3 written view (Concert vs B♭ / E♭ / bass clef)   7 Bravura loaded before first paint
+    4 out-of-scale + out-of-range marks (setStyle)    8 caret cue beside notes, click a note to select it
+  Also: clef gutter outside the slots (Clef policy), auto-zoom with a 5px staff-gap floor (Whole-screen layout).
+  Loads vexflow@5.0.0 core from jsDelivr (ESM) and Bravura/Academico via VexFlow.loadFonts — needs network.
+  Spelling here is a simplified stand-in for tonal (same rules as earlier prototypes).
+  Run: serve prototypes/ (e.g. python3 -m http.server) and open /vexflow-spike/index.html
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<title>PROTOTYPE — VexFlow notation spike</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { font: 13px system-ui, sans-serif; background: #eceae4; color: #222; display: flex; flex-direction: column; overflow: hidden; }
+  #bar { flex: none; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 6px 12px; background: #fffbe6; border-bottom: 1px solid #e5d9a8; }
+  #bar .tag { background: #c0392b; color: #fff; font-weight: 700; padding: 1px 6px; border-radius: 3px; font-size: 11px; }
+  .btn { font: 600 12px system-ui; height: 28px; border: 1px solid #aaa; background: #fff; border-radius: 4px; cursor: pointer; padding: 0 9px; }
+  #body { flex: 1; display: flex; min-height: 0; }
+  #rail { width: 128px; flex: none; background: #fff; border-right: 1px solid #ccc; color: #aaa; font-size: 11px; padding: 8px; }
+  #main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #chartWrap { flex: 1 1 50%; overflow: auto; background: #fff; position: relative; }
+  #dock { flex: 1 1 50%; background: #d9d6ce; border-top: 2px solid #999; display: flex; align-items: center; justify-content: center; color: #8a877f; }
+  #loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 15px; color: #888; }
+  .row { display: grid; border-bottom: 1px solid #999; }
+  .gutter { position: relative; }
+  .slot { position: relative; border-right: 1px dashed #bbb; min-width: 0; cursor: text; }
+  .slot.barEnd { border-right: 2.5px solid #333; }
+  .slot.active { background: #eef4fd; }
+  .slot .sh { display: flex; gap: 6px; align-items: baseline; padding: 2px 6px 0; white-space: nowrap; overflow: hidden; height: var(--hdr); }
+  .slot .sh b { font-size: calc(15px * var(--z)); }
+  .slot .sh span { font-size: calc(11px * var(--z)); color: #777; overflow: hidden; text-overflow: ellipsis; }
+  .slot svg, .gutter svg { display: block; overflow: visible; }
+  .vf-stavenote { cursor: pointer; }
+  .vf-stavenote:hover { opacity: .7; }
+  .caret { position: absolute; width: 2.5px; background: #2a6fdb; pointer-events: none; }
+  .caret::before { content: ''; position: absolute; left: -4px; top: -6px; border: 5px solid transparent; border-top-color: #2a6fdb; }
+  #panel { width: 330px; flex: none; background: #1e1e1e; color: #d6d6d6; padding: 8px 10px; font: 11.5px/1.5 ui-monospace, monospace; white-space: pre-wrap; overflow: auto; }
+  #panel .ok { color: #7bd88f; } #panel .bad { color: #ff7b72; } #panel .wait { color: #e5c07b; }
+</style>
+</head>
+<body>
+<div id="bar">
+  <span class="tag">PROTOTYPE</span>
+  <label>Instrument <select id="instr"></select></label>
+  <label id="ccWrap">Concert clef <select id="cclef"><option>treble</option><option>bass</option></select></label>
+  <label>Bars/row <select id="bpr"><option>2</option><option selected>4</option><option>8</option></select></label>
+  <label>Zoom <select id="zoom"><option value="auto" selected>auto (floor 5px gap)</option><option value="1">1.0</option><option value="0.5">0.5 (floor)</option><option value="0.35">0.35 (below floor)</option></select></label>
+  <label>Melody <select id="mlen"><option value="32" selected>all 32 bars</option><option value="12">12 bars</option></select></label>
+  <button class="btn" id="edit">Random edit</button>
+  <button class="btn" id="bench">Benchmark 20 edits</button>
+  <span style="color:#777">click a note = select + caret · ←/→ caret · click a chord = make it altered (marks)</span>
+</div>
+<div id="body">
+  <div id="rail">rail (layout C)</div>
+  <div id="main">
+    <div id="chartWrap"><div id="loading">Loading Bravura…</div><div id="chart"></div></div>
+    <div id="dock">docked hex (not in this spike)</div>
+  </div>
+  <div id="panel"></div>
+</div>
+<script type="module">
+const t0 = performance.now();
+const VF = await import('https://cdn.jsdelivr.net/npm/vexflow@5.0.0/build/esm/entry/vexflow-core.js');
+const { VexFlow, Renderer, Stave, StaveNote, GhostNote, Voice, Formatter, Beam, Accidental } = VF;
+const tImport = performance.now();
+let fontErr = null;
+try { await VexFlow.loadFonts('Bravura', 'Academico'); VexFlow.setFonts('Bravura', 'Academico'); } catch (e) { fontErr = String(e); }
+await document.fonts.ready;
+const tFonts = performance.now();
+
+// ---------- music (stand-in for tonal) ----------
+const LET = 'CDEFGAB', LPC = [0,2,4,5,7,9,11];
+const mod = (x, n) => ((x % n) + n) % n;
+const DEFSET = [['C',0],['C',1],['D',0],['E',-1],['E',0],['F',0],['F',1],['G',0],['A',-1],['A',0],['B',-1],['B',0]];
+const accS = a => a > 0 ? '♯' : a < 0 ? '♭' : '';
+const parsePitch = s => { const m = s.match(/^([A-G])(#|b)?(\d)$/); return 12 * (+m[3] + 1) + LPC[LET.indexOf(m[1])] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0); };
+function spellPc(L, pc) { const a = mod(pc - LPC[L] + 6, 12) - 6; if (Math.abs(a) > 1) { const [l, aa] = DEFSET[mod(pc, 12)]; return { L: LET.indexOf(l), a: aa }; } return { L, a }; }
+const SCALES = { Dorian: [[0,0],[1,2],[2,3],[3,5],[4,7],[5,9],[6,10]], Mixolydian: [[0,0],[1,2],[2,4],[3,5],[4,7],[5,9],[6,10]],
+  Ionian: [[0,0],[1,2],[2,4],[3,5],[4,7],[5,9],[6,11]], altered: [[0,0],[1,1],[2,3],[2,4],[4,6],[5,8],[6,10]], Locrian: [[0,0],[1,1],[2,3],[3,5],[4,6],[5,8],[6,10]] };
+const QUAL = { m7: ['Dorian', [0,3,7,10]], '7': ['Mixolydian', [0,4,7,10]], maj7: ['Ionian', [0,4,7,11]], '7alt': ['altered', [0,4,8,10,3]], m7b5: ['Locrian', [0,3,6,10]] };
+const INSTR = [ // name, lo, hi, [letter steps, semis], clef
+  ['Concert', null, null, [0,0], null], ['B♭ trumpet', 'F#3', 'C6', [1,2], 'treble'], ['B♭ tenor sax', 'Bb3', 'F#6', [8,14], 'treble'],
+  ['E♭ alto sax', 'Bb3', 'F#6', [5,9], 'treble'], ['Trombone', 'E2', 'Bb4', [0,0], 'bass'], ['Violin', 'G3', 'E7', [0,0], 'treble'], ['Double bass / bass guitar', 'E2', 'G4', [7,12], 'bass'] ];
+function buildSlot(sym, iv) {
+  const m = sym.match(/^([A-G][b#]?)(.*)$/), [scale, chord] = QUAL[m[2]];
+  const rL = LET.indexOf(m[1][0]), rA = m[1].length > 1 ? (m[1][1] === '#' ? 1 : -1) : 0;
+  const wr = spellPc(mod(rL + iv[0], 7), LPC[rL] + rA + iv[1]), rPc = mod(LPC[wr.L] + wr.a, 12);
+  const degs = SCALES[scale].map(([st, se]) => ({ semis: se, ...spellPc(mod(wr.L + st, 7), rPc + se) }));
+  const wRoot = LET[wr.L] + accS(wr.a);
+  return { degs, pcs: new Set(degs.map(d => mod(rPc + d.semis, 12))), sym: wRoot + m[2].replace('b5', '♭5'), scName: wRoot + ' ' + scale };
+}
+function spellWritten(w, sc) {
+  const pc = mod(w, 12), d = sc.degs.find(g => mod(LPC[g.L] + g.a, 12) === pc);
+  let L, a; if (d) ({ L, a } = d); else { const [l, aa] = DEFSET[pc]; L = LET.indexOf(l); a = aa; }
+  const oct = (w - a - LPC[L]) / 12 - 1;
+  return { key: LET[L].toLowerCase() + (a > 0 ? '#' : a < 0 ? 'b' : '') + '/' + oct, inScale: !!d };
+}
+
+// ---------- form + melody ----------
+const A1 = [['Cmaj7'],['Am7'],['Dm7'],['G7'],['Em7','A7'],['Dm7','G7'],['Cmaj7'],['Dm7','G7']];
+const A2 = [['Cmaj7'],['Am7'],['Dm7'],['G7'],['Em7','A7'],['Dm7','G7'],['Cmaj7'],['Cmaj7']];
+const BR = [['Gm7'],['C7'],['Fmaj7'],['Fmaj7'],['Bm7b5','E7alt'],['Am7'],['D7'],['Dm7','G7alt']];
+let chords = JSON.parse(JSON.stringify([...A1, ...A2, ...BR, ...A1]));
+const DUR = { w: 16, h: 8, q: 4, e: 2, s: 1 }, VFD = { w: 'w', h: 'h', q: 'q', e: '8', s: '16' }, BAR = 16;
+let SL = [];
+function slots() { const out = []; let t = 0; chords.forEach((b, bi) => b.forEach((sym, k) => { const len = BAR / b.length; out.push({ i: out.length, bar: bi, sym, start: t, len, end: t + len, barEnd: k === b.length - 1 }); t += len; })); return out; }
+SL = slots();
+const timeline = mel => { let t = 0; return mel.map((ev, i) => { const r = { ev, i, start: t, end: t + DUR[ev.d] }; t = r.end; return r; }); };
+function genMelody(bars) {
+  const PAT16 = [['q','e','e','q','q'], ['e','e','e','e','h'], ['e','e','q','s','s','e','q'], ['h','q','q'], ['q','q','e','e','s','s','e'], ['e','e','e','e','e','e','q'], ['w']];
+  const PAT8 = [['q','q'], ['e','e','q'], ['e','e','s','s','e'], ['h']];
+  let p = 64, seed = 7; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+  const out = [];
+  for (const sl of SL.filter(s => s.bar < bars)) {
+    const sc = buildSlot(sl.sym, [0,0]), pats = sl.len === 16 ? PAT16 : PAT8, pat = pats[Math.floor(rnd() * pats.length)];
+    const ups = []; for (let m = 50; m < 86; m++) if (sc.pcs.has(mod(m, 12))) ups.push(m);
+    let idx = ups.findIndex(m => m >= p); if (idx < 0) idx = ups.length - 1;
+    pat.forEach((d, j) => {
+      if (j > 0 && rnd() < 0.08) { out.push({ d }); return; }
+      out.push({ pitch: ups[idx], d });
+      const dir = ups[idx] > 76 ? -1 : ups[idx] < 58 ? 1 : (rnd() < 0.5 ? -1 : 1);
+      idx = Math.max(0, Math.min(ups.length - 1, idx + dir * (rnd() < 0.3 ? 2 : 1)));
+    });
+    p = ups[idx];
+  }
+  return out;
+}
+let melody = genMelody(32);
+melody.push(); // (melody may be shorter than the form via the Melody select)
+let caretT = 0, instrIdx = 0;
+const $ = id => document.getElementById(id);
+const iv = () => INSTR[instrIdx][3];
+const clefOf = () => INSTR[instrIdx][4] || $('cclef').value;
+const scCache = new Map(); const scOf = s => { const k = s.sym + instrIdx; if (!scCache.has(k)) scCache.set(k, buildSlot(s.sym, iv())); return scCache.get(k); };
+const activeSlot = () => SL.find(s => caretT >= s.start && caretT < s.end) || SL[SL.length - 1];
+
+// ---------- rendering ----------
+const SLOT_H = 110, HDR = 20, GUT = 46, STAVE_Y = 0;
+let metrics = { renders: [], lastMs: 0, notes: 0, staves: 0, errors: [] };
+function zoomFor(rows) {
+  const v = $('zoom').value; if (v !== 'auto') return +v;
+  const H = $('chartWrap').clientHeight - 4, z = H / (rows * (SLOT_H + HDR));
+  return Math.max(0.5, Math.min(1.4, z));
+}
+function mkSvg(host, Wlog, z) {
+  const r = new Renderer(host, Renderer.Backends.SVG); r.resize(Wlog, SLOT_H);
+  const svg = host.querySelector('svg'); svg.setAttribute('viewBox', `0 0 ${Wlog} ${SLOT_H}`);
+  svg.setAttribute('width', Wlog * z); svg.setAttribute('height', SLOT_H * z);
+  svg.style.width = Wlog * z + 'px'; svg.style.height = SLOT_H * z + 'px'; // VexFlow sets inline styles on resize
+  return { ctx: r.getContext(), svg };
+}
+const staveOpts = { spaceAboveStaffLn: 3, spaceBelowStaffLn: 3 };
+function renderChart() {
+  const t = performance.now(); metrics.errors = [];
+  const bpr = +$('bpr').value, nRows = Math.ceil(chords.length / bpr), z = zoomFor(nRows);
+  const chart = $('chart'); chart.style.setProperty('--z', z); chart.style.setProperty('--hdr', HDR * z + 'px');
+  const act = activeSlot(), clef = clefOf(), tl = timeline(melody);
+  let html = '';
+  for (let r = 0; r < nRows; r++) {
+    const rs = SL.filter(s => Math.floor(s.bar / bpr) === r);
+    html += `<div class="row" style="grid-template-columns:${GUT * z}px repeat(${bpr * 2}, minmax(0,1fr))"><div class="gutter" data-r="${r}" style="padding-top:${HDR * z}px"></div>` +
+      rs.map(sl => { const sc = scOf(sl); return `<div class="slot${sl === act ? ' active' : ''}${sl.barEnd ? ' barEnd' : ''}" data-s="${sl.i}" style="grid-column: span ${sl.len / 8}"><div class="sh"><b data-chord="${sl.i}">${sc.sym}</b><span>${sc.scName}</span></div><div class="host"></div></div>`; }).join('') + '</div>';
+  }
+  chart.innerHTML = html;
+  let nNotes = 0, nStaves = 0;
+  chart.querySelectorAll('.gutter').forEach(g => {
+    const { ctx } = mkSvg(g, GUT, z);
+    new Stave(0, STAVE_Y, GUT, { ...staveOpts, rightBar: false }).addClef(clef).setContext(ctx).draw(); nStaves++;
+  });
+  const range = INSTR[instrIdx][1] ? [parsePitch(INSTR[instrIdx][1]), parsePitch(INSTR[instrIdx][2])] : null;
+  chart.querySelectorAll('.slot').forEach(el => {
+    const sl = SL[+el.dataset.s], host = el.querySelector('.host'), Wlog = el.clientWidth / z, sc = scOf(sl);
+    const { ctx, svg } = mkSvg(host, Wlog, z);
+    const stave = new Stave(0, STAVE_Y, Wlog, { ...staveOpts, leftBar: false, rightBar: false });
+    if (sl.i === 0) stave.addTimeSignature('4/4');
+    stave.setContext(ctx).draw(); nStaves++;
+    const evs = tl.filter(r => r.start >= sl.start && r.start < sl.end);
+    const notes = [], meta = [];
+    for (const r of evs) {
+      let n;
+      if (r.ev.pitch == null) n = new StaveNote({ clef, keys: [clef === 'bass' ? 'd/3' : 'b/4'], duration: VFD[r.ev.d] + 'r' });
+      else {
+        const w = r.ev.pitch + iv()[1], sp = spellWritten(w, sc);
+        n = new StaveNote({ clef, keys: [sp.key], duration: VFD[r.ev.d], autoStem: true });
+        const oor = range && (w < range[0] || w > range[1]);
+        if (!sp.inScale) n.setStyle({ fillStyle: '#d62728', strokeStyle: '#d62728' });
+        else if (oor) n.setStyle({ fillStyle: '#b5b5b5', strokeStyle: '#b5b5b5' });
+        meta.push({ n, r, oos: !sp.inScale });
+      }
+      notes.push(n); nNotes++;
+      if (r.ev.pitch == null) meta.push({ n, r, rest: true });
+    }
+    // pad the rest of the slot with ghost notes so the time grid stays proportional
+    let used = evs.reduce((a, r) => a + DUR[r.ev.d], 0), padT = sl.start + used;
+    while (used < sl.len) { const d = ['w','h','q','e','s'].find(k => DUR[k] <= sl.len - used && padT % DUR[k] === 0) || 's'; notes.push(new GhostNote({ duration: VFD[d] })); used += DUR[d]; padT += DUR[d]; }
+    try {
+      const voice = new Voice({ numBeats: sl.len / 4, beatValue: 4 }).setMode(Voice.Mode.SOFT);
+      voice.addTickables(notes);
+      Accidental.applyAccidentals([voice], 'C');
+      const beams = Beam.generateBeams(notes.filter(n => !(n instanceof GhostNote)));
+      new Formatter().joinVoices([voice]).formatToStave([voice], stave);
+      voice.draw(ctx, stave); beams.forEach(b => b.setContext(ctx).draw());
+    } catch (e) { metrics.errors.push(`slot ${sl.i + 1} ${sl.sym}: ${e.message}`); }
+    // marks overlay + click hooks
+    for (const m of meta) {
+      const g = m.n.getSVGElement && m.n.getSVGElement();
+      if (g) { g.dataset.t = m.r.start; g.addEventListener('click', ev => { ev.stopPropagation(); caretT = m.r.start; renderChart(); }); }
+      if (m.oos) { const x = (m.n.getNoteHeadBeginX() + m.n.getNoteHeadEndX()) / 2, y = m.n.getYs()[0];
+        const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle'); c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('r', 9); c.setAttribute('fill', 'none'); c.setAttribute('stroke', '#d62728'); c.setAttribute('stroke-width', 1.5); svg.appendChild(c); }
+    }
+    // caret
+    if (sl === act) {
+      const hit = meta.find(m => m.r.start === caretT);
+      let x = hit ? hit.n.getAbsoluteX() - 6 : stave.getNoteStartX() + (caretT - sl.start) / sl.len * (stave.getNoteEndX() - stave.getNoteStartX());
+      const c = document.createElement('div'); c.className = 'caret';
+      c.style.left = x * z + 'px'; c.style.top = HDR * z + 12 * z + 'px'; c.style.height = 66 * z + 'px'; el.appendChild(c);
+      el._caretX = x;
+    }
+  });
+  metrics.lastMs = performance.now() - t; metrics.notes = nNotes; metrics.staves = nStaves; metrics.z = z;
+  renderPanel();
+}
+function renderPanel() {
+  const m = metrics, ok = s => `<span class="ok">✔</span> ${s}`, bad = s => `<span class="bad">✘</span> ${s}`, wait = s => `<span class="wait">…</span> ${s}`;
+  const avg = m.renders.length ? (m.renders.reduce((a, b) => a + b, 0) / m.renders.length) : null;
+  const gap = (10 * m.z).toFixed(1);
+  $('panel').innerHTML =
+`<b>VexFlow ${VexFlow.BUILD ? (VexFlow.BUILD.VERSION || '') : ''} spike</b>
+import  ${(tImport - t0).toFixed(0)} ms · fonts ${(tFonts - tImport).toFixed(0)} ms${fontErr ? '\n<span class="bad">font error: ' + fontErr + '</span>' : ''}
+
+${ok('1 slice fidelity — one melody, ' + SL.filter(s => s.len === 8).length + ' half-bar slots, ghost-padded')}
+${ok('2 durations w h q 8 16 + auto beams')}
+${ok('3 written view — ' + INSTR[instrIdx][0] + ', ' + clefOf() + ' clef')}
+${ok('4 marks — red+ring out-of-scale, grey out-of-range')}
+${ok('5 chrome: chord/scale in HTML above, bar lines CSS')}
+${avg == null ? wait('6 redraw — press Benchmark') : (avg < 100 ? ok : bad)(`6 redraw avg ${avg.toFixed(0)} ms over ${m.renders.length} edits`)}
+${fontErr ? bad('7 Bravura failed to load') : ok('7 Bravura ready before first paint (' + (tFonts - tImport).toFixed(0) + ' ms)')}
+${ok('8 caret beside notes; click a note to select')}
+${m.errors.length ? bad(m.errors.length + ' slot errors:\n' + m.errors.slice(0, 6).join('\n')) : ok('no engraving errors')}
+
+last full redraw  ${m.lastMs.toFixed(0)} ms
+staves            ${m.staves} (incl. ${Math.ceil(chords.length / +$('bpr').value)} gutters)
+notes + rests     ${m.notes}
+zoom              ${m.z.toFixed(2)} · staff gap ${gap}px${+gap < 5 ? ' <span class="bad">(below floor)</span>' : ''}
+caret             bar ${Math.floor(caretT / BAR) + 1} beat ${1 + (caretT % BAR) / 4}`;
+}
+// ---------- interactions ----------
+INSTR.forEach((x, i) => $('instr').add(new Option(x[0], i)));
+const reset = () => { scCache.clear(); $('ccWrap').style.display = instrIdx === 0 ? '' : 'none'; renderChart(); };
+$('instr').onchange = e => { instrIdx = +e.target.value; reset(); };
+['cclef', 'bpr', 'zoom'].forEach(id => $(id).onchange = renderChart);
+$('mlen').onchange = e => { melody = genMelody(+e.target.value); caretT = 0; renderChart(); };
+function randomEdit() {
+  const tl = timeline(melody).filter(r => r.ev.pitch != null), r = tl[Math.floor(Math.random() * tl.length)];
+  const sc = scOf(SL.find(s => r.start >= s.start && r.start < s.end)); let w = r.ev.pitch + iv()[1] + (Math.random() < .5 ? 1 : -1);
+  while (!sc.pcs.has(mod(w, 12))) w += 1;
+  melody[r.i] = { ...r.ev, pitch: w - iv()[1] }; caretT = r.end;
+  renderChart(); metrics.renders.push(metrics.lastMs); renderPanel();
+}
+$('edit').onclick = randomEdit;
+$('bench').onclick = async () => { metrics.renders = []; for (let k = 0; k < 20; k++) { randomEdit(); await new Promise(r => requestAnimationFrame(r)); } };
+$('chart').addEventListener('click', e => {
+  const ch = e.target.closest('[data-chord]');
+  if (ch) { const sl = SL[+ch.dataset.chord], b = chords[sl.bar]; b[b.length === 1 ? 0 : (sl.start % BAR ? 1 : 0)] = /alt$/.test(sl.sym) ? sl.sym.replace('7alt', '7') : sl.sym.replace(/^([A-G][b#]?).*$/, '$17alt'); SL = slots(); scCache.clear(); renderChart(); return; }
+  const el = e.target.closest('.slot'); if (!el) return;
+  const sl = SL[+el.dataset.s], rect = el.getBoundingClientRect();
+  caretT = sl.start + Math.floor(Math.max(0, Math.min(.999, (e.clientX - rect.left) / rect.width)) * sl.len / 2) * 2; renderChart();
+});
+document.addEventListener('keydown', e => {
+  if (e.target.matches('select')) return;
+  const tl = timeline(melody);
+  if (e.key === 'ArrowRight') { const r = tl.find(x => x.start === caretT); caretT = Math.min(SL[SL.length - 1].end, r ? r.end : caretT + 2); renderChart(); }
+  if (e.key === 'ArrowLeft') { const r = tl.find(x => x.end === caretT); caretT = Math.max(0, r ? r.start : caretT - 2); renderChart(); }
+});
+window.addEventListener('resize', () => { clearTimeout(window._rz); window._rz = setTimeout(renderChart, 100); });
+$('loading').remove();
+reset();
+</script>
+</body>
+</html>

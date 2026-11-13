@@ -1,0 +1,405 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway. Ticket "Hex palette layout" (issues/019).
+  Question: degree-stable diatonic hex palette — axes, 14-cell packing, borders/fills, remould, instrument mid-range, octave shift.
+  Axes (working assumption): ↖ diatonic third (±2), east diatonic step (±1), SW diatonic fifth (±4); 1+2+4≡0 mod 7.
+  Variants via ?variant= / yellow bar: packing A compact hex-ish · B third-columns.
+  Run: open index.html
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<title>PROTOTYPE — Hex palette layout</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 13px system-ui, sans-serif; background: #eceae4; color: #222; }
+  #proto { background: #fffbe6; border-bottom: 1px solid #e5d9a8; padding: 8px 12px; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+  #proto .tag { background: #c0392b; color: #fff; font-weight: 700; padding: 1px 6px; border-radius: 3px; font-size: 11px; }
+  #proto label { display: inline-flex; gap: 4px; align-items: center; color: #555; }
+  #proto select, #proto button { font: 12px system-ui; }
+  main { padding: 16px; max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 16px; margin: 0 0 6px; }
+  .blurb { color: #666; margin: 0 0 16px; max-width: 62ch; line-height: 1.4; }
+  .slots { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+  .slot { background: #fff; border: 1px solid #ccc; border-radius: 8px; padding: 10px; }
+  .slot.active { border-color: #3a7bd5; box-shadow: 0 0 0 2px #3a7bd533; }
+  .slot h2 { margin: 0 0 2px; font-size: 15px; }
+  .slot .meta { color: #888; font-size: 11px; margin-bottom: 8px; }
+  .hexwrap { display: flex; justify-content: center; min-height: 210px; }
+  svg.hex { overflow: visible; }
+  .hexcell { cursor: pointer; }
+  .hexcell:hover .face { filter: brightness(1.08); }
+  .hexcell:hover .ring { stroke-width: 3.5; }
+  .legend { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; font-size: 12px; }
+  .swatch { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch i { width: 18px; height: 18px; border-radius: 4px; display: inline-block; border: 3px solid #000; }
+  .state { margin-top: 14px; background: #1e1e1e; color: #d6d6d6; padding: 10px 12px; border-radius: 6px; font: 12px ui-monospace, monospace; white-space: pre-wrap; }
+  .axes { margin-top: 12px; font-size: 12px; color: #555; }
+  .axes code { background: #fff; padding: 1px 4px; border-radius: 3px; }
+</style>
+</head>
+<body>
+<div id="proto">
+  <span class="tag">PROTOTYPE</span>
+  <label>Packing
+    <select id="variant">
+      <option value="A">A · compact (third × step)</option>
+      <option value="B">B · third columns</option>
+    </select>
+  </label>
+  <label>Instrument
+    <select id="instr">
+      <option value="concert">Concert (mid C4)</option>
+      <option value="tpt">B♭ trumpet (mid ~ written A4)</option>
+      <option value="alto">E♭ alto sax (mid ~ written A4)</option>
+      <option value="bass">Bass (mid ~ written G2)</option>
+      <option value="flute">Flute (mid ~ written G5)</option>
+    </select>
+  </label>
+  <label>Octave shift <button type="button" id="octDown">−</button> <span id="octLab">0</span> <button type="button" id="octUp">+</button></label>
+  <span style="color:#888">Click a hex to audition · click slot header to activate</span>
+</div>
+<main>
+  <h1>Hex palette layout — round 1</h1>
+  <p class="blurb">Same 14-cell degree geometry in every slot; pitches/spellings remould with the slot scale.
+    White fill = chord tone, black = scale tone. Border colour = scale degree 1–7.
+    Switch Dm7 → G7 → Cmaj7 to see stable degrees; G7alt changes the pitch-class set.</p>
+  <div class="slots" id="slots"></div>
+  <div class="axes">Axes: <code>↖ +2 third</code> · <code>→ +1 step</code> · <code>↙ +4 fifth</code> (1+2+4 ≡ 0 mod 7)</div>
+  <div class="legend" id="legend"></div>
+  <div class="state" id="state"></div>
+</main>
+<script>
+const DEG_BORDER = ['#e41a1c','#ff7f00','#ffd92f','#4daf4a','#377eb8','#984ea3','#a65628'];
+const LET = 'CDEFGAB';
+const LPC = [0,2,4,5,7,9,11];
+const DEF = ['C','C#','D','Eb','E','F','F#','G','Ab','A','Bb','B'];
+const SHARP = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const FLAT = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+const mod = (x,n=12) => ((x % n) + n) % n;
+
+const SC = {
+  dorian:     [[0,0],[2,1],[3,2],[5,3],[7,4],[9,5],[10,6]],
+  mixolydian: [[0,0],[2,1],[4,2],[5,3],[7,4],[9,5],[10,6]],
+  ionian:     [[0,0],[2,1],[4,2],[5,3],[7,4],[9,5],[11,6]],
+  altered:    [[0,0],[1,1],[3,1],[4,2],[6,4],[8,5],[10,6]],
+};
+const CHORD = {
+  m7:   [[0,0],[3,2],[7,4],[10,6]],
+  '7':  [[0,0],[4,2],[7,4],[10,6]],
+  maj7: [[0,0],[4,2],[7,4],[11,6]],
+  '7alt':[[0,0],[4,2],[8,4],[10,6],[3,1]], // R 3 #5 b7 #9 — chord pcs for fill
+};
+
+function spell(rl, ra, semitones, degSteps) {
+  const L = mod(rl + degSteps, 7);
+  const pc = mod(LPC[rl] + ra + semitones);
+  const a = mod(pc - LPC[L] + 6, 12) - 6;
+  if (Math.abs(a) > 1) {
+    const pc2 = mod(LPC[rl] + ra + semitones);
+    return { pc: pc2, L: LET.indexOf(DEF[pc2][0]), a: DEF[pc2].length>1 ? (DEF[pc2][1]==='#'?1:-1) : 0, name: DEF[pc2] };
+  }
+  const name = LET[L] + (a>0?'#':a<0?'b':'');
+  return { pc, L, a, name };
+}
+
+function buildScale(rootName, scaleKey, chordKey) {
+  const rl = LET.indexOf(rootName[0]);
+  const ra = rootName.length>1 ? (rootName[1]==='#'?1:rootName[1]==='b'?-1:0) : 0;
+  const ivs = SC[scaleKey];
+  const degrees = []; // index 0 = degree 1
+  let leanF=0, leanS=0;
+  for (const [st, dstep] of ivs) {
+    const sp = spell(rl, ra, st, dstep);
+    degrees.push(sp);
+    if (sp.a<0) leanF++; if (sp.a>0) leanS++;
+  }
+  const lean = leanF>leanS ? FLAT : leanS>leanF ? SHARP : DEF;
+  const chordPcs = new Set();
+  for (const [st, dstep] of CHORD[chordKey]) {
+    chordPcs.add(spell(rl, ra, st, dstep).pc);
+  }
+  return { rootName, scaleKey, degrees, chordPcs, lean, rl, ra };
+}
+
+const SLOTS = [
+  { id:'ii',  sym:'Dm7',    root:'D', scale:'dorian',     chord:'m7' },
+  { id:'V',   sym:'G7',     root:'G', scale:'mixolydian', chord:'7' },
+  { id:'I',   sym:'Cmaj7',  root:'C', scale:'ionian',     chord:'maj7' },
+  { id:'alt', sym:'G7alt',  root:'G', scale:'altered',    chord:'7alt' },
+];
+
+// Instrument: written mid MIDI for palette centre (concert sounding ignored in proto labels — we show written names)
+const INSTR = {
+  concert: { label:'Concert', mid:60, tr:0 },
+  tpt:     { label:'B♭ tpt', mid:69, tr:2 },  // written mid ~A4
+  alto:    { label:'E♭ alto', mid:69, tr:9 },
+  bass:    { label:'Bass', mid:43, tr:12 },   // written G2
+  flute:   { label:'Flute', mid:79, tr:0 },   // G5
+};
+
+// --- hex geometry (pointy top) ---
+const SIZE = 22;
+function hexCorner(cx, cy, i) {
+  const ang = Math.PI / 180 * (60 * i - 30);
+  return [cx + SIZE * Math.cos(ang), cy + SIZE * Math.sin(ang)];
+}
+function axialToPixel(q, r) {
+  const x = SIZE * Math.sqrt(3) * (q + r/2);
+  const y = SIZE * 1.5 * r;
+  return [x, y];
+}
+
+// degree delta for cube/axial neighbors: q axis = step(+1), r axis = third(+2)
+// axial (q,r): degree = q*1 + r*2  (mod 7). Fifth axis is s = -q-r with delta +4.
+function packingA() {
+  // Compact: all (q,r) with max(|q|,|r|,|q+r|) <= 2, keep first 14 that cover two octaves of degrees
+  // Place degree d octave o at spiral positions where (q+2r) mod 7 == d and octave from floor.
+  const cells = [];
+  // Generate candidates in hex radius 3, assign degree = mod(q+2r,7), octaveRank by (q+2r) itself
+  const cand = [];
+  for (let q=-3; q<=3; q++) for (let r=-3; r<=3; r++) {
+    const s = -q-r;
+    if (Math.max(Math.abs(q),Math.abs(r),Math.abs(s)) > 2) continue;
+    const t = q + 2*r; // signed degree walk
+    cand.push({ q, r, t, deg: mod(t,7), score: Math.abs(q)+Math.abs(r)+Math.abs(s) });
+  }
+  // Want two of each degree: pick lowest |t| bands — t in [-3..10] roughly for two octaves
+  // Prefer t from 0..13 mapped onto compact region: use t = deg + 7*oct with oct 0..1
+  // Find cell with smallest score for each (deg,oct) targeting t = deg + 7*oct
+  for (let oct=0; oct<2; oct++) {
+    for (let deg=0; deg<7; deg++) {
+      const target = deg + 7*oct;
+      // find (q,r) with q+2r === target, minimal hex norm
+      let best=null;
+      for (let q=-6; q<=6; q++) for (let r=-6; r<=6; r++) {
+        if (q + 2*r !== target) continue;
+        const s=-q-r, n=Math.max(Math.abs(q),Math.abs(r),Math.abs(s));
+        const score = n*10 + Math.abs(q)+Math.abs(r);
+        if (!best || score < best.score) best = { q, r, deg, oct, score };
+      }
+      if (best) cells.push(best);
+    }
+  }
+  return cells;
+}
+
+function packingB() {
+  // Third columns: each column is a chain of thirds (r axis); columns spaced by step (q)
+  // deg 0..6 along a "zigzag": column c has degrees progressing by thirds
+  const cells = [];
+  // octave 0: place degree d at (d, 0) — wait that makes degree = d + 0 = d via q*1+r*2... use r for thirds along column
+  // Column q=0: r=0..6 would be degrees 0,2,4,6,1,3,5 (third chain) — one octave of all degrees!
+  // Then octave 1: shift by vector that adds +7 to t: e.g. (7,0) or (1,3) since 1+6=7, etc. Use (3,2): 3+4=7.
+  const shift = { q: 3, r: 2 }; // +7 in t
+  // Place the third-chain for one octave in a short path of 7: start deg0 at (0,0), walk +third six times — but that's a line of 7 in r: degrees 0,2,4,6,1+7? 
+  // r:0→6: t=0,2,4,6,8,10,12 → deg 0,2,4,6,1,3,5 and octaves mixed.
+  // Cleaner: for each deg 0..6, oct 0..1: position q = deg, r = -Math.floor(deg/2) + something...
+  // Simple readable B: grid deg on x, octave on y-ish via third offset
+  for (let oct=0; oct<2; oct++) {
+    for (let deg=0; deg<7; deg++) {
+      // walk deg steps on step axis from origin, then oct * shift
+      const q = deg + oct * shift.q;
+      const r = 0 + oct * shift.r;
+      // But then third axis unused for packing — rotate: place along third chain for visual
+      // Column per "stack": use r = deg for third walk from tonic... 
+      cells.push({ q: oct * shift.q + (deg % 2), r: oct * shift.r + Math.floor(deg * 0.5) * (deg%2===0?1:-1), deg, oct });
+    }
+  }
+  // Recalculate properly: third-column layout
+  cells.length = 0;
+  // For each octave, a parallelogram: q = 0..3, r = 0..3 clipped to 7 cells then +7
+  // Degree chain by thirds starting at tonic: positions (0,0),(0,1),(0,2),(0,3),(1,3),(1,2),(1,1) — messy.
+  // Flat: 7 cells in row for oct0 using step; oct1 row below using r=+1 offset with +7 via (1,3)? 
+  // User-facing B: columns are thirds (vertical-ish), adjacent column = step
+  for (let oct = 0; oct < 2; oct++) {
+    for (let i = 0; i < 7; i++) {
+      // i along third chain; degree = (0 + 2*i) mod 7, but we want degree = i
+      // So position where t = i + 7*oct: solve q+2r = i+7oct with r = i, q = i+7oct - 2i = 7oct - i
+      const t = i + 7 * oct;
+      const r = i;
+      const q = t - 2 * r;
+      cells.push({ q, r, deg: i, oct });
+    }
+  }
+  return cells;
+}
+
+function layoutCells(variant) {
+  return variant === 'B' ? packingB() : packingA();
+}
+
+let variant = new URLSearchParams(location.search).get('variant') || 'A';
+let instrKey = 'concert';
+let octShift = 0; // added to base octave of mid
+let activeSlot = 'ii';
+let lastPick = null;
+let audioCtx = null;
+
+function midiFor(slotScale, deg, oct, midMidi) {
+  // degree 0 = tonic pc; build MIDI near midMidi
+  const sp = slotScale.degrees[deg];
+  const basePc = sp.pc;
+  // written MIDI: find octave such that note is near midMidi + octShift*12
+  const target = midMidi + octShift * 12;
+  let best = null;
+  for (let o = 0; o < 9; o++) {
+    const m = (o + 1) * 12 + basePc; // C_o style: MIDI 12=C0? actually MIDI 60=C4 → floor(60/12)-1=4 → midi = (oct+1)*12+pc with oct scientific
+    // scientific: C4=60 = 12*(4+1)+0
+    const midi = 12 * (o + 1) + basePc;
+    // place this degree's "oct" layer: we have two layers; layer oct should be the lower/higher near target
+    const dist = Math.abs(midi - target);
+    if (!best || dist < best.dist) best = { midi, dist, o };
+  }
+  // Two layers: lower and upper relative to target
+  const candidates = [];
+  for (let o = 0; o < 9; o++) {
+    const midi = 12 * (o + 1) + basePc;
+    candidates.push(midi);
+  }
+  candidates.sort((a,b) => Math.abs(a-target) - Math.abs(b-target));
+  // pick ordered by pitch: the two closest unique, assign by oct index
+  const two = [...new Set(candidates)].sort((a,b)=>a-b);
+  // choose window of 2 around target
+  let lo = 0;
+  for (let i=0;i<two.length;i++) if (Math.abs(two[i]-target) < Math.abs(two[lo]-target)) lo=i;
+  const i0 = Math.max(0, Math.min(two.length-2, lo - (two[lo] > target ? 1 : 0)));
+  const pair = [two[i0], two[i0+1]];
+  return pair[oct];
+}
+
+function nameWritten(midi, scale) {
+  const pc = mod(midi);
+  const deg = scale.degrees.findIndex(d => d.pc === pc);
+  if (deg >= 0) {
+    const sp = scale.degrees[deg];
+    const oct = Math.floor(midi/12) - 1;
+    return sp.name + oct;
+  }
+  return DEF[pc] + (Math.floor(midi/12)-1);
+}
+
+function play(midi) {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    const t = audioCtx.currentTime;
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = 'sine';
+    o.frequency.value = 440 * Math.pow(2, (midi - 69) / 12);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.2, t+0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+0.35);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(t); o.stop(t+0.4);
+  } catch (_) {}
+}
+
+function renderLegend() {
+  const el = document.getElementById('legend');
+  let h = '<span class="swatch"><i style="background:#fff;border-color:#666"></i> chord tone</span>';
+  h += '<span class="swatch"><i style="background:#111;border-color:#666"></i> scale tone</span>';
+  for (let d=0; d<7; d++) {
+    h += `<span class="swatch"><i style="background:transparent;border-color:${DEG_BORDER[d]}"></i> deg ${d+1}</span>`;
+  }
+  el.innerHTML = h;
+}
+
+function renderSlot(slot) {
+  const scale = buildScale(slot.root, slot.scale, slot.chord);
+  const cells = layoutCells(variant);
+  const mid = INSTR[instrKey].mid;
+  const pts = cells.map(c => {
+    const [x,y] = axialToPixel(c.q, c.r);
+    return { ...c, x, y, midi: midiFor(scale, c.deg, c.oct, mid) };
+  });
+  const xs = pts.map(p=>p.x), ys = pts.map(p=>p.y);
+  const pad = SIZE * 2;
+  const minX = Math.min(...xs) - pad, maxX = Math.max(...xs) + pad;
+  const minY = Math.min(...ys) - pad, maxY = Math.max(...ys) + pad;
+  const w = maxX - minX, h = maxY - minY;
+
+  let svg = `<svg class="hex" width="${w}" height="${h}" viewBox="${minX} ${minY} ${w} ${h}">`;
+  for (const p of pts) {
+    const sp = scale.degrees[p.deg];
+    const isChord = scale.chordPcs.has(sp.pc);
+    const fill = isChord ? '#ffffff' : '#1a1a1a';
+    const textFill = isChord ? '#111' : '#f5f5f5';
+    const border = DEG_BORDER[p.deg];
+    const label = sp.name;
+    const corners = [0,1,2,3,4,5].map(i => hexCorner(p.x, p.y, i).join(',')).join(' ');
+    const sub = p.oct === 0 ? '˯' : '˰';
+    svg += `<g class="hexcell" data-slot="${slot.id}" data-deg="${p.deg}" data-oct="${p.oct}" data-midi="${p.midi}">
+      <polygon class="face" points="${corners}" fill="${fill}" stroke="none"/>
+      <polygon class="ring" points="${corners}" fill="none" stroke="${border}" stroke-width="3"/>
+      <text x="${p.x}" y="${p.y + 4}" text-anchor="middle" font-size="11" font-weight="700" fill="${textFill}" pointer-events="none">${label}</text>
+    </g>`;
+  }
+  svg += '</svg>';
+
+  return { html: `
+    <div class="slot ${activeSlot===slot.id?'active':''}" data-sid="${slot.id}">
+      <h2>${slot.sym}</h2>
+      <div class="meta">${scale.scaleKey} · mid ${mid + octShift*12} · ${INSTR[instrKey].label}</div>
+      <div class="hexwrap">${svg}</div>
+    </div>`, scale, pts };
+}
+
+function render() {
+  document.getElementById('variant').value = variant;
+  document.getElementById('instr').value = instrKey;
+  document.getElementById('octLab').textContent = String(octShift);
+  const root = document.getElementById('slots');
+  const built = SLOTS.map(s => ({ slot:s, ...renderSlot(s) }));
+  root.innerHTML = built.map(b => b.html).join('');
+
+  root.querySelectorAll('.slot').forEach(el => {
+    el.addEventListener('click', e => {
+      if (e.target.closest('.hexcell')) return;
+      activeSlot = el.dataset.sid;
+      render();
+    });
+  });
+  root.querySelectorAll('.hexcell').forEach(g => {
+    g.addEventListener('click', e => {
+      e.stopPropagation();
+      const midi = +g.dataset.midi;
+      const deg = +g.dataset.deg;
+      const oct = +g.dataset.oct;
+      const sid = g.dataset.slot;
+      activeSlot = sid;
+      play(midi);
+      const slot = SLOTS.find(s => s.id===sid);
+      const scale = buildScale(slot.root, slot.scale, slot.chord);
+      lastPick = { slot: slot.sym, deg: deg+1, layer: oct, midi, name: nameWritten(midi, scale), variant, instr: instrKey, octShift };
+      render();
+      dump(built);
+    });
+  });
+  dump(built);
+  const qs = new URLSearchParams(location.search);
+  qs.set('variant', variant);
+  history.replaceState(null, '', '?' + qs.toString());
+}
+
+function dump(built) {
+  const active = built.find(b => b.slot.id === activeSlot);
+  const lines = [
+    `variant=${variant}  instrument=${instrKey}  octShift=${octShift}  active=${activeSlot}`,
+    `axes: step(+1) on +q · third(+2) on +r (↖) · fifth(+4) on -q-r`,
+    lastPick ? `lastPick ${JSON.stringify(lastPick)}` : 'lastPick null',
+    active ? `active cells: ${active.pts.map(p => `d${p.deg+1}@${p.oct}:${nameWritten(p.midi, active.scale)}`).join('  ')}` : '',
+  ];
+  document.getElementById('state').textContent = lines.filter(Boolean).join('\n');
+}
+
+document.getElementById('variant').onchange = e => { variant = e.target.value; render(); };
+document.getElementById('instr').onchange = e => { instrKey = e.target.value; render(); };
+document.getElementById('octDown').onclick = () => { octShift--; render(); };
+document.getElementById('octUp').onclick = () => { octShift++; render(); };
+
+renderLegend();
+render();
+</script>
+</body>
+</html>

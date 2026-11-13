@@ -1,0 +1,36 @@
+{
+  "app": "honeycomb",
+  "v": 2,
+  "kind": "progression",
+  "progression": {
+    "title": "ii–V–I in C (demo)",
+    "timeSignature": "4/4",
+    "barsPerRow": 4,
+    "instrument": "concert",
+    "bars": [
+      [ { "chord": "Dm7" } ],
+      [ { "chord": "G7" } ],
+      [ { "chord": "Cmaj7" } ],
+      [ { "chord": "Cmaj7" } ]
+    ],
+    "melody": [
+      { "pitch": 62, "d": "q" },
+      { "pitch": 65, "d": "q" },
+      { "pitch": 69, "d": "q" },
+      { "pitch": 74, "d": "q" },
+      { "pitch": 67, "d": "e" },
+      { "pitch": 65, "d": "e" },
+      { "pitch": 62, "d": "e" },
+      { "pitch": 59, "d": "e" },
+      { "pitch": 55, "d": "q" },
+      { "pitch": 59, "d": "q" },
+      { "pitch": 60, "d": "h" },
+      { "pitch": 64, "d": "q" },
+      { "pitch": 67, "d": "q" },
+      { "pitch": 71, "d": "q" },
+      { "pitch": 72, "d": "q" },
+      { "d": "q" },
+      { "pitch": 67, "d": "q" }
+    ]
+  }
+}

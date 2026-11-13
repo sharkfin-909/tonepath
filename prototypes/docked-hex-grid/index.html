@@ -1,0 +1,343 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway. Ticket "Docked hex grid" (issues/027).
+  Question: what the bottom-docked hex looks like and how it fits the range. Fixed: step right, up-left = diatonic third
+  (so up-right = fourth), each row = the row below shifted by that third, remoulded by the active slot, as much of the
+  practical written range as fits, grey out of range, white/black fills, 3px degree borders.
+  Three ways to fit the range into the dock, switched with ?variant= or the floating bar (← / → keys):
+    A · Fill dock   — fixed cell size; as many rows and columns as fit; pitches repeat across rows.
+    B · Two-row strip — 2 rows; columns sized so the range just fits across; reads like a keyboard.
+    C · Fit range   — picks rows × columns that cover the range with the biggest possible cells.
+  The Anchor toggle answers the remould question: pitch (letters stay put across ii–V–I) vs root (degree 1 always bottom-left).
+  Run: open prototypes/docked-hex-grid/index.html
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<title>PROTOTYPE — Docked hex grid</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; font: 13px system-ui, sans-serif; background: #eceae4; color: #222; display: flex; flex-direction: column; overflow: hidden; }
+  #proto { background: #fffbe6; border-bottom: 1px solid #e5d9a8; padding: 6px 12px; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; flex: none; }
+  #proto .tag { background: #c0392b; color: #fff; font-weight: 700; padding: 1px 6px; border-radius: 3px; font-size: 11px; }
+  #proto label { display: inline-flex; gap: 4px; align-items: center; color: #555; }
+  #proto select, #proto button, #proto input { font: 12px system-ui; }
+  #top { flex: 1 1 50%; min-height: 0; display: flex; gap: 12px; padding: 10px 12px; overflow: hidden; }
+  #chart { flex: 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; align-content: start; background: #fff; border: 1px solid #bbb; }
+  .slot { border-right: 1px solid #999; border-bottom: 1px solid #999; padding: 6px 8px 8px; min-height: 92px; cursor: pointer; position: relative; }
+  .slot:nth-child(4n) { border-right: 3px solid #333; }
+  .slot.active { background: #eef4fd; box-shadow: inset 0 0 0 2px #3a7bd5; }
+  .slot .sym { font-weight: 700; font-size: 16px; }
+  .slot .sc { color: #777; font-size: 11px; }
+  .slot .stub { margin-top: 6px; font: 12px ui-monospace, monospace; color: #333; min-height: 16px; border-top: 1px dashed #ccc; padding-top: 4px; }
+  .slot .tag2 { position: absolute; top: 4px; right: 6px; font-size: 10px; color: #b55; }
+  #state { width: 340px; flex: none; background: #1e1e1e; color: #d6d6d6; padding: 8px 10px; border-radius: 6px; font: 11.5px/1.45 ui-monospace, monospace; white-space: pre-wrap; overflow: auto; }
+  #dock { flex: 1 1 50%; min-height: 0; background: #d9d6ce; border-top: 2px solid #999; position: relative; }
+  #dock svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .cell { cursor: pointer; }
+  .cell text { pointer-events: none; font-family: system-ui, sans-serif; font-weight: 600; }
+  .cell .halo { fill: none; stroke: #2a6fdb; stroke-width: 4; opacity: 0; }
+  .cell.dup .halo { opacity: .9; }
+  .cell:hover .face { filter: brightness(.94); }
+  .cell.flash .face { filter: brightness(.75); }
+  #switcher { position: fixed; bottom: 8px; left: 50%; transform: translateX(-50%); background: #111; color: #fff; border-radius: 999px; padding: 4px 6px; display: flex; gap: 6px; align-items: center; box-shadow: 0 4px 14px #0006; z-index: 10; font: 12px system-ui; }
+  #switcher button { background: #333; color: #fff; border: 0; border-radius: 999px; width: 26px; height: 26px; cursor: pointer; font-size: 14px; }
+  #switcher span { min-width: 170px; text-align: center; }
+  .legend { position: absolute; top: 6px; right: 10px; display: flex; gap: 8px; font-size: 11px; color: #444; background: #fff9; padding: 3px 6px; border-radius: 4px; }
+  .legend i { display: inline-block; width: 12px; height: 12px; border: 3px solid; border-radius: 3px; vertical-align: -2px; margin-right: 3px; }
+</style>
+</head>
+<body>
+<div id="proto">
+  <span class="tag">PROTOTYPE</span>
+  <label>Instrument <select id="instr"></select></label>
+  <label>Anchor
+    <select id="anchor">
+      <option value="pitch">pitch: bottom-left = lowest playable scale tone</option>
+      <option value="root">root: bottom-left = degree 1 at/below range</option>
+    </select>
+  </label>
+  <label id="sizeWrap">Cell radius <input type="range" id="size" min="14" max="44" value="26"> <span id="sizeLab">26</span></label>
+  <label><input type="checkbox" id="degnum" checked> degree numbers</label>
+  <label><input type="checkbox" id="hidegrey"> hide grey cells</label>
+  <span style="color:#888">Click a slot to make it active · click a hex to audition + insert · playing a note flashes every cell with that pitch</span>
+</div>
+<div id="top">
+  <div id="chart"></div>
+  <div id="state"></div>
+</div>
+<div id="dock">
+  <svg id="svg"></svg>
+  <div class="legend" id="legend"></div>
+</div>
+<div id="switcher">
+  <button id="prev" title="previous (←)">‹</button>
+  <span id="vlab"></span>
+  <button id="next" title="next (→)">›</button>
+</div>
+<script>
+// ---------- music basics ----------
+const LET = 'CDEFGAB', LPC = [0,2,4,5,7,9,11];
+const mod = (x, n) => ((x % n) + n) % n;
+const DEFSET = [['C',0],['C',1],['D',0],['E',-1],['E',0],['F',0],['F',1],['G',0],['A',-1],['A',0],['B',-1],['B',0]];
+const accS = a => a > 0 ? '♯' : a < 0 ? '♭' : '';
+function parsePitch(s) {
+  const m = s.match(/^([A-G])(#|b)?(\d)$/);
+  return 12 * (+m[3] + 1) + LPC[LET.indexOf(m[1])] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0);
+}
+// spell pitch class on letter L; at most one accidental, else default set
+function spellPc(L, pc) {
+  const a = mod(pc - LPC[L] + 6, 12) - 6;
+  if (Math.abs(a) > 1) { const [l, aa] = DEFSET[mod(pc, 12)]; return { L: LET.indexOf(l), a: aa }; }
+  return { L, a };
+}
+const nameMidi = (midi, L, a) => LET[L] + accS(a) + ((midi - a - LPC[L]) / 12 - 1);
+
+// scales: [letter steps, semitones] from root
+const SCALES = {
+  'Dorian':          [[0,0],[1,2],[2,3],[3,5],[4,7],[5,9],[6,10]],
+  'Mixolydian':      [[0,0],[1,2],[2,4],[3,5],[4,7],[5,9],[6,10]],
+  'Ionian':          [[0,0],[1,2],[2,4],[3,5],[4,7],[5,9],[6,11]],
+  'altered':         [[0,0],[1,1],[2,3],[2,4],[4,6],[5,8],[6,10]],
+  'Locrian':         [[0,0],[1,1],[2,3],[3,5],[4,6],[5,8],[6,10]],
+  'half-whole dim':  [[0,0],[1,1],[2,3],[2,4],[3,6],[4,7],[5,9],[6,10]],
+  'whole-tone':      [[0,0],[1,2],[2,4],[3,6],[4,8],[6,10]],
+};
+const SLOTS = [
+  { root:'D',  q:'m7',    scale:'Dorian',         chord:[0,3,7,10] },
+  { root:'G',  q:'7',     scale:'Mixolydian',     chord:[0,4,7,10] },
+  { root:'C',  q:'maj7',  scale:'Ionian',         chord:[0,4,7,11] },
+  { root:'C',  q:'maj7',  scale:'Ionian',         chord:[0,4,7,11] },
+  { root:'G',  q:'7alt',  scale:'altered',        chord:[0,4,8,10,3] },
+  { root:'F#', q:'m7b5',  scale:'Locrian',        chord:[0,3,6,10], stress:'' },
+  { root:'G',  q:'7b9',   scale:'half-whole dim', chord:[0,4,7,10,1], stress:'8-note scale' },
+  { root:'C',  q:'7#5',   scale:'whole-tone',     chord:[0,4,8,10], stress:'6-note scale' },
+];
+// written = concert + [letter steps, semitones]
+const INSTR = [
+  ['Concert', null, null, [0,0]],
+  ['Flute', 'C4', 'C7', [0,0]],
+  ['Violin', 'G3', 'E7', [0,0]],
+  ['Trombone', 'E2', 'Bb4', [0,0]],
+  ['Vibraphone', 'F3', 'F6', [0,0]],
+  ['B♭ trumpet', 'F#3', 'C6', [1,2]],
+  ['B♭ clarinet', 'E3', 'A6', [1,2]],
+  ['B♭ soprano sax', 'Bb3', 'F#6', [1,2]],
+  ['B♭ tenor sax', 'Bb3', 'F#6', [8,14]],
+  ['E♭ alto sax', 'Bb3', 'F#6', [5,9]],
+  ['E♭ baritone sax', 'Bb3', 'F#6', [12,21]],
+  ['F horn', 'C3', 'G5', [4,7]],
+  ['Guitar', 'E3', 'E6', [7,12]],
+  ['Double bass / bass guitar', 'E2', 'G4', [7,12]],
+];
+const DEG = ['#e41a1c','#ff7f00','#ffd92f','#4daf4a','#377eb8','#984ea3','#a65628','#f781bf'];
+
+function buildSlot(s, iv) {
+  const rL = LET.indexOf(s.root[0]);
+  const rA = s.root.length > 1 ? (s.root[1] === '#' ? 1 : -1) : 0;
+  const wr = spellPc(mod(rL + iv[0], 7), LPC[rL] + rA + iv[1]);
+  const rPc = mod(LPC[wr.L] + wr.a, 12);
+  const degs = SCALES[s.scale].map(([st, se]) => ({ semis: se, step: st, ...spellPc(mod(wr.L + st, 7), rPc + se) }));
+  const wRoot = LET[wr.L] + accS(wr.a);
+  return { ...s, rPc, degs, N: degs.length, chordPcs: new Set(s.chord.map(x => mod(rPc + x, 12))),
+    sym: wRoot + s.q.replace('b', '♭').replace('#', '♯'), scName: wRoot + ' ' + s.scale,
+    names: degs.map(d => LET[d.L] + accS(d.a)).join(' ') };
+}
+function cellPitch(sc, t) {
+  const d = mod(t, sc.N), o = Math.floor(t / sc.N), g = sc.degs[d];
+  const midi = 12 + sc.rPc + g.semis + 12 * o;
+  return { t, d, deg: g.step, midi, name: nameMidi(midi, g.L, g.a), chord: sc.chordPcs.has(mod(midi, 12)) };
+}
+// row offsets: row r+1 starts a third (up-left) / fourth (up-right) above row r; odd rows indented half a cell right
+const rowOff = r => { let o = 0; for (let i = 0; i < r; i++) o += (i % 2 === 0) ? 3 : 2; return o; };
+
+// ---------- state ----------
+const VARIANTS = [['A', 'Fill dock'], ['B', 'Two-row strip'], ['C', 'Fit range']];
+let variant = new URLSearchParams(location.search).get('variant') || 'A';
+let instrIdx = 9; // alto by default — a transposing instrument
+let active = 0, hoverMidi = null, lastPick = null;
+const stubs = SLOTS.map(() => []);
+let layout = null;
+
+const $ = id => document.getElementById(id);
+INSTR.forEach((x, i) => $('instr').add(new Option(x[0] + (x[1] ? `  (written ${x[1]}–${x[2]})` : '  (no limit)'), i)));
+$('instr').value = instrIdx;
+
+function rangeOf() {
+  const [, lo, hi] = INSTR[instrIdx];
+  // Concert has no limit: prototype shows a C3–C6 window with nothing greyed (open question)
+  return lo ? { lo: parsePitch(lo), hi: parsePitch(hi), limited: true } : { lo: 48, hi: 84, limited: false };
+}
+
+function compute() {
+  const iv = INSTR[instrIdx][3];
+  const sc = buildSlot(SLOTS[active], iv);
+  const R0 = rangeOf();
+  let tLo = 0; while (cellPitch(sc, tLo).midi < R0.lo) tLo++;
+  let tHi = tLo; while (cellPitch(sc, tHi + 1).midi <= R0.hi) tHi++;
+  let t0 = tLo;
+  if ($('anchor').value === 'root') t0 = Math.floor(tLo / sc.N) * sc.N;
+
+  const svg = $('svg'), W = svg.clientWidth, H = svg.clientHeight;
+  const padX = 14, padTop = 30, padBot = 46; // bottom pad keeps the switcher off the cells
+  const availW = W - 2 * padX, availH = H - padTop - padBot;
+  const fitR = (cols, rows) => Math.min(availW / (Math.sqrt(3) * (cols + 0.5)), availH / (2 + 1.5 * (rows - 1)));
+  let cols, rows, R;
+  if (variant === 'A') {
+    R = +$('size').value;
+    cols = Math.max(1, Math.floor(availW / (Math.sqrt(3) * R) - 0.5));
+    rows = Math.max(1, Math.floor((availH - 2 * R) / (1.5 * R)) + 1);
+  } else if (variant === 'B') {
+    rows = 2;
+    cols = Math.max(4, tHi - t0 - rowOff(rows - 1) + 1);
+    R = fitR(cols, rows);
+  } else {
+    let best = null;
+    for (let r = 1; r <= 12; r++) {
+      const c = Math.max(4, tHi - t0 - rowOff(r - 1) + 1);
+      const rr = fitR(c, r);
+      if (!best || rr > best.R) best = { cols: c, rows: r, R: rr };
+    }
+    ({ cols, rows, R } = best);
+  }
+  const cells = [];
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    const t = t0 + c + rowOff(r);
+    const p = cellPitch(sc, t);
+    p.inRange = !R0.limited || (p.midi >= R0.lo && p.midi <= R0.hi);
+    p.cx = padX + Math.sqrt(3) * R * (c + 0.5 + (r % 2) * 0.5);
+    p.cy = H - padBot - R - r * 1.5 * R;
+    p.r = r; p.c = c;
+    cells.push(p);
+  }
+  // coverage
+  const visT = new Set(cells.map(x => x.t));
+  let missing = [];
+  for (let t = tLo; t <= tHi; t++) if (!visT.has(t)) missing.push(cellPitch(sc, t).name);
+  const inR = cells.filter(x => x.inRange);
+  const perPitch = {}; inR.forEach(x => perPitch[x.midi] = (perPitch[x.midi] || 0) + 1);
+  const counts = Object.values(perPitch);
+  layout = { sc, R0, tLo, tHi, t0, cols, rows, R, cells, missing, iv,
+    lowName: cellPitch(sc, tLo).name, hiName: cellPitch(sc, tHi).name,
+    grey: cells.length - inR.length, maxRepeat: counts.length ? Math.max(...counts) : 0,
+    distinct: counts.length, totalTones: tHi - tLo + 1 };
+}
+
+function hexPts(cx, cy, R) {
+  let s = '';
+  for (let i = 0; i < 6; i++) { const a = Math.PI / 180 * (60 * i - 30); s += (cx + R * Math.cos(a)).toFixed(1) + ',' + (cy + R * Math.sin(a)).toFixed(1) + ' '; }
+  return s;
+}
+
+function renderDock() {
+  const { cells, R } = layout;
+  const hide = $('hidegrey').checked, deg = $('degnum').checked;
+  const fs = Math.max(9, R * 0.42);
+  let h = '';
+  for (const p of cells) {
+    if (hide && !p.inRange) continue;
+    const border = DEG[p.deg]; // border = spelled degree 1–7 (option 2)
+    const fill = !p.inRange ? '#bdbab3' : p.chord ? '#ffffff' : '#141414';
+    const ink = !p.inRange ? '#8a877f' : p.chord ? '#111' : '#f4f4f4';
+    const op = p.inRange ? 1 : 0.35;
+    const cls = 'cell' + (hoverMidi === p.midi && p.inRange ? ' dup' : '');
+    h += `<g class="${cls}" data-t="${p.t}" data-midi="${p.midi}">
+      <polygon class="face" points="${hexPts(p.cx, p.cy, R - 2)}" fill="${fill}" stroke="${border}" stroke-opacity="${op}" stroke-width="3"/>
+      <polygon class="halo" points="${hexPts(p.cx, p.cy, R + 1)}"/>
+      <text x="${p.cx}" y="${p.cy + fs * 0.35}" text-anchor="middle" font-size="${fs}" fill="${ink}">${p.name.replace(/-?\d+$/, '')}</text>
+      ${deg ? `<text x="${p.cx}" y="${p.cy - R * 0.45}" text-anchor="middle" font-size="${fs * 0.6}" fill="${ink}" opacity=".7">${p.deg + 1}</text>` : ''}
+    </g>`;
+  }
+  $('svg').innerHTML = h;
+  $('legend').innerHTML = layout.sc.degs.map(d => `<span><i style="border-color:${DEG[d.step]}"></i>${d.step + 1} ${LET[d.L]}${accS(d.a)}</span>`).join('')
+    + `<span><i style="border-color:#999;background:#fff"></i>chord</span><span><i style="border-color:#999;background:#141414"></i>scale</span><span><i style="border-color:#bbb;background:#bdbab3"></i>out of range</span>`;
+}
+
+function renderChart() {
+  const iv = INSTR[instrIdx][3];
+  $('chart').innerHTML = SLOTS.map((s, i) => {
+    const b = buildSlot(s, iv);
+    return `<div class="slot${i === active ? ' active' : ''}" data-i="${i}">
+      ${s.stress ? `<span class="tag2">stress: ${s.stress}</span>` : ''}
+      <div class="sym">${b.sym}</div><div class="sc">${b.scName} · ${b.names}</div>
+      <div class="stub">${stubs[i].join(' ') || '<span style="color:#bbb">(notation stub)</span>'}</div></div>`;
+  }).join('');
+}
+
+function renderState() {
+  const L = layout, v = VARIANTS.find(x => x[0] === variant);
+  const ivName = INSTR[instrIdx][3][1] ? `written = concert + ${INSTR[instrIdx][3][1]} semitones` : 'concert = written';
+  $('state').textContent =
+`variant      ${v[0]} · ${v[1]}
+instrument   ${INSTR[instrIdx][0]} (${ivName})
+range        ${L.R0.limited ? INSTR[instrIdx][1] + '–' + INSTR[instrIdx][2] + ' written' : 'none — showing C3–C6, nothing grey'}
+active slot  ${active + 1}: ${L.sc.sym}  →  ${L.sc.scName}
+             ${L.sc.names}  (${L.sc.N} notes)
+anchor       ${$('anchor').value}  (bottom-left t=${L.t0}: ${cellPitch(L.sc, L.t0).name})
+grid         ${L.cols} cols × ${L.rows} rows = ${L.cells.length} cells, radius ${L.R.toFixed(1)}px
+in-range     ${L.lowName} … ${L.hiName}  (${L.totalTones} scale tones)
+coverage     ${L.missing.length ? 'MISSING ' + L.missing.length + ': ' + L.missing.slice(0, 8).join(' ') + (L.missing.length > 8 ? ' …' : '') : 'all in-range tones visible'}
+grey cells   ${L.grey}
+repeats      ${L.distinct} distinct pitches, max ${L.maxRepeat}× on screen
+last pick    ${lastPick || '—'}`;
+}
+
+function renderSwitcher() {
+  const v = VARIANTS.find(x => x[0] === variant);
+  $('vlab').textContent = `${v[0]} — ${v[1]}`;
+  $('sizeWrap').style.opacity = variant === 'A' ? 1 : .35;
+}
+
+function renderAll() { compute(); renderChart(); renderDock(); renderState(); renderSwitcher(); }
+
+// ---------- audio ----------
+let ctx = null;
+function play(concertMidi) {
+  ctx = ctx || new AudioContext();
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.type = 'sine'; o.frequency.value = 440 * Math.pow(2, (concertMidi - 69) / 12);
+  g.gain.setValueAtTime(0.0001, ctx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.6);
+  o.connect(g).connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.65);
+}
+
+// ---------- events ----------
+$('chart').addEventListener('click', e => { const s = e.target.closest('.slot'); if (!s) return; active = +s.dataset.i; renderAll(); });
+$('svg').addEventListener('click', e => {
+  const g = e.target.closest('.cell'); if (!g) return;
+  const p = layout.cells.find(x => x.t === +g.dataset.t);
+  play(p.midi - layout.iv[1]);
+  lastPick = `${p.name} (written MIDI ${p.midi}, concert ${p.midi - layout.iv[1]}), degree ${p.deg + 1}, ${p.inRange ? (p.chord ? 'chord tone' : 'scale tone') : 'OUT OF RANGE'}`;
+  stubs[active].push(p.name);
+  flashSame(p.midi);
+  g.classList.add('flash'); setTimeout(() => { renderChart(); renderState(); }, 120);
+});
+// on play: flash every cell holding the same pitch, so the octave is implied without printing it
+let dupTimer = null;
+function flashSame(midi) {
+  clearTimeout(dupTimer);
+  document.querySelectorAll('#svg .cell').forEach(c => c.classList.toggle('dup', +c.dataset.midi === midi));
+  dupTimer = setTimeout(() => document.querySelectorAll('#svg .cell.dup').forEach(c => c.classList.remove('dup')), 700);
+}
+$('instr').onchange = e => { instrIdx = +e.target.value; renderAll(); };
+['anchor', 'degnum', 'hidegrey'].forEach(id => $(id).onchange = renderAll);
+$('size').oninput = e => { $('sizeLab').textContent = e.target.value; renderAll(); };
+function cycle(d) {
+  const i = VARIANTS.findIndex(x => x[0] === variant);
+  variant = VARIANTS[mod(i + d, VARIANTS.length)][0];
+  const u = new URL(location); u.searchParams.set('variant', variant); history.replaceState(null, '', u);
+  renderAll();
+}
+$('prev').onclick = () => cycle(-1); $('next').onclick = () => cycle(1);
+document.addEventListener('keydown', e => {
+  if (e.target.matches('input, textarea, select, [contenteditable]')) return;
+  if (e.key === 'ArrowLeft') cycle(-1);
+  if (e.key === 'ArrowRight') cycle(1);
+});
+window.addEventListener('resize', renderAll);
+renderAll();
+</script>
+</body>
+</html>
