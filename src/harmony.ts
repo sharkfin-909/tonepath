@@ -145,7 +145,12 @@ export function candidateScales(c: ParsedChord): ScaleId[] {
       return pcs.every((pc) => scale.has(pc));
     });
   };
-  const all = fits(c.intervals);
+  // A plain triad (no 7th) also fits the key's modes it sits in: a major triad on V (Mixolydian), a diminished triad
+  // on vii (Locrian) — last, so defaults don't change (SPEC §4.2: the key's simple chords keep the key).
+  const triad = !c.intervals.some((iv) => iv.startsWith('7'));
+  const extra: ScaleId[] = triad && family === 'major' ? ['mixolydian'] : triad && family === 'diminished' ? ['locrian'] : [];
+  const fitsExtra = extra.filter((id) => c.intervals.every((iv) => scalePitchClasses(c.root, id).has(pcOf(c.root, iv))));
+  const all = [...fits(c.intervals), ...fitsExtra];
   if (all.length > 0 || !(c.intervals.includes('5P') && c.intervals.includes('13m'))) return all;
   return fits(c.intervals.filter((iv) => iv !== '5P'));
 }

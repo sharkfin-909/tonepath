@@ -1,7 +1,7 @@
 // In-place chord-symbol entry (SPEC §4.2). Enter / Tab → next slot, ⇧Tab → previous, Esc cancels.
 // Autosuggest: completions for the symbol being typed; ↑ / ↓ pick one, Enter / Tab take it, a click takes it.
 import { useEffect, useRef, useState } from 'react';
-import { acceptSuggestion, suggestChords } from '../chordSuggest';
+import { acceptSuggestion, capitaliseRoots, suggestChords } from '../chordSuggest';
 
 export interface ChordFieldProps {
   initial: string;
@@ -11,14 +11,16 @@ export interface ChordFieldProps {
   onCommit: (text: string, move: -1 | 1 | null) => boolean;
   /** Chords already in the progression (written): suggested first. */
   used?: string[];
+  /** The key's simple chords (written): listed while the field is empty, first for a typed root. */
+  inKey?: string[];
 }
 
-export function ChordField({ initial, error, onCommit, used = [] }: ChordFieldProps) {
+export function ChordField({ initial, error, onCommit, used = [], inKey = [] }: ChordFieldProps) {
   const ref = useRef<HTMLInputElement>(null);
   const done = useRef(false);
   const [value, setValue] = useState(initial);
-  // The list opens once the user types, and closes on Esc or after a commit.
-  const [open, setOpen] = useState(false);
+  // The list opens once the user types (or at once, empty, with the key's chords), and closes on Esc or after a commit.
+  const [open, setOpen] = useState(initial === ''); // an empty field lists the key's chords straight away
   const [index, setIndex] = useState(-1);
 
   useEffect(() => {
@@ -26,7 +28,7 @@ export function ChordField({ initial, error, onCommit, used = [] }: ChordFieldPr
     ref.current?.select();
   }, []);
 
-  const { from, items } = open ? suggestChords(value, used) : { from: 0, items: [] };
+  const { from, items } = open ? suggestChords(value, used, 8, inKey) : { from: 0, items: [] };
   const showList = items.length > 0;
 
   const finish = (text: string, move: -1 | 1 | null) => {
@@ -55,7 +57,15 @@ export function ChordField({ initial, error, onCommit, used = [] }: ChordFieldPr
         aria-autocomplete="list"
         aria-activedescendant={showList && index >= 0 ? `chord-suggest-${index}` : undefined}
         onChange={(e) => {
-          setValue(e.currentTarget.value);
+          // Root letters capitalised as typed; the caret stays put (same length).
+          const input = e.currentTarget;
+          const fixed = capitaliseRoots(input.value);
+          if (fixed !== input.value) {
+            const at = input.selectionStart;
+            input.value = fixed;
+            input.setSelectionRange(at, at);
+          }
+          setValue(fixed);
           setOpen(true);
           setIndex(-1);
         }}

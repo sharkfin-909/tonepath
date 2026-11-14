@@ -5,10 +5,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { LengthLatch } from './rail/LengthLatch';
 import { Chart } from './chart/Chart';
-import { commitChordText, setBarsPerRow, setConcertClef, setInstrument, setScaleOverride, setTitle, type Progression } from './progression';
+import { setBarsPerRow, setConcertClef, setInstrument, setScaleOverride, setTitle, type Progression } from './progression';
 import { BarsPerRow, ClearAll, TimeSignatureField, TitleField } from './rail/RailSettings';
 import { InstrumentPicker } from './rail/InstrumentPicker';
-import { concertChordText } from './instruments';
 import { playBass, playChord, playNote, playRoot, playScale, setMuted, unlockAudio } from './audio';
 import { onArrivalOf, readDevice, writeDevice, type OnArrival } from './device';
 import { AudioControls } from './rail/AudioControls';
@@ -16,6 +15,7 @@ import { DockedHex } from './hex/DockedHex';
 import type { StoredProgression } from './storage';
 import { openDocument, type ProgressionDocument } from './document';
 import { initialSession, reduce, type Effect, type Intent, type SessionState } from './session';
+import { enterChord } from './chordEntry';
 import { keyIntent } from './keymap';
 import { clickUnderPointer, trackPointer } from './pointerClick';
 import { instrumentView } from './view';
@@ -211,8 +211,9 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
   const onRefusalShown = useCallback(() => dispatchRef.current({ type: 'refusal-shown' }), []);
 
   // Input in a non-Concert view is read as written (SPEC §5.3).
+  /** Chord entry (SPEC §4.2): one step — transposition, splitting, the key's mode — committed as one undo step. */
   const onChordCommit = (bar: number, part: number, text: string) => {
-    const r = commitChordText(doc.progression, bar, part, concertChordText(text, view.inst));
+    const r = enterChord(doc.progression, view, bar, part, text);
     if (r.ok) commit(r.progression);
     return r;
   };

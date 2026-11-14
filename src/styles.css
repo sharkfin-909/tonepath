@@ -3,7 +3,15 @@
   --ink: #1d1b19;
   --muted: #7a746e;
   --rail-bg: #f3f1ec;
-  --dock-bg: #d9d6ce;
+  --dock-bg: #453f38;
+  /* Hex theme tokens (DockedHex reads these; SPEC §8.2). */
+  --cell-neutral: #bfafa2; /* non-triad cells at rest, and every cell of the unchecked hex */
+  --cell-outline: #a39385;
+  --ball-highlight: #ffe6d0; /* note spheres: highlight (top left) → rim */
+  --ball-edge: #44372f;
+  --ball-ink: #ffffff; /* degree numbers and ♯ / ♭ / ♮ on the spheres */
+  --grid-glow: #f5e9b0; /* the glow around the honeycomb */
+  --grid-glow-opacity: 0.65;
   --line: #1d1b19;
   --divider: #8c8680;
   --focus: #2f6fdb;
@@ -130,11 +138,39 @@ body,
   fill: var(--deg-ink);
   transition: fill 180ms ease;
 }
+/* A cell's top part (lit glow, name, socket) and the travelling colour copy: the pointer goes to the cell's fill. */
+.hex-cell-top,
+.hex-colour-copy {
+  pointer-events: none;
+}
+/* The ball layer sits above the cells; clicks and hover go to the cell underneath. */
+.hex-balls {
+  pointer-events: none;
+}
 .hex-ball {
   transition: transform 180ms cubic-bezier(0.3, 0.7, 0.4, 1.2); /* a slight overshoot: the ball settles */
 }
 .hex-socket {
   transition: opacity 180ms ease;
+}
+/* The clicked ball (or border button): shrinks fast, then grows back easing out. */
+.hex-pop {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: hex-pop 750ms both; /* ~30 ms dip, ~720 ms recovery */
+}
+@keyframes hex-pop {
+  0% {
+    transform: scale(1);
+    animation-timing-function: cubic-bezier(0.5, 0, 1, 1); /* accelerate into the dip */
+  }
+  4% {
+    transform: scale(0.45);
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1); /* ease out: fast, then settling */
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .hex-bg,
@@ -143,10 +179,13 @@ body,
   .hex-socket {
     transition: none;
   }
+  .hex-pop {
+    animation: none;
+  }
 }
 .hex-cell.muted .hex-bg {
-  fill: #cdc9c0;
-  stroke: #bdb8ad;
+  fill: var(--cell-neutral);
+  stroke: var(--cell-outline);
   stroke-width: 1;
 }
 .hex-cell.muted .hex-name {
@@ -167,8 +206,9 @@ body,
 
 /* Chromatic-entry buttons on cell borders: beside the hovered cell (desktop), always on touch screens. */
 .hex-acc {
-  opacity: 0;
-  pointer-events: none;
+  /* Always shown (SPEC §8.3). */
+  opacity: 1;
+  pointer-events: auto;
   cursor: pointer;
   transition: opacity 120ms ease;
 }
@@ -187,12 +227,10 @@ body,
   }
 }
 
-/* Every cell with the hovered / clicked pitch: a white glow round its ball. */
+/* Every cell with the hovered / clicked pitch: a white glow inside its edge (DockedHex: blurred, clipped). */
 .hex-lit {
   fill: none;
   stroke: #ffffff;
-  stroke-width: 3;
-  filter: drop-shadow(0 0 3px #ffffff) drop-shadow(0 0 7px rgba(255, 255, 255, 0.85));
   pointer-events: none;
 }
 
@@ -1251,4 +1289,28 @@ button.dock-label {
   padding: 0 4px;
   font-weight: 600;
   white-space: nowrap;
+}
+
+/* Degree numbers / accidentals on the dark-rimmed spheres: white, lifted by a soft dark edge. */
+.hex-ball-ink {
+  fill: var(--ball-ink);
+  paint-order: stroke;
+  stroke: rgba(40, 30, 24, 0.55);
+  stroke-width: 2px;
+}
+
+/* Inversion labels under the bottom row of the hex (root / 1st / 2nd / 3rd); hover tip "… inversion". */
+.hex-inversion {
+  fill: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: help;
+}
+
+/* The glow around the whole honeycomb (theme tokens). */
+.hex-glow {
+  opacity: var(--grid-glow-opacity);
+}
+.hex-glow polygon {
+  fill: var(--grid-glow);
 }

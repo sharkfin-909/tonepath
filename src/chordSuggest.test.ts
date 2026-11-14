@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseChord } from './chords';
-import { QUALITIES, acceptSuggestion, suggestChords } from './chordSuggest';
+import { QUALITIES, acceptSuggestion, capitaliseRoots, suggestChords } from './chordSuggest';
 
 const symbols = (text: string, used: string[] = [], limit?: number) => suggestChords(text, used, limit).items.map((i) => i.symbol);
 
@@ -55,5 +55,15 @@ describe('chord autosuggest', () => {
 
   it('shows the tones', () => {
     expect(suggestChords('Dm', [], 1).items[0]).toEqual({ symbol: 'Dm7', tones: 'D F A C' });
+  });
+
+  it('root letters are capitalised as typed; a b after a root stays a flat; qualities stay lower case', () => {
+    expect(capitaliseRoots('d')).toBe('D');
+    expect(capitaliseRoots('bbm7')).toBe('Bbm7');
+    expect(capitaliseRoots('ebmaj7')).toBe('Ebmaj7');
+    expect(capitaliseRoots('g7/b')).toBe('G7/B');
+    expect(capitaliseRoots('dm7 g7')).toBe('Dm7 G7');
+    expect(capitaliseRoots('c6/9 cm(add9) csus4 caug cdim7 c7alt')).toBe('C6/9 Cm(add9) Csus4 Caug Cdim7 C7alt');
+    expect(capitaliseRoots('n.c.')).toBe('n.c.');
   });
 });

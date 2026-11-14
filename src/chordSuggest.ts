@@ -27,11 +27,15 @@ export interface Suggestions {
 
 const NONE: Suggestions = { from: 0, items: [] };
 
-/** Suggestions for `text` with the cursor at its end. `used` = chords already in the progression. */
-export function suggestChords(text: string, used: string[] = [], limit = 8): Suggestions {
+/**
+ * Suggestions for `text` with the cursor at its end. `used` = chords already in the progression; `inKey` = the key's
+ * simple chords (key.ts keyChords): all of them for an empty field, and first among completions of a typed root.
+ */
+export function suggestChords(text: string, used: string[] = [], limit = 8, inKey: string[] = []): Suggestions {
   const from = Math.max(text.lastIndexOf(' '), text.lastIndexOf('\t')) + 1;
   const token = text.slice(from);
-  if (token === '' || token.includes('/') || /\s/.test(token)) return NONE;
+  if (token === '') return { from, items: inKey.flatMap((symbol) => withTones(symbol)) };
+  if (token.includes('/') || /\s/.test(token)) return NONE;
 
   if (/^n\.?c?\.?$/i.test(token)) return { from, items: [{ symbol: 'N.C.', tones: 'no chord' }] };
 
@@ -52,6 +56,7 @@ export function suggestChords(text: string, used: string[] = [], limit = 8): Sug
   };
 
   const typedRoot = (s: string) => /^([A-G])(#|b|♯|♭)?/.exec(s)?.[0];
+  for (const k of inKey) if (typedRoot(k) === root && k.slice(root.length).startsWith(q)) offer(k);
   for (const u of used) if (typedRoot(u) === root && u.slice(root.length).startsWith(q)) offer(u);
   // A bare `m` means minor: `maj` qualities wait until the `a` is typed.
   const fits = (quality: string) => quality.startsWith(q) && !(q === 'm' && quality.startsWith('ma'));
@@ -62,6 +67,20 @@ export function suggestChords(text: string, used: string[] = [], limit = 8): Sug
     for (const quality of QUALITIES) if (quality.toLowerCase().startsWith(lq)) offer(root + quality);
   }
   return { from, items };
+}
+
+function withTones(symbol: string): ChordSuggestion[] {
+  const c = parseChord(symbol);
+  return c.kind === 'chord' ? [{ symbol, tones: chordNoteNames(c).map(prettyName).join(' ') }] : [];
+}
+
+/**
+ * Root letters capitalised as typed (SPEC §4.2): the first letter of each symbol and the letter after a `/`
+ * (a slash bass) become A–G; everything else is left alone — `b` after a root is a flat, qualities stay lower case.
+ * `d` → `D`, `bbm7` → `Bbm7`, `g7/b` → `G7/B`, `dm7 g7` → `Dm7 G7`.
+ */
+export function capitaliseRoots(text: string): string {
+  return text.replace(/(^|\s|\/)([a-g])/g, (_, before: string, letter: string) => before + letter.toUpperCase());
 }
 
 /** The text with the token at `from` replaced by `symbol`. */

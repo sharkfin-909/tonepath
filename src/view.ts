@@ -4,6 +4,7 @@
 
 import { layoutMeter, slotAt, slotsOf, type FormSlot, type Meter } from './form';
 import { scaleLabel, slotHarmony, type SlotHarmony } from './harmony';
+import { keyChords, type KeyChord } from './key';
 import { dockHex, type DockHex, type PitchRange } from './hex';
 import { clefOf, hexRange, instrumentOf, toConcert, toWritten, writtenChord, type Clef, type Instrument } from './instruments';
 import { noteMark, type NoteMark } from './marks';
@@ -45,6 +46,8 @@ export interface InstrumentView {
   name: (concertMidi: number, slot: ViewSlot) => string;
   /** Out-of-scale / out-of-range marks for a concert pitch in its owning slot (SPEC §7.2). */
   mark: (concertMidi: number, slot: ViewSlot) => NoteMark;
+  /** The key's simple chords offered in the slot at `index`'s empty chord field (written; SPEC §4.2). */
+  keyChords: (index: number) => KeyChord[];
   /** The docked hex for the slot at `index` (SPEC §8.4). */
   dock: (index: number) => DockHex;
 }
@@ -76,5 +79,6 @@ export function instrumentView(p: Progression): InstrumentView {
     name: (m, slot) => noteName(toWritten(m, inst), slot.spelling),
     mark: (m, slot) => noteMark(toWritten(m, inst), slot.harmony, slot.chord, inst),
     dock: (index) => dockHex(slots.map((s) => s.harmony), index, range),
+    keyChords: (index) => keyChords(slots.slice(0, index).reverse().map((s) => s.harmony)),
   };
 }

@@ -28,6 +28,7 @@ export interface ChartProps {
   /** A click on a stave away from the notes: the form time under the pointer. */
   onTimeClick: (t: number) => void;
   /** Apply typed chord text to a slot; returns the result (refused commits change nothing). */
+  /** Chord entry (chordEntry.ts): the typed text for a slot → the commit result. */
   onChordCommit: (bar: number, part: number, text: string) => ChordCommit;
   /** Set (or with null, clear) a slot's scale override. */
   onScaleChange: (bar: number, part: number, scale: ScaleId | null) => void;
@@ -266,7 +267,7 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
       )}
       <div className="slot-header" style={{ height: header }}>
         {editing ? (
-          <ChordField initial={chord} error={error} onCommit={onCommit} used={usedChords} />
+          <ChordField initial={chord} error={error} onCommit={onCommit} used={usedChords} inKey={view.keyChords(slot.index).map((k) => k.symbol)} />
         ) : (
           <ChordLabel chord={chord} harmony={harmony} bar={slot.bar} part={slot.part} onEdit={onEdit} />
         )}

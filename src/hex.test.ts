@@ -2,7 +2,7 @@
 // ii–V–I — Concert, plus trombone, violin and B♭ tenor sax (written view), and the §8.4 cases.
 import { describe, expect, it } from 'vitest';
 import { slotHarmony } from './harmony';
-import { CONCERT_VIEW, cellCentre, dockHex, hexGrid, hexSize, slotHex, type SlotHex } from './hex';
+import { CONCERT_VIEW, cellCentre, dockHex, hexGrid, hexSize, inversionLabel, slotHex, type SlotHex } from './hex';
 import { hexRange, instrumentOf, writtenChord } from './instruments';
 
 const hexFor = (chord: string, scale?: string): SlotHex => {
@@ -16,7 +16,7 @@ const octaveDegrees = (hex: SlotHex, root: string) => {
   const bottom = row(hex, 0);
   const start = bottom.findIndex((c) => c.name === root);
   const pcs = new Set<number>();
-  const out: number[] = [];
+  const out: (number | null)[] = [];
   for (const c of bottom.slice(start)) {
     if (pcs.has(c.midi % 12)) break;
     pcs.add(c.midi % 12);
@@ -68,13 +68,13 @@ describe('test table 6: hex layout (Concert C3–C6)', () => {
   it('8-note scale: G half-whole (G7b9) degrees 1 2 3 3 4 5 6 7', () => {
     const hex = hexFor('G7b9');
     expect(octaveDegrees(hex, 'G')).toEqual([1, 2, 3, 3, 4, 5, 6, 7]);
-    expect(hex.rowLengths).toEqual([19, 19, 20]); // 24 steps in C3–C6 (no C in G half-whole)
+    expect(hex.rowLengths).toEqual([17, 17, 18]); // fixed 7-note fit (24 of its steps lie in C3–C6)
   });
 
   it('6-note scale: C whole-tone (C7#5) degrees 1 2 3 4 5 7', () => {
     const hex = hexFor('C7#5');
     expect(octaveDegrees(hex, 'C')).toEqual([1, 2, 3, 4, 5, 7]);
-    expect(hex.rowLengths).toEqual([14, 14, 15]); // 19 steps (C3 … C6)
+    expect(hex.rowLengths).toEqual([17, 17, 18]); // fixed 7-note fit: reaches past C6
   });
 
   it('G altered, scale-spelled (override on G7b5b9): degrees 1 2 3 3 5 6 7', () => {
@@ -85,7 +85,7 @@ describe('test table 6: hex layout (Concert C3–C6)', () => {
   it('G7alt: anchor moves to Db3 (lowest in-range altered tone); chord spelling renames the #5 / #9', () => {
     const hex = hexFor('G7alt');
     expect(hex.anchor).toBe(49);
-    expect(hex.rowLengths).toEqual([16, 16, 17]);
+    expect(hex.rowLengths).toEqual([17, 17, 18]);
     const names = row(hex, 0).slice(0, 7).map((c) => `${c.name}${c.degree}`);
     expect(names).toEqual(['Db5', 'D#5', 'F7', 'G1', 'Ab2', 'A#2', 'B3']);
   });
@@ -102,7 +102,25 @@ describe('test table 6: hex layout (Concert C3–C6)', () => {
   });
 });
 
+describe('inversion labels (SPEC §8.2)', () => {
+  const labels = (chord: string) =>
+    Object.fromEntries(hexFor(chord).cells.filter((c) => inversionLabel(c)).map((c) => [c.name, inversionLabel(c)]));
+  it('root position, and the 3rd, 5th and 7th in the bass make the 1st, 2nd and 3rd inversions', () => {
+    expect(labels('Dm7')).toEqual({ D: 'root', F: '1st', A: '2nd', C: '3rd' });
+    expect(labels('C')).toEqual({ C: 'root', E: '1st', G: '2nd' }); // a triad: no 3rd inversion
+  });
+  it('no labels without a chord', () => {
+    expect(dockHex([slotHarmony({ chord: 'N.C.' })], 0).hex.cells.some((c) => inversionLabel(c))).toBe(false);
+  });
+});
+
 describe('hexGrid and fitting', () => {
+  it('the same grid size in every key and scale (sized from the range); the chord-tones hex sizes itself', () => {
+    const sizes = ['C', 'D', 'F#', 'B', 'C7alt', 'Cdim7', 'C+', 'Am7b5'].map((chord) => hexFor(chord).rowLengths.join('/'));
+    expect(new Set(sizes)).toEqual(new Set(['17/17/18']));
+    expect(dockHex([slotHarmony({ chord: 'C7sus4b9' })], 0).hex.rowLengths).not.toEqual([17, 17, 18]);
+  });
+
   it('cells are regular hexagons in any dock shape (never stretched or squashed)', () => {
     const g = hexGrid(new Set([0, 2, 4, 5, 7, 9, 11]), CONCERT_VIEW);
     const size = hexSize(g, 400, 1000, 12);
@@ -200,28 +218,14 @@ describe('test table 6: §8.4 slots without a scale', () => {
   const hs = (...chords: string[]) => chords.map((chord) => slotHarmony({ chord }));
   const pitches = (hex: SlotHex) => hex.cells.map((c) => c.midi);
 
-  it('N.C. after a scaled slot: that slot\'s layout, unchecked', () => {
-    const d = dockHex(hs('Dm7', 'G7', 'N.C.'), 2);
-    expect(d.mode).toBe('unchecked');
-    expect(d.label).toBe('N.C.: notes not checked');
-    expect(d.labelEditsChord).toBe(false);
-    expect(pitches(d.hex)).toEqual(pitches(hexFor('G7')));
-    expect(d.hex.cells.find((c) => c.name === 'G')!.degree).toBe(1); // G Mixolydian rings
-  });
-
-  it('N.C. before any scaled slot: the next scaled slot\'s layout', () => {
-    const d = dockHex(hs('N.C.', 'N.C.', 'Bbm7'), 0);
-    expect(pitches(d.hex)).toEqual(pitches(hexFor('Bbm7')));
-  });
-
-  it('skips no-fit and unscaled slots when looking for a layout', () => {
-    const d = dockHex(hs('Dm7', 'C7sus4b9', '', 'N.C.'), 3);
-    expect(pitches(d.hex)).toEqual(pitches(hexFor('Dm7')));
-  });
-
-  it('no scaled slot anywhere (form start): C major', () => {
-    const d = dockHex(hs('N.C.', ''), 0);
-    expect(pitches(d.hex)).toEqual(pitches(hexFor('C')));
+  it('N.C.: always the key of C, whatever is around it; no degree data', () => {
+    for (const d of [dockHex(hs('Dm7', 'G7', 'N.C.'), 2), dockHex(hs('N.C.', 'Bbm7'), 0), dockHex(hs('N.C.', ''), 0)]) {
+      expect(d.mode).toBe('unchecked');
+      expect(pitches(d.hex)).toEqual(pitches(hexFor('C')));
+      expect(d.hex.cells.every((c) => c.degree === null && !c.triad && c.colour === 'var(--cell-neutral)')).toBe(true);
+    }
+    const d = dockHex(hs('Dm7', 'N.C.'), 1);
+    expect([d.label, d.labelEditsChord]).toEqual(['N.C.: notes not checked', false]);
   });
 
   it('empty and unparseable slots: their labels, which edit the chord', () => {

@@ -1,7 +1,9 @@
 // The docked hex (SPEC §8): React SVG for the active slot. Click = pick; a nudged pitch gets a dashed halo.
 // Slots without a scale (§8.4): the unchecked hex (no chord) or the chord-tones hex, each with a dock label.
+// Geometry and the travel plan come from `hexLayout`; colours from the CSS theme tokens (styles.css :root).
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { HEX_THEME as T, cellCentre, hexSize, type DockHex, type HexBorder, type HexCell } from '../hex';
+import { HEX_THEME as T, type DockHex, type HexBorder, type HexCell } from '../hex';
+import { layoutHex, travelSteps, type HexLayout } from '../hexLayout';
 import { prettyName } from '../spelling';
 
 /** A pointy-top hex, `rx` across (half-width √3/2·rx) and `ry` from centre to top vertex. */
@@ -30,6 +32,15 @@ function useSize<T extends HTMLElement>() {
 /** A hover place: a cell (by grid position), or a chromatic-entry button on a border (row, x, index). */
 type HoverTarget = { kind: 'cell'; r: number; c: number } | { kind: 'border'; r: number; x: number; i: number };
 
+const buttonKey = (b: HexBorder, i: number) => `b${b.r}:${b.x}:${i}`;
+
+/** Slide an element in from `dx` px to its place (the travel plan); a new slide takes over mid-way. */
+function slideIn(el: Element | null, dx: number) {
+  if (!el) return;
+  el.getAnimations().forEach((a) => a.cancel());
+  el.animate([{ transform: `translate(${dx}px, 0)` }, { transform: 'translate(0, 0)' }], { duration: T.travelMs, easing: 'ease-in' });
+}
+
 export interface DockedHexProps {
   /** What the dock shows for the active slot (SPEC §8.4), in the view's (written) pitch. */
   dock: DockHex;
@@ -46,11 +57,10 @@ export interface DockedHexProps {
 export function DockedHex({ dock, onPick, halo, onLabelClick, onHoverPitch }: DockedHexProps) {
   const [ref, { width, height }] = useSize<HTMLDivElement>();
   const { hex, mode, label, labelEditsChord } = dock;
-  // Duplicates (SPEC §8.2): hovering a cell, or clicking it (~600 ms), lights every cell with the same pitch.
-  // What is under the pointer is kept as a place (a cell, or a border button), so its pitch follows the hex when the
-  // slot changes under a still pointer.
+  const layout: HexLayout | null = width > 0 && height > 0 ? layoutHex(hex, width, height, T.borderButtonGap) : null;
+
+  // Hover (SPEC §8.2 duplicates): kept as a place, so its pitch follows the hex when the slot changes under a still pointer.
   const [hover, setHoverState] = useState<HoverTarget | null>(null);
-  /** A hover place's pitch in the current hex, and whether A may pick it. */
   const resolve = (t: HoverTarget | null): { midi: number | null; pick: number | null } => {
     if (!t) return { midi: null, pick: null };
     if (t.kind === 'border') {
@@ -60,7 +70,7 @@ export function DockedHex({ dock, onPick, halo, onLabelClick, onHoverPitch }: Do
     const cell = hex.cells.find((c) => c.r === t.r && c.c === t.c);
     return { midi: cell?.midi ?? null, pick: cell?.playable && onPick ? cell.midi : null };
   };
-  // Border buttons show next to the hovered cell (both its borders) or while hovered themselves (CSS: always on touch).
+  // Border buttons show beside the hovered cell (both its borders) or while hovered themselves (CSS: always on touch).
   const hoverCell = hover?.kind === 'cell' ? hex.cells.find((c) => c.r === hover.r && c.c === hover.c) : undefined;
   const shown = (b: HexBorder) =>
     hover !== null && b.r === hover.r && (hover.kind === 'border' ? b.x === hover.x : !!hoverCell && Math.abs(b.x - hoverCell.x) === 0.5);
@@ -70,74 +80,147 @@ export function DockedHex({ dock, onPick, halo, onLabelClick, onHoverPitch }: Do
     setHoverState(t);
     onHoverPitch?.(resolve(t).pick);
   };
+  // A picks what is under the pointer (SPEC §11). When the hex changes under a still pointer, report the new pitch too.
+  useLayoutEffect(() => {
+    onHoverPitch?.(hoverPick);
+  }, [hoverPick, onHoverPitch]);
+
+  // A click: the pitch is picked, its cells light (~600 ms) and the clicked ball pops (re-keyed by `n` to replay).
   const [flash, setFlash] = useState<number | null>(null);
   const flashTimer = useRef<number>();
   useEffect(() => () => window.clearTimeout(flashTimer.current), []);
+  const [pressed, setPressed] = useState<{ at: string; n: number }>({ at: '', n: 0 });
   const pick = !onPick
     ? undefined
-    : (midi: number) => {
+    : (midi: number, at: string) => {
+        setPressed((p) => ({ at, n: p.n + 1 }));
         onPick(midi);
         setFlash(midi);
         window.clearTimeout(flashTimer.current);
         flashTimer.current = window.setTimeout(() => setFlash(null), 600);
       };
+  const popOf = (at: string) => (pressed.at === at ? pressed.n : 0);
 
-  // A picks what is under the pointer (SPEC §11, keymap.ts). When the hex changes under a still pointer
-  // (a new active slot), the same place now holds another pitch: report that too, before paint.
+  // Travel (SPEC §8.2): in the same key, the balls and a copy of the coloured cells slide together by the plan's
+  // cells; the real cells show plain until the copy lands, then take the colour back before the copy is removed.
+  const ballsRef = useRef<SVGGElement>(null);
+  const coloursRef = useRef<SVGGElement>(null);
+  const inversionsRef = useRef<SVGGElement>(null);
+  const prevDock = useRef(dock);
+  const [travel, setTravel] = useState<{ id: number; dx: number; settled: boolean } | null>(null);
+  const travelTimers = useRef<number[]>([]);
+  useEffect(() => () => travelTimers.current.forEach((t) => window.clearTimeout(t)), []);
+  const look = hex.cells.map((c) => `${c.midi}:${c.degree}`).join(' ');
   useLayoutEffect(() => {
-    onHoverPitch?.(hoverPick);
-  }, [hoverPick, onHoverPitch]);
+    const prev = prevDock.current;
+    prevDock.current = dock;
+    const steps = travelSteps(prev, dock);
+    if (steps === null || !layout || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const dx = -steps * layout.cellWidth; // each ball starts where its degree was
+    slideIn(ballsRef.current, dx);
+    slideIn(inversionsRef.current, dx); // the labels go with their balls
+    travelTimers.current.forEach((t) => window.clearTimeout(t));
+    const id = performance.now();
+    setTravel({ id, dx, settled: false });
+    travelTimers.current = [
+      window.setTimeout(() => setTravel((t) => (t?.id === id ? { ...t, settled: true } : t)), T.travelMs),
+      window.setTimeout(() => setTravel((t) => (t?.id === id ? null : t)), T.travelMs + 250), // after the cells' colour fade
+    ];
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs when what the hex shows changes
+  }, [look]);
+  useLayoutEffect(() => {
+    if (travel && !travel.settled) slideIn(coloursRef.current, travel.dx);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per travel
+  }, [travel?.id]);
+  const plain = !!travel && !travel.settled;
 
   return (
     <div ref={ref} className="docked-hex" data-mode={mode}>
-      {width > 0 && height > 0 && (
+      {layout && (
         <svg width={width} height={height} role="img" aria-label={`Docked hex: ${hex.cells.length} cells`}>
-          <NoteDefs R={hexSize(hex, width, height).rx} />
-          {hex.cells.map((cell) => {
-            const size = hexSize(hex, width, height);
-            const { cx, cy } = cellCentre(cell, hex, size, width, height);
-            return (
-              <Cell
-                key={`${cell.r}-${cell.c}`}
-                cell={cell}
-                cx={cx}
-                cy={cy}
-                R={size.rx}
-                ry={size.ry}
-                onPick={pick}
-                halo={cell.midi === halo}
-                lit={cell.midi === hoverMidi || cell.midi === flash}
-                onHover={setHover}
-              />
-            );
-          })}
+          <NoteDefs R={layout.size.rx} />
+          <clipPath id="hex-grid-clip">
+            {layout.cells.map(({ cell, cx, cy }) => (
+              <polygon key={`${cell.r}-${cell.c}`} points={hexPoints(cx, cy, layout.size.rx + 0.5, layout.size.ry + 0.5)} />
+            ))}
+          </clipPath>
+          {/* A warm glow around the whole honeycomb: every cell's shape, blurred, behind the cells. */}
+          <g className="hex-glow" filter="url(#hex-glow-blur)" aria-hidden>
+            {layout.cells.map(({ cell, cx, cy }) => (
+              <polygon key={`${cell.r}-${cell.c}`} points={hexPoints(cx, cy, layout.size.rx, layout.size.ry)} />
+            ))}
+          </g>
+          {(['bg', 'top'] as const).map((part) => (
+            <g key={part} className={`hex-layer-${part}`}>
+              {layout.cells.map(({ cell, cx, cy }) => (
+                <Cell
+                  key={`${cell.r}-${cell.c}`}
+                  part={part}
+                  plain={plain}
+                  cell={cell}
+                  cx={cx}
+                  cy={cy}
+                  R={layout.size.rx}
+                  ry={layout.size.ry}
+                  onPick={pick}
+                  halo={cell.midi === halo}
+                  lit={cell.midi === hoverMidi || cell.midi === flash}
+                  onHover={setHover}
+                />
+              ))}
+              {/* Travelling colours: a copy of the coloured cells between the cells' fill and their names, clipped
+                  to the grid (the clip stays put; the inner group slides). */}
+              {part === 'bg' && travel && (
+                <g clipPath="url(#hex-grid-clip)" aria-hidden>
+                  <g ref={coloursRef} className="hex-colour-copy">
+                    {layout.cells
+                      .filter(({ cell }) => cell.triad)
+                      .map(({ cell, cx, cy }) => (
+                        <polygon
+                          key={`${cell.r}-${cell.c}`}
+                          points={hexPoints(cx, cy, layout.size.rx + 0.5, layout.size.ry + 0.5)}
+                          fill={cell.colour}
+                          opacity={cell.inRange ? 1 : T.outOpacity}
+                        />
+                      ))}
+                  </g>
+                </g>
+              )}
+            </g>
+          ))}
+          {/* Balls above all cells, so they can travel; pointer events go to the cells. */}
+          <g className="hex-balls" ref={ballsRef}>
+            {layout.cells.map(({ cell, cx, cy }) => (
+              <Ball key={`${cell.r}-${cell.c}`} cell={cell} cx={cx} cy={cy} R={layout.size.rx} halo={cell.midi === halo} pop={popOf(`${cell.r}:${cell.c}`)} />
+            ))}
+          </g>
+          {/* Inversions under the bottom row's chord tones: root, 3rd → 1st, 5th → 2nd, 7th → 3rd. They travel with the balls. */}
+          <g ref={inversionsRef}>
+            {layout.inversions.map(({ cell, label: inv, tip, cx, cy }) => (
+              <text key={`inv-${cell.c}`} className="hex-inversion" x={cx} y={cy} textAnchor="middle" dominantBaseline="central">
+                <title>{tip}</title>
+                {inv}
+              </text>
+            ))}
+          </g>
           {/* Chromatic entry (suspensions, anticipations): on the border between two cells of a row, the pitch(es)
               between those steps. Drawn above every cell, as a button overlaps both. */}
           {pick &&
-            hex.borders.map((b) => {
-              const size = hexSize(hex, width, height);
-              // A border's centre: the cell centre formula at a half-cell x.
-              const { cx, cy } = cellCentre({ r: b.r, x: b.x } as HexCell, hex, size, width, height);
-              const gap = size.ry * T.borderButtonGap;
-              return b.buttons.map((btn, i) => {
-                if (!btn.playable) return null;
-                const y = b.buttons.length === 1 ? cy : i === 0 ? cy + gap : cy - gap; // two: the higher pitch on top
-                return (
-                  <BorderButton
-                    key={`${b.r}:${b.x}:${i}`}
-                    cx={cx}
-                    cy={y}
-                    R={size.rx}
-                    glyph={btn.glyph}
-                    label={prettyName(btn.name)}
-                    shown={shown(b)}
-                    onClick={() => pick(btn.midi)}
-                    onEnter={() => setHover({ kind: 'border', r: b.r, x: b.x, i })}
-                    onLeave={() => setHover(null)}
-                  />
-                );
-              });
-            })}
+            layout.buttons.map(({ border, button, i, cx, cy }) => (
+              <BorderButtonView
+                key={buttonKey(border, i)}
+                cx={cx}
+                cy={cy}
+                R={layout.size.rx}
+                glyph={button.glyph}
+                label={prettyName(button.name)}
+                shown={shown(border)}
+                onClick={() => pick(button.midi, buttonKey(border, i))}
+                pop={popOf(buttonKey(border, i))}
+                onEnter={() => setHover({ kind: 'border', r: border.r, x: border.x, i })}
+                onLeave={() => setHover(null)}
+              />
+            ))}
         </svg>
       )}
       {label &&
@@ -152,29 +235,21 @@ export function DockedHex({ dock, onPick, halo, onLabelClick, onHoverPitch }: Do
   );
 }
 
-interface CellProps {
-  cell: HexCell;
-  cx: number;
-  cy: number;
-  /** Horizontal radius (also sizes the ball, names and buttons) and vertical radius (the cell is stretched to fill). */
-  R: number;
-  ry: number;
-  onPick?: (midi: number) => void;
-  halo: boolean;
-  /** Same pitch as the hovered / just-clicked cell: colour shown and a white glow round the ball. */
-  lit: boolean;
-  onHover: (target: HoverTarget | null) => void;
-}
-
-/** Shared SVG defs: the note sphere's gradient and drop shadow. */
+/** Shared SVG defs: the note sphere's gradient (theme tokens), the glows and the drop shadow. */
 function NoteDefs({ R }: { R: number }) {
   return (
     <defs>
-      <radialGradient id="hex-note-sphere" cx="0.5" cy="0.5" r="0.5" fx="0.36" fy="0.3">
-        <stop offset="0" stopColor={T.noteHighlight} />
-        <stop offset="0.45" stopColor={T.noteFill} />
-        <stop offset="1" stopColor={T.noteEdge} />
+      <radialGradient id="hex-note-sphere" cx="0.5" cy="0.5" r="0.5" fx="0.24" fy="0.16">
+        <stop offset="0" style={{ stopColor: 'var(--ball-highlight)' }} />
+        <stop offset="1" style={{ stopColor: 'var(--ball-edge)' }} />
       </radialGradient>
+      <filter id="hex-glow-blur" x="-10%" y="-30%" width="120%" height="160%">
+        <feGaussianBlur stdDeviation={Math.max(4, R * 0.3)} />
+      </filter>
+      {/* Lit cells: a soft white glow inside the cell's edge (blurred stroke, clipped to the cell). */}
+      <filter id="hex-lit-blur" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur stdDeviation={Math.max(1.5, R * 0.05)} />
+      </filter>
       <filter id="hex-note-shadow" x="-50%" y="-50%" width="200%" height="200%">
         <feDropShadow dx="0" dy={Math.max(1, R * 0.06)} stdDeviation={Math.max(1, R * 0.07)} floodColor="#000" floodOpacity="0.45" />
       </filter>
@@ -182,48 +257,102 @@ function NoteDefs({ R }: { R: number }) {
   );
 }
 
-function Cell({ cell, cx, cy, R, ry, onPick, halo, lit, onHover }: CellProps) {
+interface CellProps {
+  /** `bg`: the fill (and the pointer target); `top`: the lit glow, name and socket, drawn over travelling colours. */
+  part: 'bg' | 'top';
+  /** While the colours travel: show the neutral fill (the copy carries the colour). */
+  plain: boolean;
+  cell: HexCell;
+  cx: number;
+  cy: number;
+  /** Horizontal radius (also sizes the ball, names and buttons) and vertical radius. */
+  R: number;
+  ry: number;
+  onPick?: (midi: number, at: string) => void;
+  halo: boolean;
+  /** Same pitch as the hovered / just-clicked cell: colour shown and a white glow inside the cell edge. */
+  lit: boolean;
+  onHover: (target: HoverTarget | null) => void;
+}
+
+function Cell({ part, plain, cell, cx, cy, R, ry, onPick, halo, lit, onHover }: CellProps) {
   const active = cell.playable && !!onPick;
   const r = R * (cell.triad ? T.triadNote : T.otherNote);
-  const home = cy; // the ball's default spot: the cell centre
-  // Sharps sit to the right, flats to the left; a dark socket marks the default spot behind them.
-  const shift = cell.accidental * T.accidentalShift;
-  const slide = R * shift; // applied as a transform so the slide can be transitioned (CSS: .hex-ball)
-  const dfs = Math.max(8, r * (cell.triad ? 0.85 : 0.95)); // degree number on the ball
-  const nfs = Math.max(8, R * 0.25); // note name, above the ball
+  // Only triad cells show their degree colour; the rest stay neutral until lit (CSS: .hex-cell.muted).
+  const className = ['hex-cell', cell.triad && !plain ? '' : 'muted', lit ? 'lit' : ''].join(' ').trim();
+  const style = { ['--deg' as string]: cell.colour, ['--deg-ink' as string]: cell.ink };
+  const opacity = cell.inRange ? 1 : T.outOpacity;
+  if (part === 'top') {
+    const clipId = `hex-clip-${cell.r}-${cell.c}`;
+    return (
+      <g className={`${className} hex-cell-top`} style={style} opacity={opacity}>
+        {lit && (
+          <>
+            <clipPath id={clipId}>
+              <polygon points={hexPoints(cx, cy, R, ry)} />
+            </clipPath>
+            <polygon className="hex-lit" points={hexPoints(cx, cy, R, ry)} clipPath={`url(#${clipId})`} strokeWidth={R * 0.2} filter="url(#hex-lit-blur)" />
+          </>
+        )}
+        <text x={cx} y={cy - R * 0.6} textAnchor="middle" dominantBaseline="central" fontSize={Math.max(8, R * 0.25)} fontWeight={700} className="hex-name">
+          {prettyName(cell.name)}
+        </text>
+        {/* The socket shows only while a sharp / flat ball is out of it. */}
+        <circle className="hex-socket" cx={cx} cy={cy} r={r} opacity={cell.accidental === 0 ? 0 : 1} />
+      </g>
+    );
+  }
   const name = prettyName(cell.name);
   const tone = cell.role === 'chord' ? (cell.triad ? ', triad tone' : ', chord tone') : '';
   return (
     <g
-      className={['hex-cell', cell.triad ? '' : 'muted', lit ? 'lit' : ''].join(' ').trim()}
+      className={className}
       data-midi={cell.midi}
-      data-degree={cell.degree}
+      data-degree={cell.degree ?? undefined}
       data-role={cell.inRange ? cell.role : 'out'}
       data-triad={cell.triad || undefined}
       data-halo={halo || undefined}
       onMouseEnter={() => onHover({ kind: 'cell', r: cell.r, c: cell.c })}
       onMouseLeave={() => onHover(null)}
-      aria-label={`${name}, degree ${cell.degree}${tone}`}
+      aria-label={cell.degree === null ? name : `${name}, degree ${cell.degree}${tone}`}
       role={active ? 'button' : undefined}
-      onClick={active ? () => onPick!(cell.midi) : undefined}
-      // Only triad cells show their degree colour; the rest stay neutral until lit (CSS: .hex-cell.muted).
-      style={{ cursor: active ? 'pointer' : undefined, ['--deg' as string]: cell.colour, ['--deg-ink' as string]: cell.ink }}
-      opacity={cell.inRange ? 1 : T.outOpacity}
+      onClick={active ? () => onPick!(cell.midi, `${cell.r}:${cell.c}`) : undefined}
+      style={{ ...style, cursor: active ? 'pointer' : undefined }}
+      opacity={opacity}
     >
       {/* +0.5 px overlaps neighbours so the grid shows no hairline seams */}
       <polygon className="hex-bg" points={hexPoints(cx, cy, R + 0.5, ry + 0.5)} />
-      <text x={cx} y={cy - R * 0.6} textAnchor="middle" dominantBaseline="central" fontSize={nfs} fontWeight={700} className="hex-name">
-        {name}
-      </text>
-      {/* The socket shows only while a sharp / flat ball is out of it. */}
-      <circle className="hex-socket" cx={cx} cy={home} r={r} opacity={shift === 0 ? 0 : 1} />
+    </g>
+  );
+}
+
+interface BallProps {
+  cell: HexCell;
+  cx: number;
+  cy: number;
+  R: number;
+  halo: boolean;
+  /** Non-zero while this ball is the last one clicked; each new value replays its pop. */
+  pop: number;
+}
+
+/** A cell's ball and degree number, in the layer above every cell (it travels with that layer; clicks pass through). */
+function Ball({ cell, cx, cy, R, halo, pop }: BallProps) {
+  const r = R * (cell.triad ? T.triadNote : T.otherNote);
+  // Sharps sit to the right, flats to the left of the cell centre (over the cell's socket).
+  const slide = R * cell.accidental * T.accidentalShift; // a transform, so the slide can be transitioned (CSS: .hex-ball)
+  const dfs = Math.max(8, r * (cell.triad ? 0.85 : 0.95)); // degree number on the ball
+  return (
+    <g opacity={cell.inRange ? 1 : T.outOpacity}>
       <g className="hex-ball" style={{ transform: `translateX(${slide.toFixed(2)}px)` }}>
-        <circle cx={cx} cy={home} r={r} fill="url(#hex-note-sphere)" filter={cell.inRange ? 'url(#hex-note-shadow)' : undefined} />
-        <text x={cx} y={home} textAnchor="middle" dominantBaseline="central" fontSize={dfs} fontWeight={cell.triad ? 700 : 600} fill={T.noteInk}>
-          {cell.degree}
-        </text>
-        {lit && <circle className="hex-lit" cx={cx} cy={home} r={r + 1.5} />}
-        {halo && <circle className="hex-halo" cx={cx} cy={home} r={r + 3} />}
+        {/* Re-keyed on every click of this ball, so the pop (CSS: .hex-pop) plays again. */}
+        <g key={pop} className={pop > 0 ? 'hex-pop' : undefined}>
+          <circle cx={cx} cy={cy} r={r} fill="url(#hex-note-sphere)" filter={cell.inRange ? 'url(#hex-note-shadow)' : undefined} />
+          <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central" fontSize={dfs} fontWeight={cell.triad ? 700 : 600} className="hex-ball-ink">
+            {cell.degree ?? ''}
+          </text>
+        </g>
+        {halo && <circle className="hex-halo" cx={cx} cy={cy} r={r + 3} />}
       </g>
     </g>
   );
@@ -241,16 +370,20 @@ interface BorderButtonProps {
   onClick: () => void;
   onEnter: () => void;
   onLeave: () => void;
+  /** Non-zero while this button is the last one clicked; each new value replays its pop. */
+  pop: number;
 }
 
-function BorderButton({ cx, cy, R, glyph, label, shown, onClick, onEnter, onLeave }: BorderButtonProps) {
+function BorderButtonView({ cx, cy, R, glyph, label, shown, onClick, onEnter, onLeave, pop }: BorderButtonProps) {
   const r = R * T.accidentalButton;
   return (
     <g className={shown ? 'hex-acc shown' : 'hex-acc'} role="button" aria-label={label} onClick={onClick} onMouseEnter={onEnter} onMouseLeave={onLeave}>
-      <circle cx={cx} cy={cy} r={r} fill="url(#hex-note-sphere)" filter="url(#hex-note-shadow)" />
-      <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central" fontSize={Math.max(10, r * 1.45)} fontWeight={700} fill={T.noteInk}>
-        {glyph}
-      </text>
+      <g key={pop} className={pop > 0 ? 'hex-pop' : undefined}>
+        <circle cx={cx} cy={cy} r={r} fill="url(#hex-note-sphere)" filter="url(#hex-note-shadow)" />
+        <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central" fontSize={Math.max(10, r * 1.45)} fontWeight={700} className="hex-ball-ink">
+          {glyph}
+        </text>
+      </g>
     </g>
   );
 }
