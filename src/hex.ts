@@ -2,7 +2,7 @@
 // 3 left-slanted rows; cell (r, c) = scale step t₀ + c + 2r; pitch anchor t₀ = lowest in-range scale tone;
 // Fit range row lengths; largest radius that fits. Pitches are in the view's pitch (written for an instrument).
 
-import { classify, scalePitchClasses, triadPitchClasses, slotHarmony, type SlotHarmony } from './harmony';
+import { classify, scalePitchClasses, triadPitchClasses, guidePitchClasses, slotHarmony, type SlotHarmony } from './harmony';
 import { keyOf, type Key } from './key';
 import { pcName, pcOfName, slotSpelling, spelledDegree } from './spelling';
 
@@ -31,6 +31,8 @@ export interface GridCell {
 }
 
 export interface HexGrid {
+  /** Rows: 3 for the honeycomb, 1 for Linear. */
+  rows: number;
   /** Top-row length; also the grid width in cell widths. */
   top: number;
   /** Cells per row, bottom → top. */
@@ -70,7 +72,40 @@ export function hexGrid(pcs: Set<number>, range: PitchRange, ownSize = false): H
       cells.push({ r, c, step, midi, x: offset + c + 0.5, inRange: !range.limited || (midi >= range.lo && midi <= range.hi) });
     }
   }
-  return { top, rowLengths, anchor: ladder[i0], stepsInRange, cells };
+  return { rows: ROWS, top, rowLengths, anchor: ladder[i0], stepsInRange, cells };
+}
+
+/**
+ * How the dock lays out the hex: the 3-row honeycomb, or **Linear** — one row, one octave of the scale from `octave`
+ * (the MIDI of a C) up, switched by octave (SPEC §8.5).
+ */
+export type HexShape = { kind: 'honeycomb' } | { kind: 'linear'; octave: number };
+export const HONEYCOMB: HexShape = { kind: 'honeycomb' };
+
+/**
+ * Linear (SPEC §8.5): one row — the scale's steps from the first at or above `octave` (a C), one octave's worth plus
+ * the octave above (8 cells for a 7-note scale), so every key shows the same number of cells.
+ */
+export function linearGrid(pcs: Set<number>, range: PitchRange, octave: number): HexGrid {
+  const ladder: number[] = [];
+  for (let m = 0; m <= 127; m++) if (pcs.has(m % 12)) ladder.push(m);
+  const i0 = Math.max(0, ladder.findIndex((m) => m >= octave));
+  const n = pcs.size + 1;
+  const cells: GridCell[] = [];
+  for (let c = 0; c < n; c++) {
+    const midi = ladder[Math.min(i0 + c, ladder.length - 1)];
+    cells.push({ r: 0, c, step: c, midi, x: c + 0.5, inRange: !range.limited || (midi >= range.lo && midi <= range.hi) });
+  }
+  const stepsInRange = ladder.filter((m) => m >= range.lo && m <= range.hi).length;
+  return { rows: 1, top: n, rowLengths: [n], anchor: ladder[i0], stepsInRange, cells };
+}
+
+/** Linear's octave switch (SPEC §8.5): the Cs whose octave overlaps the range, and where it starts (mid-range). */
+export function linearOctaves(range: PitchRange): { min: number; max: number; start: number } {
+  const c = (m: number) => Math.floor(m / 12) * 12;
+  const min = c(range.lo);
+  const max = Math.max(min, c(range.hi) === range.hi ? range.hi - 12 : c(range.hi));
+  return { min, max, start: Math.min(max, Math.max(min, c((range.lo + range.hi) / 2))) };
 }
 
 /**
@@ -83,12 +118,12 @@ export interface HexSize {
 }
 
 /** Padding inside the dock: left / right, and top / bottom. */
-export const HEX_PAD_X = 12;
-export const HEX_PAD_Y = 12;
+export const HEX_PAD_X = 24;
+export const HEX_PAD_Y = 24;
 
 export function hexSize(grid: HexGrid, width: number, height: number, padX = HEX_PAD_X, padY = HEX_PAD_Y): HexSize {
   const byWidth = (width - 2 * padX) / (Math.sqrt(3) * grid.top);
-  const byHeight = (height - 2 * padY) / (2 + 1.5 * (ROWS - 1));
+  const byHeight = (height - 2 * padY) / (2 + 1.5 * (grid.rows - 1));
   const rx = Math.max(0, Math.min(byWidth, byHeight));
   return { rx, ry: rx };
 }
@@ -96,10 +131,10 @@ export function hexSize(grid: HexGrid, width: number, height: number, padX = HEX
 /** Cell centre in px for a cell size, with the grid centred in the dock. */
 export function cellCentre(cell: GridCell, grid: HexGrid, size: HexSize, width: number, height: number) {
   const w = Math.sqrt(3) * size.rx;
-  const gridH = 2 * size.ry + 1.5 * size.ry * (ROWS - 1);
+  const gridH = 2 * size.ry + 1.5 * size.ry * (grid.rows - 1);
   const x0 = (width - w * grid.top) / 2;
   const y0 = (height - gridH) / 2;
-  return { cx: x0 + cell.x * w, cy: y0 + size.ry + (ROWS - 1 - cell.r) * 1.5 * size.ry };
+  return { cx: x0 + cell.x * w, cy: y0 + size.ry + (grid.rows - 1 - cell.r) * 1.5 * size.ry };
 }
 
 export type CellRole = 'chord' | 'scale';
@@ -112,6 +147,8 @@ export interface HexCell extends GridCell {
   role: CellRole;
   /** A triad tone (root, 3rd / sus, 5th): its cell always shows its degree colour. */
   triad: boolean;
+  /** A guide tone of a quartad (its 7th or 6th): its cell shows its degree colour, like a triad tone. */
+  guide: boolean;
   /** The degree colour, and black or white lettering, whichever reads better on it. */
   colour: string;
   ink: string;
@@ -152,13 +189,14 @@ export interface SlotHex extends Omit<HexGrid, 'cells'> {
  * The hex for a slot with a chord: its scale, or for a valid chord no scale fits, the **chord-tones hex** (each cell
  * the next chord tone up, all chord-tone centres; SPEC §8.4). Null for `N.C.`, empty and unparseable slots.
  */
-export function slotHex(h: SlotHarmony, range: PitchRange = CONCERT_VIEW): SlotHex | null {
+export function slotHex(h: SlotHarmony, range: PitchRange = CONCERT_VIEW, shape: HexShape = HONEYCOMB): SlotHex | null {
   if (h.kind !== 'chord') return null;
   const pcs = h.scale ? scalePitchClasses(h.root, h.scale) : h.chordTones;
-  const grid = hexGrid(pcs, range, !h.scale);
+  const grid = shape.kind === 'linear' ? linearGrid(pcs, range, shape.octave) : hexGrid(pcs, range, !h.scale);
   const onHex = (m: number) => pcs.has(((m % 12) + 12) % 12);
   const sp = slotSpelling(h);
   const triad = triadPitchClasses(h);
+  const guide = guidePitchClasses(h);
   return {
     ...grid,
     cells: grid.cells.map((cell) => {
@@ -171,6 +209,7 @@ export function slotHex(h: SlotHarmony, range: PitchRange = CONCERT_VIEW): SlotH
         degree,
         role: classify(cell.midi, h) === 'chord' ? 'chord' : 'scale',
         triad: triad.has(cell.midi % 12),
+        guide: guide.has(cell.midi % 12),
         colour,
         ink: inkOn(colour),
         accidental: name[1] === '#' ? 1 : name[1] === 'b' ? -1 : 0,
@@ -227,29 +266,20 @@ const NEUTRAL = 'var(--cell-neutral)';
  * **unchecked hex**: C major (in the view's pitch), names only — fully playable (♯ / ♭ reach every other pitch); notes written there are not checked against any scale.
  * `harmonies` are per form slot, in the view's pitch.
  */
-export function dockHex(harmonies: SlotHarmony[], active: number, range: PitchRange = CONCERT_VIEW): DockHex {
+export function dockHex(harmonies: SlotHarmony[], active: number, range: PitchRange = CONCERT_VIEW, shape: HexShape = HONEYCOMB): DockHex {
   const h = harmonies[active];
   if (h.kind === 'chord') {
     const root = ((pcOfName(h.root) % 12) + 12) % 12;
     return h.scale
-      ? { hex: slotHex(h, range)!, mode: 'scale', label: null, labelEditsChord: false, key: keyOf(h), root }
-      : { hex: slotHex(h, range)!, mode: 'chord-tones', label: 'No scale fits: chord tones only', labelEditsChord: false, key: null, root };
+      ? { hex: slotHex(h, range, shape)!, mode: 'scale', label: null, labelEditsChord: false, key: keyOf(h), root }
+      : { hex: slotHex(h, range, shape)!, mode: 'chord-tones', label: 'No scale fits: chord tones only', labelEditsChord: false, key: null, root };
   }
   const label =
     h.reason === 'nc' ? 'N.C.: notes not checked' : h.reason === 'empty' ? 'No chord yet: notes not checked' : 'Chord not recognised: notes not checked';
   // C major's layout and note names only: no chord here, so no degrees, degree colours or triad tones.
-  const c = slotHex(C_MAJOR, range)!;
-  const cells = c.cells.map((x) => ({ ...x, degree: null, role: 'scale' as const, triad: false, colour: NEUTRAL, ink: HEX_THEME.noteInk }));
+  const c = slotHex(C_MAJOR, range, shape)!;
+  const cells = c.cells.map((x) => ({ ...x, degree: null, role: 'scale' as const, triad: false, guide: false, colour: NEUTRAL, ink: HEX_THEME.noteInk }));
   return { hex: { ...c, cells }, mode: 'unchecked', label, labelEditsChord: h.reason !== 'nc', key: null, root: null };
-}
-
-/**
- * The inversion a cell's note makes when it is in the bass (SPEC §8.2): the chord's root → 'root' (root position),
- * 3rd → '1st', 5th → '2nd', 7th → '3rd'. Null for non-chord tones and on the unchecked hex (no chord).
- */
-export function inversionLabel(cell: Pick<HexCell, 'role' | 'degree'>): 'root' | '1st' | '2nd' | '3rd' | null {
-  if (cell.role !== 'chord') return null;
-  return cell.degree === 1 ? 'root' : cell.degree === 3 ? '1st' : cell.degree === 5 ? '2nd' : cell.degree === 7 ? '3rd' : null;
 }
 
 /** Degree colours, degrees 1–7 (SPEC §8.2, user theme). */

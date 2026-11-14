@@ -202,7 +202,12 @@ describe('test table 4: nudge', () => {
     return res.ok ? `${show(res.melody)} → ${res.pitch}` : 'refused';
   };
 
-  it('moves the note before the caret one step of its owning slot\'s scale', () => {
+  it('moves the note at the caret (the one it sits on)', () => {
+    expect(nudged([n(60), n(64)], q, 1)).toBe('60q 65q → 65'); // caret on E: E moves, not C
+    expect(nudged([n(60), n(64)], 0, 1)).toBe('62q 64q → 62'); // caret on C
+  });
+
+  it('at the end of the melody: the last note, one step of its owning slot\'s scale', () => {
     expect(nudged([n(60), n(64)], 2 * q, 1)).toBe('60q 65q → 65'); // E → F in D Dorian
     expect(nudged([n(60), n(64)], 2 * q, -1)).toBe('60q 62q → 62'); // E → D
     expect(nudged([n(71)], q, 1)).toBe('72q → 72'); // B → C
@@ -233,9 +238,9 @@ describe('test table 4: nudge', () => {
     expect(res).toEqual({ ok: true, melody: [n(61)], pitch: 61 }); // C → Db (b9)
   });
 
-  it('refuses on a rest, with nothing before the caret, in a slot without a scale (except octaves), off MIDI', () => {
+  it('refuses on a rest, with no note at or before the caret, in a slot without a scale (except octaves), off MIDI', () => {
     expect(nudged([n(60), r()], 2 * q, 1)).toBe('refused');
-    expect(nudged([n(60)], 0, 1)).toBe('refused');
+    expect(nudged([], 0, 1)).toBe('refused'); // no note at or before the caret
     const nc = [r('w'), r('w'), n(60)];
     expect(nudged(nc, 9 * q, 1)).toBe('refused');
     expect(nudged(nc, 9 * q, 1, true)).toBe('rw rw 72q → 72');

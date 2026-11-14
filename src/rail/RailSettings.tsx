@@ -1,5 +1,5 @@
 // Control-rail settings (SPEC §3.1): inline title rename, time signature, bars per row, Clear all, caret readout.
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { parseTimeSignature } from '../form';
 import { BARS_PER_ROW } from '../progression';
 
@@ -93,10 +93,71 @@ export function BarsPerRow({ value, onChange }: { value: number; onChange: (n: n
   );
 }
 
-export function ClearAll({ disabled, onClear }: { disabled: boolean; onClear: () => void }) {
+/**
+ * Clear ▾ (SPEC §6.2 item 10): a menu with **Clear notes** (the melody; undoable, no confirm) and **Clear all…**
+ * (chords, scales and notes; asks for confirmation in the menu first). Both are one undo step.
+ */
+export function ClearMenu({ canClearNotes, canClearAll, onClearNotes, onClearAll }: { canClearNotes: boolean; canClearAll: boolean; onClearNotes: () => void; onClearAll: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+  const close = () => {
+    setOpen(false);
+    setConfirming(false);
+  };
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (!wrap.current?.contains(e.target as Node)) close();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close();
+    };
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
   return (
-    <button type="button" className="rail-button clear-all" disabled={disabled} title="Clear the melody (undoable)" onClick={onClear}>
-      Clear all
-    </button>
+    <div className="clear-menu-wrap" ref={wrap}>
+      <button
+        type="button"
+        className="rail-button clear-menu-button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        disabled={!canClearNotes && !canClearAll}
+        onClick={() => (open ? close() : setOpen(true))}
+      >
+        Clear ▾
+      </button>
+      {open && (
+        <div className="clear-menu" role="menu" aria-label="Clear">
+          {confirming ? (
+            <div className="clear-confirm" role="alertdialog" aria-label="Clear all">
+              <p>Clear all chords, scales and notes?</p>
+              <div className="clear-confirm-actions">
+                <button type="button" className="clear-menu-item danger" onClick={() => (onClearAll(), close())}>
+                  Clear all
+                </button>
+                <button type="button" className="clear-menu-item" onClick={close}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <button type="button" role="menuitem" className="clear-menu-item" disabled={!canClearNotes} onClick={() => (onClearNotes(), close())}>
+                Clear notes
+              </button>
+              <button type="button" role="menuitem" className="clear-menu-item" disabled={!canClearAll} onClick={() => setConfirming(true)}>
+                Clear all…
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

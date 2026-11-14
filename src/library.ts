@@ -145,11 +145,18 @@ export function migrateStorage(storage: Storage): boolean {
 
 export type Launch = { kind: 'open'; progression: StoredProgression } | { kind: 'empty' };
 
+/** A further bundled demo, added to every library once (by `key`), even a non-empty one. */
+export interface ExtraDemo {
+  key: string;
+  file: unknown;
+}
+
 /**
  * Launch (SPEC §12.5): first launch seeds the demo once (guarded by `seeded`, so deleting it is permanent);
  * then reopen `lastOpenId`, or if it is missing / dangling the newest; an empty library → the empty state.
+ * Each extra demo is added once per device (`seededDemos`, so deleting it is permanent too) without being opened.
  */
-export function launch(storage: Storage, demo: unknown, makeId: MakeId = uuid, now = new Date()): Launch {
+export function launch(storage: Storage, demo: unknown, makeId: MakeId = uuid, now = new Date(), extras: ExtraDemo[] = []): Launch {
   const device = readDevice(storage);
   if (!device.seeded) {
     // Through the normal import path. Existing (pre-library) progressions count as a library already: don't bury them.
@@ -159,7 +166,15 @@ export function launch(storage: Storage, demo: unknown, makeId: MakeId = uuid, n
   const all = listProgressions(storage);
   const last = device.lastOpenId ? all.find((p) => p.id === device.lastOpenId) : undefined;
   const open = last ?? all[0];
-  return open ? { kind: 'open', progression: open } : { kind: 'empty' };
+  // Extra demos join the library after the choice of what to open, so they never displace it.
+  const seeded = device.seededDemos ?? [];
+  const fresh = extras.filter((x) => !seeded.includes(x.key));
+  if (fresh.length) {
+    importTexts(storage, fresh.map((x) => ({ name: x.key, text: JSON.stringify(x.file) })), makeId, now);
+    writeDevice(storage, { seededDemos: [...seeded, ...fresh.map((x) => x.key)] });
+  }
+  const opened = open ?? listProgressions(storage)[0];
+  return opened ? { kind: 'open', progression: opened } : { kind: 'empty' };
 }
 
 /** Remember the open progression for the next launch. */

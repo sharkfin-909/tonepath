@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  clearEverything,
   clearMelody,
   commitChordText,
   newProgression,
@@ -105,13 +106,21 @@ describe('rail settings', () => {
     expect(setBarsPerRow(p, 4)).toBe(p);
   });
 
-  it('test table 4: Clear all empties the melody, leaves chords, scales and title', () => {
+  it('test table 4: Clear notes empties the melody, leaves chords, scales and title', () => {
     const p0 = { ...withMelody(), title: 'ii–V–I' };
     const p = clearMelody(p0);
     expect(p.melody).toEqual([]);
     expect(p.bars).toBe(p0.bars);
     expect(p.title).toBe('ii–V–I');
     expect(clearMelody(p)).toBe(p);
+  });
+
+  it('Clear all: chords, scale overrides and notes go; bars, splits, title and time signature stay', () => {
+    const p0 = { ...withMelody(), title: 'ii–V–I', bars: [[{ chord: 'Dm7', scale: 'aeolian' as const }], [{ chord: 'G7' }, { chord: 'C' }]] };
+    const p = clearEverything(p0);
+    expect(p.bars).toEqual([[{ chord: '' }], [{ chord: '' }, { chord: '' }]]);
+    expect([p.melody, p.title, p.timeSignature]).toEqual([[], 'ii–V–I', p0.timeSignature]);
+    expect(clearEverything(p)).toBe(p); // nothing left to clear
   });
 });
 

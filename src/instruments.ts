@@ -45,7 +45,7 @@ export const INSTRUMENTS: Instrument[] = [
   row('eb-baritone-sax', 'E♭ baritone sax', '13M', 21, 58, 90),
   row('f-horn', 'F horn', '5P', 7, 48, 79), // C3–G5
   row('guitar', 'Guitar', '8P', 12, 52, 88), // E3–E6
-  row('bass', 'Double bass / bass guitar', '8P', 12, 40, 67, 'bass'), // E2–G4
+  row('bass', 'Bass', '8P', 12, 40, 67, 'bass'), // E2–G4
 ];
 
 const BY_ID = new Map(INSTRUMENTS.map((i) => [i.id, i]));

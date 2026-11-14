@@ -196,6 +196,15 @@ export function triadPitchClasses(h: Extract<SlotHarmony, { kind: 'chord' }>): S
   return new Set(core.map((iv) => pcOf(h.root, iv)));
 }
 
+/**
+ * The chord's guide tone(s) (SPEC §8.2): in a four-note chord (a quartad) or larger, its **7th or 6th** — the tone
+ * that gives the chord its pull. Extensions (9, 11, 13) and altered tones never count; a triad has none.
+ * C7 → B♭, Cmaj7 → B, C6 / Cm6 / C6/9 → A, Cdim7 → B𝄫 (A), C13 → B♭.
+ */
+export function guidePitchClasses(h: Extract<SlotHarmony, { kind: 'chord' }>): Set<number> {
+  return new Set(h.intervals.filter((iv) => /^[67][mMd]$/.test(iv)).map((iv) => pcOf(h.root, iv)));
+}
+
 export type PitchRole = 'chord' | 'scale' | 'chromatic';
 
 /** Classify a pitch (MIDI or pitch class) against a slot: chord tone > scale tone > chromatic. */

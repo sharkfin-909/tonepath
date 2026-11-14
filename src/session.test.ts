@@ -119,6 +119,28 @@ describe('Play', () => {
   });
 });
 
+describe('Write: stepwise playback (` / ~)', () => {
+  const melody = { ...prog(), melody: [{ pitch: 62, d: 'h' as const }, { d: 'h' as const }, { pitch: 67, d: 'w' as const }] };
+  const step: Intent = { type: 'step-play' };
+
+  it('each press plays the event at the caret and moves past it; rests pass silently; slot starts bring On arrival', () => {
+    const r = run([step, step, step], { p: melody, onArrival: 'chord' });
+    expect(r.per.map(show)).toEqual([['note 62', 'chord D'], [], ['note 67', 'chord G']]);
+    expect(r.state.caret).toBe(2 * W);
+    expect(r.p).toBe(melody); // nothing recorded
+  });
+
+  it('after the last event it starts again at bar 1; from inside an event it plays that event', () => {
+    expect(show(run([step], { p: melody, state: { caret: 2 * W } }).effects)).toEqual(['note 62']);
+    expect(run([step], { p: melody, state: { caret: q } }).state.caret).toBe(2 * q); // mid-note: plays it, caret to its end
+  });
+
+  it('an empty melody or Play mode: nothing', () => {
+    expect(run([step]).effects).toEqual([]);
+    expect(run([{ type: 'mode', mode: 'play' }, step], { p: melody }).per[1]).toEqual([]);
+  });
+});
+
 describe('browsing in Write', () => {
   it('‹ › move the caret to the slot start, wrapping', () => {
     expect(run([{ type: 'browse', dir: -1 }]).state.caret).toBe(3 * W);
@@ -157,12 +179,16 @@ describe('editing commands', () => {
   it('delete, nudge (plays, halo) and clear all', () => {
     const p = { ...prog(), melody: [{ pitch: 62, d: 'q' as const }, { pitch: 65, d: 'q' as const }] };
     const n = run([{ type: 'nudge', dir: 1, octave: false }], { p });
-    expect(n.p.melody[1]).toEqual({ pitch: 67, d: 'q' });
-    expect(show(n.effects)).toEqual(['note 67']);
-    expect(n.state.halo?.pitch).toBe(67);
+    expect(n.p.melody[1]).toEqual({ pitch: 66, d: 'q' }); // ↑: a semitone
+    expect(show(n.effects)).toEqual(['note 66']);
+    expect(n.state.halo?.pitch).toBe(66);
+    const step = run([{ type: 'nudge', dir: 1, octave: false, scale: true }], { p });
+    expect(step.p.melody[1]).toEqual({ pitch: 67, d: 'q' }); // ⌥↑: the next D Dorian step (F → G)
     expect(run([{ type: 'delete', back: true }], { p }).p.melody).toHaveLength(1);
-    const c = run([{ type: 'clear-all' }], { p });
-    expect([c.p.melody, c.state.caret]).toEqual([[], 0]);
+    const c = run([{ type: 'clear-notes' }], { p });
+    expect([c.p.melody, c.state.caret, c.p.bars]).toEqual([[], 0, p.bars]); // notes only
+    const all = run([{ type: 'clear-all' }], { p: { ...p, bars: [[{ chord: 'Dm7', scale: 'aeolian' }], [{ chord: 'G7' }, { chord: 'G7alt' }]] } });
+    expect([all.p.melody, all.p.bars]).toEqual([[], [[{ chord: '' }], [{ chord: '' }, { chord: '' }]]]); // bars and splits stay
   });
 
   it('bar actions: copy says so, delete refuses the last bar with a notice', () => {

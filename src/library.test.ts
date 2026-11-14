@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import demo from '../examples/demo.honeycomb.json';
+import rhythmChanges from '../examples/rhythm-changes.honeycomb.json';
 import { readDevice, writeDevice } from './device';
 import {
   createProgression,
@@ -48,6 +49,20 @@ describe('library', () => {
     expect((launch(s, demo) as { progression: { id: string } }).progression.id).toBe(a.id);
     rememberOpen(s, 'gone');
     expect((launch(s, demo) as { progression: { id: string } }).progression.id).toBe(b.id);
+  });
+
+  it('an extra demo joins any library once, without being opened; deleting it is permanent', () => {
+    const s = new MemoryStorage();
+    saveProgression(s, { ...newProgression(), id: 'mine', updatedAt: '' }, at(0));
+    rememberOpen(s, 'mine');
+    const extras = [{ key: 'rhythm-changes', file: rhythmChanges }];
+    const l = launch(s, demo, ids, at(1), extras);
+    expect(l.kind === 'open' && l.progression.id).toBe('mine');
+    const added = listProgressions(s).find((p) => p.title === 'Rhythm changes in B♭ (demo)')!;
+    expect(added.bars).toHaveLength(32);
+    deleteProgression(s, added.id);
+    launch(s, demo, ids, at(2), extras);
+    expect(listProgressions(s).map((p) => p.id)).toEqual(['mine']);
   });
 
   it('an existing library is not buried under the demo', () => {

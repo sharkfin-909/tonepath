@@ -2,6 +2,7 @@
 // Launch reopens the last-open progression, seeding the bundled demo on first launch (§12.5).
 import { useCallback, useEffect, useState } from 'react';
 import demo from '../examples/demo.honeycomb.json';
+import rhythmChanges from '../examples/rhythm-changes.honeycomb.json';
 import { App } from './App';
 import {
   createProgression,
@@ -36,7 +37,7 @@ function download(filename: string, text: string) {
 
 function initialScreen(): Screen {
   migrateStorage(localStorage); // SPEC §12.4: older storage is migrated; newer makes the tab read-only
-  const l = launch(localStorage, demo);
+  const l = launch(localStorage, demo, undefined, undefined, [{ key: 'rhythm-changes', file: rhythmChanges }]);
   if (l.kind === 'empty') return { kind: 'library' };
   rememberOpen(localStorage, l.progression.id);
   return { kind: 'chart', progression: l.progression, rename: false };

@@ -7,15 +7,19 @@
   /* Hex theme tokens (DockedHex reads these; SPEC §8.2). */
   --cell-neutral: #bfafa2; /* non-triad cells at rest, and every cell of the unchecked hex */
   --cell-outline: #a39385;
+  --triad-edge: #ffffff; /* thin border round triad cells */
   --ball-highlight: #ffe6d0; /* note spheres: highlight (top left) → rim */
   --ball-edge: #44372f;
   --ball-ink: #ffffff; /* degree numbers and ♯ / ♭ / ♮ on the spheres */
+  --note-name: #1d1b19; /* note names in the grid (with a white glow) */
   --grid-glow: #f5e9b0; /* the glow around the honeycomb */
   --grid-glow-opacity: 0.65;
+  /* Inner glow round the header and the hex panel: the grid glow's colour, softer. */
+  --panel-glow: inset 0 0 28px color-mix(in srgb, var(--grid-glow) 38%, transparent);
   --line: #1d1b19;
   --divider: #8c8680;
   --focus: #2f6fdb;
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif;
   color: var(--ink);
   background: var(--bg);
 }
@@ -44,8 +48,15 @@ body,
 }
 
 .topbar {
-  background: var(--rail-bg);
-  border-bottom: 1px solid #e0ddd6;
+  /* The header matches the hex panel: dark, with light text. Tokens are redefined here so every control follows. */
+  --ink: #f3eee6;
+  --muted: #b8afa3;
+  --line: #8a8076;
+  --divider: #8a8076;
+  color-scheme: dark; /* native selects and fields render dark too */
+  color: var(--ink);
+  background: var(--dock-bg);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.3);
   padding: 6px 12px;
   display: flex;
   flex-wrap: wrap;
@@ -55,12 +66,6 @@ body,
   font-size: 13px;
 }
 
-.bar-sep {
-  width: 1px;
-  align-self: stretch;
-  background: #dcd8cf;
-  margin: 2px 2px;
-}
 
 
 .rail-link {
@@ -157,14 +162,14 @@ body,
 .hex-pop {
   transform-box: fill-box;
   transform-origin: center;
-  animation: hex-pop 750ms both; /* ~30 ms dip, ~720 ms recovery */
+  animation: hex-pop 1470ms both; /* ~30 ms dip, ~1440 ms recovery */
 }
 @keyframes hex-pop {
   0% {
     transform: scale(1);
     animation-timing-function: cubic-bezier(0.5, 0, 1, 1); /* accelerate into the dip */
   }
-  4% {
+  2% {
     transform: scale(0.45);
     animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1); /* ease out: fast, then settling */
   }
@@ -206,9 +211,9 @@ body,
 
 /* Chromatic-entry buttons on cell borders: beside the hovered cell (desktop), always on touch screens. */
 .hex-acc {
-  /* Always shown (SPEC §8.3). */
-  opacity: 1;
-  pointer-events: auto;
+  /* Hidden at rest; shown beside the hovered cell (.shown) and always on touch screens (SPEC §8.3). */
+  opacity: 0;
+  pointer-events: none;
   cursor: pointer;
   transition: opacity 120ms ease;
 }
@@ -348,9 +353,8 @@ button.dock-label {
   overflow: visible;
 }
 
-/* Bar lines heavier than slot dividers; both span the staff only. */
-.bar-line,
-.slot-divider {
+/* Bar lines span the staff only (no line between two chords in a bar). */
+.bar-line {
   position: absolute;
   right: 0;
   pointer-events: none;
@@ -361,10 +365,6 @@ button.dock-label {
   background: var(--line);
 }
 
-.slot-divider {
-  width: 1px;
-  background: var(--divider);
-}
 
 /* Chord grammar: red when unparseable; interpretation tooltip on hover / focus. */
 .chord-label.invalid {
@@ -804,7 +804,8 @@ button.dock-label {
 /* Bar number + ⋯ bar handle (SPEC §4.1). */
 .bar-handle {
   position: absolute;
-  top: 1px;
+  /* Just above the stave's top line, at the start of the bar (SPEC §3.1). */
+  top: calc(var(--staff-top, 0px) - 1.5em);
   left: 2px;
   z-index: 5;
   display: inline-flex;
@@ -947,9 +948,9 @@ button.dock-label {
   flex: 1;
   border: none;
   background: none;
-  padding: 4px 12px;
+  padding: 3px 10px;
   font: inherit;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--ink);
   cursor: pointer;
 }
@@ -1251,45 +1252,10 @@ button.dock-label {
   color: #b71c1c;
 }
 
-/* Slot browser + readout in the header (‹ Bar 4 · Bbm7 · B♭ Dorian ›): previous / next slot. */
-.slot-nav {
-  margin-left: auto; /* always at the right end, on whichever line it lands */
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px;
-  border-radius: 14px;
-  background: #fff;
-  border: 1px solid #e0ddd6;
-  font-size: 13px;
-}
 
-.slot-nav-scale {
-  color: var(--muted);
-}
 
-.slot-nav-button {
-  width: 26px;
-  height: 24px;
-  border: none;
-  border-radius: 12px;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  font-size: 18px;
-  line-height: 1;
-  cursor: pointer;
-}
 
-.slot-nav-button:hover {
-  background: rgba(0, 0, 0, 0.08);
-}
 
-.slot-nav-label {
-  padding: 0 4px;
-  font-weight: 600;
-  white-space: nowrap;
-}
 
 /* Degree numbers / accidentals on the dark-rimmed spheres: white, lifted by a soft dark edge. */
 .hex-ball-ink {
@@ -1299,13 +1265,6 @@ button.dock-label {
   stroke-width: 2px;
 }
 
-/* Inversion labels under the bottom row of the hex (root / 1st / 2nd / 3rd); hover tip "… inversion". */
-.hex-inversion {
-  fill: #ffffff;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: help;
-}
 
 /* The glow around the whole honeycomb (theme tokens). */
 .hex-glow {
@@ -1313,4 +1272,412 @@ button.dock-label {
 }
 .hex-glow polygon {
   fill: var(--grid-glow);
+}
+
+/* Triad cells: a thin white border (SPEC §8.2). */
+.hex-triad-edge {
+  fill: none;
+  stroke: var(--triad-edge);
+  stroke-width: 1.5;
+  pointer-events: none;
+}
+
+/* Linear (SPEC §8.5): the octave switch, a pill under the row. */
+.octave-switch {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--ink);
+  font-size: 13px;
+}
+.octave-step {
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 8px;
+  cursor: pointer;
+  color: var(--ink);
+}
+.octave-step:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.octave-name {
+  min-width: 56px;
+  text-align: center;
+  font-weight: 600;
+}
+
+/* The octave number under a C cell's ball (SPEC §8.2): like the note name. */
+.hex-octave {
+  fill: #ffffff;
+  pointer-events: none;
+}
+
+/* Header on the dark panel colour: controls that used dark-on-light fills. */
+.topbar .rail-button:hover,
+.topbar .latch-button.on {
+  background: rgba(255, 255, 255, 0.16);
+}
+.topbar .mode-switch {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+.topbar .mode-option.on {
+  background: var(--ink);
+  color: var(--dock-bg);
+}
+
+/* The header and the hex panel: an inner glow in the grid glow's colour. */
+.topbar,
+.dock {
+  box-shadow: var(--panel-glow);
+}
+
+/* Outfit everywhere: form controls don't inherit the font by default. */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+/* Note names in the grid: always black, with a little white glow (SPEC §8.2). After the rules above, so it wins. */
+.hex-cell .hex-name,
+.hex-cell.muted .hex-name,
+.hex-cell.muted.lit .hex-name {
+  fill: var(--note-name);
+  filter: drop-shadow(0 0 1.5px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 3px rgba(255, 255, 255, 0.5));
+}
+
+/* Grid toggle (SPEC §8.5): bottom left of the hex panel. On = the honeycomb; off = Linear. */
+.grid-toggle {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  z-index: 2;
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f3eee6;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.grid-toggle:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+.grid-toggle.on {
+  background: #f3eee6;
+  color: var(--dock-bg);
+  border-color: #f3eee6;
+}
+
+/* The sound section: ▶ buttons and *On arrival*, together in a pill at the right end of the first row. */
+.sound-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  padding: 2px 6px 2px 4px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* The header's second row (SPEC §3.1): note lengths left, everything else right. */
+.topbar-row {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  min-width: 0;
+}
+.row-spacer {
+  margin-left: auto;
+}
+
+/* Icon-only header buttons (undo / redo): the standard curved-arrow icons. */
+.rail-button.icon-button {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 5px;
+}
+.rail-button.icon-button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* Length latch: note icons with their key (SPEC §3.1). */
+.latch-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.latch-button .latch-key {
+  font-size: 10px;
+  opacity: 0.7;
+  align-self: flex-end;
+}
+.note-icon {
+  display: block;
+}
+
+/* ← Library in the header: a pill, like the hex panel's Grid toggle. */
+.topbar .rail-link {
+  align-self: center;
+  padding: 3px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ink);
+  font-weight: 600;
+  cursor: pointer;
+}
+.topbar .rail-link:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+/* The progression title in the header: smaller, in Outfit's lightest weight (Thin, 100). */
+.topbar .rail-heading .rail-title {
+  font-size: 13px;
+  font-weight: 100;
+}
+
+/* The sound section (▶ Chord / Bass / Scale, On arrival) in Outfit Thin, like the title. */
+.topbar .sound-section,
+.topbar .sound-section .rail-button,
+.topbar .sound-section .rail-label,
+.topbar .sound-section select {
+  font-weight: 100;
+}
+
+/* Fit the sound pill on the first row: narrower dropdowns, tighter spacing. */
+.topbar .instrument-picker select {
+  max-width: 124px;
+}
+.topbar .on-arrival select {
+  width: 96px;
+}
+.topbar .sound-section {
+  gap: 4px;
+}
+.topbar .sound-section .audio-controls .rail-button {
+  padding: 3px 4px;
+}
+
+/* The mode switch sits top right of the header; the sound pill lines up under it (end of the second row). */
+.mode-corner {
+  margin-left: auto;
+}
+
+/* Clear ▾ (SPEC §6.2 item 10): a small menu under the button; Clear all asks first. Light menu on the dark header. */
+.clear-menu-wrap {
+  position: relative;
+}
+.clear-menu {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 4px);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  min-width: 150px;
+  padding: 4px;
+  border-radius: 8px;
+  background: #fff;
+  color: #1d1b19;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(0, 0, 0, 0.08);
+  font-size: 13px;
+  font-weight: 400;
+}
+.clear-menu-item {
+  border: none;
+  background: none;
+  padding: 5px 8px;
+  border-radius: 4px;
+  font: inherit;
+  text-align: left;
+  color: #1d1b19;
+  cursor: pointer;
+}
+.clear-menu-item:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.06);
+}
+.clear-menu-item:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.clear-menu-item.danger {
+  background: #c62828;
+  color: #fff;
+}
+.clear-menu-item.danger:hover {
+  background: #b71c1c;
+}
+.clear-confirm {
+  padding: 4px;
+  width: 200px;
+}
+.clear-confirm p {
+  margin: 0 0 8px;
+}
+.clear-confirm-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* Header grid (SPEC §3.1): two rows × two columns. The right column is as wide as its widest row, so the
+   instrument picker (row 1) and the sound pill (row 2) share a left edge; the mode switch sits at row 1's right end. */
+.topbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px 16px;
+}
+.topbar-left,
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px 10px;
+  min-width: 0;
+}
+.topbar-row {
+  flex-basis: auto;
+}
+.ins-label {
+  margin-right: -4px;
+}
+
+/* The selected instrument (and its Ins: label) in Outfit Thin, like the title and the sound pill. */
+.topbar .instrument-select,
+.topbar .ins-label {
+  font-weight: 100;
+}
+
+/* Row 2 now also holds the instrument picker: tighter spacing so it fits beside the sound pill. */
+.topbar .topbar-row {
+  gap: 6px 6px;
+}
+.topbar .instrument-picker select.instrument-select {
+  max-width: 104px;
+}
+.topbar .latch-button {
+  padding: 4px 4px;
+}
+.topbar {
+  column-gap: 8px;
+}
+
+/* ── Responsive layout (SPEC §3.6) ───────────────────────────────────────────────────────────────────────────── */
+
+
+
+/* Phones: the title shrinks with an ellipsis instead of breaking letter by letter; groups wrap within themselves;
+   the hex is always Linear (App). */
+@media (max-width: 640px) {
+  .topbar {
+    padding: 6px 8px;
+    row-gap: 6px;
+  }
+  .topbar-left {
+    flex: 1;
+  }
+  .topbar .rail-heading {
+    min-width: 0;
+    flex: 1;
+  }
+  .topbar .rail-heading .inline-value,
+  .topbar .rail-heading .rail-title {
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow-wrap: normal;
+  }
+  .topbar .topbar-row,
+  .topbar .sound-section {
+    flex-wrap: wrap;
+  }
+  .topbar .sound-section {
+    border-radius: 12px;
+  }
+  .topbar .rail-label {
+    white-space: nowrap;
+  }
+}
+
+/* Touch screens: bigger targets in the header and on the hex panel's buttons. */
+@media (hover: none) and (pointer: coarse) {
+  .topbar .rail-button,
+  .topbar .latch-button,
+  .topbar .mode-option {
+    min-height: 34px;
+  }
+  .octave-step {
+    padding: 4px 12px;
+  }
+}
+
+/* Ins: stays with its picker when the row wraps. */
+.ins-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+/* Header grid, final (SPEC §3.1): row 1 = title · sound pill (centred) · mode switch; row 2 = the editing controls. */
+.topbar {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+}
+.topbar .topbar-center {
+  grid-row: 1;
+  grid-column: 2;
+  justify-self: center;
+}
+.topbar .topbar-right {
+  grid-row: 1;
+  grid-column: 3;
+  justify-content: flex-end;
+}
+.topbar .topbar-row {
+  grid-row: 2;
+  grid-column: 1 / -1;
+}
+/* The sound pill's text, a step smaller. */
+.topbar .sound-section,
+.topbar .sound-section .rail-button,
+.topbar .sound-section .rail-label,
+.topbar .sound-section select {
+  font-size: 12px;
+}
+
+/* Row 1 no longer fits title + sound pill + mode switch below ~900px: the sound pill drops to a row of its own,
+   under the editing controls. */
+@media (max-width: 900px) {
+  /* Three rows: row 1 = title (left) and mode switch (right), spread apart as on wide screens; row 2 = the sound
+     pill, centred; row 3 = the editing controls, centred. */
+  .topbar .topbar-row {
+    grid-row: 3;
+    grid-column: 1 / -1;
+    justify-content: center;
+  }
+  .topbar .topbar-center {
+    grid-row: 2;
+    grid-column: 1 / -1;
+    justify-self: center;
+  }
 }

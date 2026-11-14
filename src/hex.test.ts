@@ -2,7 +2,7 @@
 // ii–V–I — Concert, plus trombone, violin and B♭ tenor sax (written view), and the §8.4 cases.
 import { describe, expect, it } from 'vitest';
 import { slotHarmony } from './harmony';
-import { CONCERT_VIEW, cellCentre, dockHex, hexGrid, hexSize, inversionLabel, slotHex, type SlotHex } from './hex';
+import { CONCERT_VIEW, cellCentre, dockHex, hexGrid, hexSize, linearOctaves, slotHex, type SlotHex } from './hex';
 import { hexRange, instrumentOf, writtenChord } from './instruments';
 
 const hexFor = (chord: string, scale?: string): SlotHex => {
@@ -102,15 +102,14 @@ describe('test table 6: hex layout (Concert C3–C6)', () => {
   });
 });
 
-describe('inversion labels (SPEC §8.2)', () => {
-  const labels = (chord: string) =>
-    Object.fromEntries(hexFor(chord).cells.filter((c) => inversionLabel(c)).map((c) => [c.name, inversionLabel(c)]));
-  it('root position, and the 3rd, 5th and 7th in the bass make the 1st, 2nd and 3rd inversions', () => {
-    expect(labels('Dm7')).toEqual({ D: 'root', F: '1st', A: '2nd', C: '3rd' });
-    expect(labels('C')).toEqual({ C: 'root', E: '1st', G: '2nd' }); // a triad: no 3rd inversion
-  });
-  it('no labels without a chord', () => {
-    expect(dockHex([slotHarmony({ chord: 'N.C.' })], 0).hex.cells.some((c) => inversionLabel(c))).toBe(false);
+describe('guide tones (SPEC §8.2)', () => {
+  const guides = (chord: string) => [...new Set(hexFor(chord).cells.filter((c) => c.guide).map((c) => c.name))];
+  it("a quartad's 7th or 6th; never extensions; a triad has none", () => {
+    expect(guides('G7')).toEqual(['F']);
+    expect(guides('Cmaj7')).toEqual(['B']);
+    expect(guides('C6')).toEqual(['A']);
+    expect(guides('C13')).toEqual(['Bb']); // not the 9th or 13th
+    expect(guides('C')).toEqual([]);
   });
 });
 
@@ -303,5 +302,28 @@ describe('cell look (SPEC §8.2)', () => {
     const hs = (...chords: string[]) => chords.map((chord) => slotHarmony({ chord }));
     expect(dockHex(hs('Dm7'), 0).hex.cells.every((c) => c.playable)).toBe(true);
     expect(dockHex(hs('Dm7', 'N.C.'), 1).hex.cells.every((c) => c.playable)).toBe(true);
+  });
+});
+
+describe('Linear (SPEC §8.5)', () => {
+  const lin = (chord: string, octave = 60) => dockHex([slotHarmony({ chord })], 0, CONCERT_VIEW, { kind: 'linear', octave }).hex;
+  it('one row: one octave of the scale plus the octave above, the same count in every key', () => {
+    const g = lin('Dm7');
+    expect([g.rows, g.rowLengths]).toEqual([1, [8]]);
+    expect(g.cells.map((c) => c.name)).toEqual(['C', 'D', 'E', 'F', 'G', 'A', 'B', 'C']);
+    expect(g.cells[0].midi).toBe(60);
+    expect(lin('Bbm7').cells.map((c) => c.name)).toEqual(['C', 'Db', 'Eb', 'F', 'G', 'Ab', 'Bb', 'C']);
+    expect(lin('Ebmaj7').cells[0].midi).toBe(60); // C is in E♭ major
+    expect(lin('E').cells[0].midi).toBe(61); // C♯: the first step at or above C4
+    expect(lin('Dm7', 72).cells[0].midi).toBe(72);
+  });
+  it('the octave switch: Cs overlapping the range, starting mid-range', () => {
+    expect(linearOctaves(CONCERT_VIEW)).toEqual({ min: 48, max: 72, start: 60 });
+  });
+  it('degrees, borders and the travel keys work as on the honeycomb', () => {
+    const d = dockHex([slotHarmony({ chord: 'G7' })], 0, CONCERT_VIEW, { kind: 'linear', octave: 60 });
+    expect(d.hex.cells.find((c) => c.name === 'G')!.degree).toBe(1);
+    expect(d.hex.borders.length).toBeGreaterThan(0);
+    expect(d.key).not.toBeNull();
   });
 });

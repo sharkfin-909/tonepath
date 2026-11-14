@@ -30,23 +30,24 @@ Honeycomb is a practice-etude tool: a chord-bar form with in-slot standard notat
 - **Etude** — the practice line the user writes over the progression: one continuous, bar-aligned **melody**, shown as standard notation **inside the slots**.
 - **Melody** — the ordered sequence of **melody events** for the whole progression (not stored per slot; slots display their time slice).
 - **Melody event** — stored as `{ pitch, d }` (concert MIDI + duration id) or `{ d }` (rest). Duration ids: `w` | `h` | `q` | `e` | `s`. No dots or ties in v1.
-- **Clear all** — empties the melody to `[]` in one undoable step; does not change chords, scales, title, or instrument.
+- **Clear notes** — empties the melody to `[]` in one undoable step; chords, scales, title and instrument stay.
+- **Clear all** — empties every chord, scale override and note (confirmed first), keeping the bars, title, time signature and instrument; one undoable step. Both live in the **Clear ▾** menu.
 - **Caret** — a **time position** in the form (not a point between events). Entry **overwrites**: a new event replaces whatever occupies its time, leftovers become rests, and later music never moves (no ripple). The **slot under the caret** is the **active slot** (remoulds and colours the docked hex). Cannot move past the end of the form; placing it past the melody's end pads the gap with rests on the next insert.
 - **Owning slot** — the slot holding an event's start; gives its spelling and out-of-scale mark. Events never cross a slot boundary: a length that doesn't fit before the slot ends is refused.
 - **Length latch** — the selected duration applied to the next insert (`w` · `h` · `q` · `e` · `s`).
 - **Rest latch** — toggled by R / Rest. While on, each length key (1–5 or a length button) inserts a rest of that length; picking a hex pitch turns Rest off and inserts that pitch.
-- **Nudge** — ↑/↓ move the note just before the caret one step of its owning slot's scale (⇧ = octave).
+- **Nudge** — ↑/↓ move the note at the caret (the one it sits on; at the melody's end, the last note) a semitone (⌥ = one step of its owning slot's scale, ⇧ = octave).
 - **Out-of-scale mark** — visual flag on a melody note whose pitch is no longer in the scale of the slot that owns its beat (e.g. after a chord edit). Notes are kept, never auto-deleted.
 
 ## Screen
 
-- **Control header** — the bar across the top of the chart screen holding every edit control (library, title, Stand, Write / Play, instrument, time, bars per row, mute, ▶ Chord / ▶ Bass / ▶ Scale, *On arrival*, length latch, Rest, undo / redo, Clear all) and, at its right end, the **slot browser** (`‹ Bar n · chord · scale ›`). Below it: the chart over the full-width docked hex.
+- **Control header** — the bar across the top of the chart screen holding every edit control (library, title, Stand, Write / Play, instrument, time, bars per row, mute, ▶ Chord / ▶ Bass / ▶ Scale, *On arrival*, length latch, Rest, undo / redo, Clear all). Below it: the chart over the full-width docked hex.
   _Avoid_: control rail (the old left column).
 - **Chart zoom** — automatic: the chart scales so every row fits its area, down to a readable floor (staff gap ≈ 5px); below that the chart scrolls, following the caret's row. No manual zoom.
 - **Write / Play** — the two hex modes, switched in the control header (or `P`). **Write** (default on every open) records hex picks at the caret. **Play** only auditions: no caret, editing controls hidden, ← / → step slot by slot (wrapping), clicking a slot or note selects it. **On arrival** — a Play-mode device setting: what sounds when a slot is reached (Silent · Chord · Root note).
 - **Editing session** — everything about the open chart that isn't saved: caret, length / Rest latches, Write / Play / Stand, the Play slot, a pending *On arrival* sound, bar selection and clipboard, mute and *On arrival* setting. Changed only by **intents** (a pick, a length, browse, a bar action…), each giving the next session, an edit to commit and sounds to play (`session.ts`; keys map to intents in `keymap.ts`).
 - **Progression document** — the open progression with its undo history and saving: each committed edit is one undo step and one save; another tab's write reloads it (`document.ts`).
-- **Stand mode** — read-only view for a tablet on a music stand: the control header and hex are hidden, and every bar is fitted onto one page. ✎ Edit / `\` returns to editing.
+- **Read mode** (code: *stand*) — the third option of the Play | Write | Read mode switch: read-only view for a tablet on a music stand: the control header and hex are hidden, and every bar is fitted onto one page. ✎ Edit / `\` returns to editing.
 
 ## Docked hex
 
@@ -60,7 +61,8 @@ Honeycomb is a practice-etude tool: a chord-bar form with in-slot standard notat
 - **Note sphere** (ball) — the shaded sphere on a cell (cream highlight → dark brown rim, theme tokens), carrying the degree number in white; sharps sit right of the cell centre, flats left, over a dark socket. Drawn in a layer above the cells so it can travel.
   _Avoid_: hex fill (the old white / grey centres).
 - **Key** — the notes of a slot's scale; two slots are in the same key when their scales have the same notes (Dm7 D Dorian and G7 G Mixolydian: key of C). A key that is a mode of a major key has **simple chords**: its seven diatonic triads, each with its mode (offered in an empty chord field; committing one sets that mode, so the key holds). _Avoid_: tonality, key signature (not shown).
-- **Travel** — the slide of the degree pattern (balls and cell colours) along the rows on a slot change in the same key: right when the new root is up to a 5th above, else left; nothing on a key change.
+- **Travel** — the slide of the degree pattern (balls and cell colours) along the rows on a slot change in the same key: right when the new root is up to a 4th above, else left (a move and its return mirror); nothing on a key change.
+- **Linear** — the docked hex as one row: one octave of the slot scale (8 cells for 7 notes), with an octave switch; shown when the **Grid** toggle (bottom left of the hex panel) is off. _Avoid_: keyboard view, single row.
 - **Unchecked hex** — the dock shown for an `N.C.`, empty or unparseable active slot: C major with names only (no degrees), fully playable; notes there are not checked against any scale. _Avoid_: rests-only hex (the old rule). A valid chord that no scale fits gets a **chord-tones hex** instead (cells step through the chord tones; entry allowed).
 
 ## Sound and instrument

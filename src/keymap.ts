@@ -94,8 +94,15 @@ export function keyIntent(e: KeyPress, ctx: KeyContext): KeyResult {
     if (!e.metaKey && !e.ctrlKey && (e.key === 'Backspace' || e.key === 'Delete')) return handled({ type: 'bar-action', bar, action: 'delete' });
     if (e.key === 'Escape') return handled({ type: 'clear-selection' });
   }
+  // ⌥↑ / ⌥↓: nudge by one step of the slot's scale.
+  if (e.altKey && !e.metaKey && !e.ctrlKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+    return handled({ type: 'nudge', dir: e.key === 'ArrowUp' ? 1 : -1, octave: false, scale: true });
+  }
   if (!plain) return NONE;
   switch (e.key) {
+    case '`':
+    case '~':
+      return handled(e.repeat ? null : { type: 'step-play' }); // stepwise playback, note by note
     case 'ArrowLeft':
     case 'ArrowRight':
       return handled({ type: 'step', dir: e.key === 'ArrowLeft' ? -1 : 1 });

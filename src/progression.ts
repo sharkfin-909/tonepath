@@ -132,6 +132,15 @@ export function clearMelody(p: Progression): Progression {
   return p.melody.length ? { ...p, melody: [] } : p;
 }
 
+/**
+ * Clear all (SPEC §6.2 item 10): every chord, scale override and note removed; the bars (and their splits), title,
+ * time signature and instrument stay. Unchanged when there is nothing to clear.
+ */
+export function clearEverything(p: Progression): Progression {
+  const empty = p.melody.length === 0 && p.bars.every((b) => b.every((s) => s.chord === '' && s.scale === undefined));
+  return empty ? p : { ...p, bars: p.bars.map((b) => b.map(() => ({ chord: '' }))), melody: [] };
+}
+
 /** Instrument switch (SPEC §10): a progression setting; unknown ids are ignored. */
 export function setInstrument(p: Progression, id: string): Progression {
   return id === p.instrument || !isInstrumentId(id) ? p : { ...p, instrument: id };

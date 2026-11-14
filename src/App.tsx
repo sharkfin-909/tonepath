@@ -6,7 +6,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, u
 import { LengthLatch } from './rail/LengthLatch';
 import { Chart } from './chart/Chart';
 import { setBarsPerRow, setConcertClef, setInstrument, setScaleOverride, setTitle, type Progression } from './progression';
-import { BarsPerRow, ClearAll, TimeSignatureField, TitleField } from './rail/RailSettings';
+import { BarsPerRow, ClearMenu, TimeSignatureField, TitleField } from './rail/RailSettings';
 import { InstrumentPicker } from './rail/InstrumentPicker';
 import { playBass, playChord, playNote, playRoot, playScale, setMuted, unlockAudio } from './audio';
 import { onArrivalOf, readDevice, writeDevice, type OnArrival } from './device';
@@ -16,9 +16,23 @@ import type { StoredProgression } from './storage';
 import { openDocument, type ProgressionDocument } from './document';
 import { initialSession, reduce, type Effect, type Intent, type SessionState } from './session';
 import { enterChord } from './chordEntry';
+import { HONEYCOMB, linearOctaves, type HexShape } from './hex';
 import { keyIntent } from './keymap';
 import { clickUnderPointer, trackPointer } from './pointerClick';
 import { instrumentView } from './view';
+
+/** A CSS media query as React state (SPEC §3.6 responsive layout). */
+function useMediaQuery(query: string): boolean {
+  const [match, setMatch] = useState(() => typeof matchMedia !== 'undefined' && matchMedia(query).matches);
+  useEffect(() => {
+    const m = matchMedia(query);
+    const on = () => setMatch(m.matches);
+    on();
+    m.addEventListener('change', on);
+    return () => m.removeEventListener('change', on);
+  }, [query]);
+  return match;
+}
 
 /** `navigator.storage.persist()` once per session, on the first edit (SPEC §12.1). */
 let persistAsked = false;
@@ -74,9 +88,25 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
     return () => ro.disconnect();
   }, [session.stand]);
   /** Clicking an empty / unparseable dock label opens that slot's chord field. */
+  // Linear (SPEC §8.5): the dock as one row, switched by octave. The layout is a device setting; the octave isn't
+  // saved (it starts mid-range and is kept within the instrument's range).
+  const [linearSetting, setLinear] = useState(() => readDevice(localStorage).hexShape === 'linear');
+  // Phones (SPEC §3.6): the honeycomb is too small there, so the dock is always Linear; the saved setting is kept.
+  const narrow = useMediaQuery('(max-width: 640px)');
+  const linear = linearSetting || narrow;
+  const [octaveWanted, setOctave] = useState<number | null>(null);
+  const toggleLinear = () =>
+    setLinear((on) => {
+      writeDevice(localStorage, { hexShape: on ? 'honeycomb' : 'linear' });
+      return !on;
+    });
   const [editRequest, setEditRequest] = useState<{ bar: number; part: number; n: number } | null>(null);
 
   const view = useMemo(() => instrumentView(progression), [progression]);
+  const octaves = linearOctaves(view.range);
+  const octave = Math.min(octaves.max, Math.max(octaves.min, octaveWanted ?? octaves.start));
+  const shape: HexShape = linear ? { kind: 'linear', octave } : HONEYCOMB;
+  const cName = (m: number) => `C${m / 12 - 1}`;
   const caretAt = Math.min(session.caret, view.end); // the form can shrink under the caret
   const playing = session.playIndex !== null;
   const active = playing ? view.slots[Math.min(session.playIndex!, view.slots.length - 1)] : view.slotAt(caretAt);
@@ -230,6 +260,30 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
   const haloPitch = halo && halo.caret === caretAt && halo.melody === progression.melody ? halo.pitch : null;
   const { muted } = session;
 
+  // The mode switch (SPEC §3.3, §3.4): Play | Write | Read (Read = the read-only page view, `\\`).
+  const mode: 'play' | 'write' | 'read' = session.stand ? 'read' : playing ? 'play' : 'write';
+  const modeSwitch = (
+    <div className="mode-switch" role="radiogroup" aria-label="Mode">
+      {(['play', 'write', 'read'] as const).map((m) => (
+        <button
+          key={m}
+          type="button"
+          role="radio"
+          aria-checked={mode === m}
+          className={mode === m ? 'mode-option on' : 'mode-option'}
+          title={m === 'play' ? 'Play: audition only (P)' : m === 'write' ? 'Write: record hex picks (P)' : 'Read: read-only page view (\\)'}
+          onClick={() => {
+            if (m === 'read') return dispatch({ type: 'stand', on: true });
+            if (session.stand) dispatch({ type: 'stand', on: false });
+            dispatch({ type: 'mode', mode: m });
+          }}
+        >
+          {m === 'play' ? 'Play' : m === 'write' ? 'Write' : 'Read'}
+        </button>
+      ))}
+    </div>
+  );
+
   if (session.stand) {
     return (
       <div className="stand-layout">
@@ -237,18 +291,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
           <span className="stand-title">{progression.title}</span>
           <span className="stand-instrument">{view.inst.name}</span>
           <span className="stand-spacer" />
-          <button
-            type="button"
-            className={muted ? 'rail-button mute on' : 'rail-button mute'}
-            aria-pressed={muted}
-            title="Mute (M)"
-            onClick={() => dispatch({ type: 'toggle-mute' })}
-          >
-            {muted ? '🔇 Muted' : '🔊 Sound'}
-          </button>
-          <button type="button" className="rail-button" title="Back to editing (\)" onClick={() => dispatch({ type: 'stand', on: false })}>
-            ✎ Edit
-          </button>
+          {modeSwitch}
         </header>
         <section className="chart-area stand-chart">
           <Chart
@@ -287,95 +330,85 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
           if (e.target instanceof HTMLSelectElement) focusHex();
         }}
       >
-        <button
-          type="button"
-          className="rail-link"
-          onClick={onLibrary} // every edit is already saved
-        >
-          ← Library
-        </button>
-        <h1 className="rail-heading">
-          <TitleField title={progression.title} editing={renameOnOpen} onRename={(t) => commit(setTitle(doc.progression, t))} />
-        </h1>
-        <span className="bar-sep" aria-hidden />
-        <button type="button" className="rail-button stand-button" title="Stand: read-only page view (\)" onClick={() => dispatch({ type: 'stand', on: true })}>
-          ▭ Stand
-        </button>
-        <div className="mode-switch" role="radiogroup" aria-label="Mode">
-          {(['write', 'play'] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              role="radio"
-              aria-checked={(m === 'play') === playing}
-              className={(m === 'play') === playing ? 'mode-option on' : 'mode-option'}
-              title={m === 'play' ? 'Play: audition only (P)' : 'Write: record hex picks (P)'}
-              onClick={() => dispatch({ type: 'mode', mode: m })}
-            >
-              {m === 'write' ? 'Write' : 'Play'}
-            </button>
-          ))}
+        {/* Row 1: title (left) · sound pill (centre) · mode switch (right); row 2: the editing controls (SPEC §3.1). */}
+        <div className="topbar-left">
+          <button
+            type="button"
+            className="rail-link"
+            onClick={onLibrary} // every edit is already saved
+          >
+            ← Library
+          </button>
+          <h1 className="rail-heading">
+            <TitleField title={progression.title} editing={renameOnOpen} onRename={(t) => commit(setTitle(doc.progression, t))} />
+          </h1>
         </div>
-        <span className="bar-sep" aria-hidden />
-        <InstrumentPicker
-          instrument={view.inst.id}
-          concertClef={progression.concertClef === 'bass' ? 'bass' : 'treble'}
-          onInstrument={onInstrument}
-          onConcertClef={(clef) => commit(setConcertClef(doc.progression, clef))}
-        />
-        <TimeSignatureField value={progression.timeSignature} onChange={(text) => dispatch({ type: 'time-signature', text })} />
-        <BarsPerRow value={progression.barsPerRow} onChange={(n) => commit(setBarsPerRow(doc.progression, n))} />
-        <span className="bar-sep" aria-hidden />
-        <AudioControls
-          muted={muted}
-          onToggleMute={() => dispatch({ type: 'toggle-mute' })}
-          onChord={() => dispatch({ type: 'sound', what: 'chord' })}
-          onBass={() => dispatch({ type: 'sound', what: 'bass' })}
-          onScale={() => dispatch({ type: 'sound', what: 'scale' })}
-        />
-        <label className="rail-setting on-arrival">
-          <span className="rail-label">On arrival</span>
-          <select className="rail-select" value={session.onArrival} onChange={(e) => dispatch({ type: 'set-arrival', how: e.target.value as OnArrival })}>
-            <option value="silent">Silent</option>
-            <option value="chord">Chord</option>
-            <option value="root">Root note</option>
-            <option value="bass">Bass note</option>
-            <option value="bass-chord">Bass note + chord</option>
-          </select>
-        </label>
-        {!playing && (
-          <>
-            <span className="bar-sep" aria-hidden />
-            <LengthLatch
-              value={session.length}
-              onChange={(d) => dispatch({ type: 'length', d })}
-              rest={session.rest}
-              onToggleRest={() => dispatch({ type: 'toggle-rest' })}
-              refusal={session.refusal}
-              onRefusalShown={onRefusalShown}
+        {/* Row 1, centred: sound and On arrival, in a pill. */}
+        <div className="sound-section topbar-center">
+          <AudioControls
+            muted={muted}
+            onToggleMute={() => dispatch({ type: 'toggle-mute' })}
+            onChord={() => dispatch({ type: 'sound', what: 'chord' })}
+            onBass={() => dispatch({ type: 'sound', what: 'bass' })}
+            onScale={() => dispatch({ type: 'sound', what: 'scale' })}
+          />
+          <label className="rail-setting on-arrival">
+            <span className="rail-label">On arrival</span>
+            <select className="rail-select" value={session.onArrival} onChange={(e) => dispatch({ type: 'set-arrival', how: e.target.value as OnArrival })}>
+              <option value="silent">Silent</option>
+              <option value="chord">Chord</option>
+              <option value="root">Root note</option>
+              <option value="bass">Bass note</option>
+              <option value="bass-chord">Bass note + chord</option>
+            </select>
+          </label>
+        </div>
+        <div className="topbar-right">
+          <div className="mode-corner">{modeSwitch}</div>
+        </div>
+        <div className="topbar-row">
+          {!playing && (
+            <>
+              <LengthLatch
+                value={session.length}
+                onChange={(d) => dispatch({ type: 'length', d })}
+                rest={session.rest}
+                onToggleRest={() => dispatch({ type: 'toggle-rest' })}
+                refusal={session.refusal}
+                onRefusalShown={onRefusalShown}
+              />
+              <TimeSignatureField value={progression.timeSignature} onChange={(text) => dispatch({ type: 'time-signature', text })} />
+              <BarsPerRow value={progression.barsPerRow} onChange={(n) => commit(setBarsPerRow(doc.progression, n))} />
+              <div className="undo-controls">
+                <button type="button" className="rail-button icon-button" title="Undo (⌘Z)" aria-label="Undo" disabled={!doc.canUndo} onClick={() => dispatch({ type: 'undo' })}>
+                  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
+                    <path fill="currentColor" d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z" />
+                  </svg>
+                </button>
+                <button type="button" className="rail-button icon-button" title="Redo (⇧⌘Z)" aria-label="Redo" disabled={!doc.canRedo} onClick={() => dispatch({ type: 'redo' })}>
+                  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
+                    <path fill="currentColor" d="M18.4 10.6C16.55 8.99 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z" />
+                  </svg>
+                </button>
+              </div>
+              <ClearMenu
+                canClearNotes={progression.melody.length > 0}
+                canClearAll={progression.melody.length > 0 || progression.bars.some((b) => b.some((s) => s.chord !== '' || s.scale !== undefined))}
+                onClearNotes={() => dispatch({ type: 'clear-notes' })}
+                onClearAll={() => dispatch({ type: 'clear-all' })}
+              />
+            </>
+          )}
+          {/* The instrument picker: after the Write-only editing group, and shown in Play too. */}
+          <span className="ins-group">
+            <span className="rail-label ins-label">Ins:</span>
+            <InstrumentPicker
+              instrument={view.inst.id}
+              concertClef={progression.concertClef === 'bass' ? 'bass' : 'treble'}
+              onInstrument={onInstrument}
+              onConcertClef={(clef) => commit(setConcertClef(doc.progression, clef))}
             />
-            <div className="undo-controls">
-              <button type="button" className="rail-button" title="Undo (⌘Z)" disabled={!doc.canUndo} onClick={() => dispatch({ type: 'undo' })}>
-                ↶ Undo
-              </button>
-              <button type="button" className="rail-button" title="Redo (⇧⌘Z)" disabled={!doc.canRedo} onClick={() => dispatch({ type: 'redo' })}>
-                ↷ Redo
-              </button>
-            </div>
-            <ClearAll disabled={!progression.melody.length} onClear={() => dispatch({ type: 'clear-all' })} />
-          </>
-        )}
-        {/* Slot browser + readout: ‹ Bar 4 · Bbm7 · B♭ Dorian › (keys < >). */}
-        <div className="slot-nav" aria-live="polite">
-          <button type="button" className="slot-nav-button" title="Previous slot (<)" aria-label="Previous slot" onClick={() => dispatch({ type: 'browse', dir: -1 })}>
-            ‹
-          </button>
-          <span className="slot-nav-label">
-            Bar {active.bar + 1} · <strong>{active.chord || '—'}</strong> · <span className="slot-nav-scale">{active.scaleText}</span>
           </span>
-          <button type="button" className="slot-nav-button" title="Next slot (>)" aria-label="Next slot" onClick={() => dispatch({ type: 'browse', dir: 1 })}>
-            ›
-          </button>
         </div>
       </header>
       <main ref={mainRef} className="main">
@@ -404,9 +437,33 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
             {session.notice.text}
           </p>
         )}
-        <section ref={dockRef} className="dock" aria-label="Docked hex" tabIndex={-1}>
+        <section ref={dockRef} className={linear ? 'dock linear' : 'dock'} aria-label="Docked hex" tabIndex={-1}>
+          {/* Grid on = the 3-row honeycomb; off = Linear (one row, by octave). SPEC §8.5. Not on phones (always Linear). */}
+          {!narrow && <button
+            type="button"
+            className={linear ? 'grid-toggle' : 'grid-toggle on'}
+            aria-pressed={!linear}
+            title={linear ? 'Grid: show the honeycomb' : 'Grid off: one row (Linear), by octave'}
+            onClick={() => {
+              toggleLinear();
+              focusHex();
+            }}
+          >
+            Grid
+          </button>}
+          {linear && (
+            <div className="octave-switch" role="group" aria-label="Octave">
+              <button type="button" className="octave-step" aria-label="Octave down" title="Octave down" disabled={octave <= octaves.min} onClick={() => setOctave(octave - 12)}>
+                ‹
+              </button>
+              <span className="octave-name">{`${cName(octave)}–${cName(octave + 12)}`}</span>
+              <button type="button" className="octave-step" aria-label="Octave up" title="Octave up" disabled={octave >= octaves.max} onClick={() => setOctave(octave + 12)}>
+                ›
+              </button>
+            </div>
+          )}
           <DockedHex
-            dock={view.dock(active.index)}
+            dock={view.dock(active.index, shape)}
             onLabelClick={() => setEditRequest((r) => ({ bar: active.bar, part: active.part, n: (r?.n ?? 0) + 1 }))}
             onPick={(written) => dispatch({ type: 'pick', written })}
             onHoverPitch={(p) => {

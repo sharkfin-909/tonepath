@@ -19,9 +19,9 @@ import {
 } from './bars';
 import { stepSlot } from './form';
 import { stepPitchClasses, type SlotHarmony } from './harmony';
-import { backspaceAt, caretFromClick, deleteAt, insertWrapping, melodyEnd, nudge, snapToEvent, stepCaret, type TimedEvent } from './melody';
+import { backspaceAt, caretFromClick, deleteAt, insertWrapping, melodyEnd, nudge, snapToEvent, stepCaret, timeline, type TimedEvent } from './melody';
 import type { OnArrival } from './device';
-import { clearMelody, setTimeSignature, type Duration, type MelodyEvent, type Progression } from './progression';
+import { clearEverything, clearMelody, setTimeSignature, type Duration, type MelodyEvent, type Progression } from './progression';
 import { instrumentView, type ViewSlot } from './view';
 
 export interface Selection {
@@ -62,9 +62,12 @@ export type Intent =
   | { type: 'length'; d: Duration }
   | { type: 'toggle-rest' }
   | { type: 'delete'; back: boolean }
-  | { type: 'nudge'; dir: -1 | 1; octave: boolean }
+  /** ↑ / ↓: by a semitone; ⇧: an octave; ⌥ (`scale`): one step of the owning slot's scale. */
+  | { type: 'nudge'; dir: -1 | 1; octave: boolean; scale?: boolean }
   /** ← / → : Write moves the caret by event; Play steps slots. */
   | { type: 'step'; dir: -1 | 1 }
+  /** ` (or ~), Write: stepwise playback — play the event at the caret and move past it, wrapping at the end. */
+  | { type: 'step-play' }
   /** ‹ › and < > : previous / next slot, wrapping. */
   | { type: 'browse'; dir: -1 | 1 }
   | { type: 'event-click'; event: TimedEvent }
@@ -79,6 +82,8 @@ export type Intent =
   | { type: 'bar-action'; bar: number; action: BarAction }
   | { type: 'append-bar' }
   | { type: 'clear-selection' }
+  /** Clear ▾ (SPEC §6.2 item 10): the notes only; or everything — chords, scales and notes (confirmed in the menu). */
+  | { type: 'clear-notes' }
   | { type: 'clear-all' }
   | { type: 'time-signature'; text: string }
   | { type: 'undo' }
@@ -202,6 +207,19 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
       }
       return done();
     }
+    case 'step-play': {
+      // Write (SPEC §6.2): note by note through the melody from the caret. A note sounds (with its slot's *On arrival*
+      // when it starts the slot); a rest passes silently; after the last event the next press starts again at bar 1.
+      if (playing) return done();
+      const events = timeline(p.melody).filter((e) => e.start < view.end);
+      if (events.length === 0) return done();
+      const e = events.find((x) => caret >= x.start && caret < x.end) ?? events[0];
+      if ('pitch' in e.ev) effects.push({ type: 'note', midi: e.ev.pitch });
+      const slot = view.slotAt(e.start);
+      if (slot.start === e.start) effects.push(...arrivalSounds(s.onArrival, slot.concert));
+      set({ caret: e.end, refusal: null });
+      return done();
+    }
     case 'length':
       set({ length: intent.d });
       if (s.rest) insert(intent.d, null); // Rest on: a length also inserts a rest (silent)
@@ -216,7 +234,8 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
       return done();
     }
     case 'nudge': {
-      const r = nudge(p.melody, slots, caret, intent.dir, intent.octave, (slot) => stepPitchClasses(slots[slot.index].concert) ?? CHROMATIC); // no chord: semitones
+      // Chromatic by default; ⌥ steps through the owning slot's scale (no chord there: semitones anyway).
+      const r = nudge(p.melody, slots, caret, intent.dir, intent.octave, (slot) => (intent.scale ? (stepPitchClasses(slots[slot.index].concert) ?? CHROMATIC) : CHROMATIC));
       if (!r.ok) return done();
       edit = { ...p, melody: r.melody };
       effects.push({ type: 'note', midi: r.pitch });
@@ -339,9 +358,13 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
     case 'clear-selection':
       set({ selection: null });
       return done();
-    case 'clear-all':
+    case 'clear-notes':
       edit = clearMelody(p); // one undo step, no confirm (SPEC §6.2 item 10)
       set({ caret: 0 });
+      return done();
+    case 'clear-all':
+      edit = clearEverything(p); // one undo step; the menu asks first
+      set({ caret: 0, selection: null });
       return done();
     case 'time-signature': {
       const next = setTimeSignature(p, intent.text);

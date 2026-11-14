@@ -32,6 +32,9 @@ function useSize<T extends HTMLElement>() {
 /** A hover place: a cell (by grid position), or a chromatic-entry button on a border (row, x, index). */
 type HoverTarget = { kind: 'cell'; r: number; c: number } | { kind: 'border'; r: number; x: number; i: number };
 
+/** A cell's octave number as written (C4 = middle C; a C♭ belongs to the octave above its sounding pitch). */
+const octaveOf = (cell: HexCell) => Math.floor((cell.midi + (cell.name.startsWith('Cb') ? 1 : 0)) / 12) - 1;
+
 const buttonKey = (b: HexBorder, i: number) => `b${b.r}:${b.x}:${i}`;
 
 /** Slide an element in from `dx` px to its place (the travel plan); a new slide takes over mid-way. */
@@ -105,7 +108,6 @@ export function DockedHex({ dock, onPick, halo, onLabelClick, onHoverPitch }: Do
   // cells; the real cells show plain until the copy lands, then take the colour back before the copy is removed.
   const ballsRef = useRef<SVGGElement>(null);
   const coloursRef = useRef<SVGGElement>(null);
-  const inversionsRef = useRef<SVGGElement>(null);
   const prevDock = useRef(dock);
   const [travel, setTravel] = useState<{ id: number; dx: number; settled: boolean } | null>(null);
   const travelTimers = useRef<number[]>([]);
@@ -118,7 +120,6 @@ export function DockedHex({ dock, onPick, halo, onLabelClick, onHoverPitch }: Do
     if (steps === null || !layout || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const dx = -steps * layout.cellWidth; // each ball starts where its degree was
     slideIn(ballsRef.current, dx);
-    slideIn(inversionsRef.current, dx); // the labels go with their balls
     travelTimers.current.forEach((t) => window.clearTimeout(t));
     const id = performance.now();
     setTravel({ id, dx, settled: false });
@@ -174,7 +175,7 @@ export function DockedHex({ dock, onPick, halo, onLabelClick, onHoverPitch }: Do
                 <g clipPath="url(#hex-grid-clip)" aria-hidden>
                   <g ref={coloursRef} className="hex-colour-copy">
                     {layout.cells
-                      .filter(({ cell }) => cell.triad)
+                      .filter(({ cell }) => cell.triad || cell.guide)
                       .map(({ cell, cx, cy }) => (
                         <polygon
                           key={`${cell.r}-${cell.c}`}
@@ -192,15 +193,6 @@ export function DockedHex({ dock, onPick, halo, onLabelClick, onHoverPitch }: Do
           <g className="hex-balls" ref={ballsRef}>
             {layout.cells.map(({ cell, cx, cy }) => (
               <Ball key={`${cell.r}-${cell.c}`} cell={cell} cx={cx} cy={cy} R={layout.size.rx} halo={cell.midi === halo} pop={popOf(`${cell.r}:${cell.c}`)} />
-            ))}
-          </g>
-          {/* Inversions under the bottom row's chord tones: root, 3rd → 1st, 5th → 2nd, 7th → 3rd. They travel with the balls. */}
-          <g ref={inversionsRef}>
-            {layout.inversions.map(({ cell, label: inv, tip, cx, cy }) => (
-              <text key={`inv-${cell.c}`} className="hex-inversion" x={cx} y={cy} textAnchor="middle" dominantBaseline="central">
-                <title>{tip}</title>
-                {inv}
-              </text>
             ))}
           </g>
           {/* Chromatic entry (suspensions, anticipations): on the border between two cells of a row, the pitch(es)
@@ -278,14 +270,18 @@ interface CellProps {
 function Cell({ part, plain, cell, cx, cy, R, ry, onPick, halo, lit, onHover }: CellProps) {
   const active = cell.playable && !!onPick;
   const r = R * (cell.triad ? T.triadNote : T.otherNote);
-  // Only triad cells show their degree colour; the rest stay neutral until lit (CSS: .hex-cell.muted).
-  const className = ['hex-cell', cell.triad && !plain ? '' : 'muted', lit ? 'lit' : ''].join(' ').trim();
+  // Triad cells and a quartad's guide tone (7th / 6th) show their degree colour; the rest stay neutral until lit
+  // (CSS: .hex-cell.muted).
+  const coloured = cell.triad || cell.guide;
+  const className = ['hex-cell', coloured && !plain ? '' : 'muted', lit ? 'lit' : ''].join(' ').trim();
   const style = { ['--deg' as string]: cell.colour, ['--deg-ink' as string]: cell.ink };
   const opacity = cell.inRange ? 1 : T.outOpacity;
   if (part === 'top') {
     const clipId = `hex-clip-${cell.r}-${cell.c}`;
     return (
       <g className={`${className} hex-cell-top`} style={style} opacity={opacity}>
+        {/* Triad cells: a thin white edge (in the top layer, so no neighbour's fill covers it; off while colours travel). */}
+        {cell.triad && !plain && <polygon className="hex-triad-edge" points={hexPoints(cx, cy, R - 0.75, ry - 0.75)} />}
         {lit && (
           <>
             <clipPath id={clipId}>
@@ -299,6 +295,12 @@ function Cell({ part, plain, cell, cx, cy, R, ry, onPick, halo, lit, onHover }: 
         </text>
         {/* The socket shows only while a sharp / flat ball is out of it. */}
         <circle className="hex-socket" cx={cx} cy={cy} r={r} opacity={cell.accidental === 0 ? 0 : 1} />
+        {/* C cells: the octave number under the ball (C4 = middle C), so you can tell the Cs apart. */}
+        {cell.name[0] === 'C' && (
+          <text x={cx} y={cy + r + Math.max(7, R * 0.16)} textAnchor="middle" dominantBaseline="central" fontSize={Math.max(8, R * 0.2)} fontWeight={700} className="hex-octave">
+            {`oct-${octaveOf(cell)}`}
+          </text>
+        )}
       </g>
     );
   }

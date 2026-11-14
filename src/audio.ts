@@ -57,11 +57,43 @@ export const midiToHz = (m: number) => 440 * 2 ** ((m - 69) / 12);
 // ---------------------------------------------------------------- engine
 
 const NOTE = { gain: 0.22, attack: 0.01, decay: 0.9 };
-const CHORD = { gain: 0.1, attack: 0.01, decay: 1.6 };
+const CHORD = { gain: 0.1, attack: 0.01, decay: 3.2 };
 const SCALE_GAP = 0.15;
 
 let ctx: AudioContext | null = null;
 let muted = false;
+
+/**
+ * Reverb without a library (SPEC §9): a ConvolverNode fed a generated impulse response — stereo white noise fading
+ * out exponentially over `seconds`. Every tone goes to the output bus, which splits into the dry signal and the
+ * reverb (`wet`), both to the speakers.
+ */
+const REVERB = { seconds: 2.2, decay: 3, wet: 0.28 };
+let bus: AudioNode | null = null;
+
+function output(c: AudioContext): AudioNode {
+  if (bus) return bus;
+  const input = c.createGain();
+  input.connect(c.destination); // dry
+  const verb = c.createConvolver();
+  verb.buffer = impulse(c, REVERB.seconds, REVERB.decay);
+  const wet = c.createGain();
+  wet.gain.value = REVERB.wet;
+  input.connect(verb).connect(wet).connect(c.destination);
+  bus = input;
+  return bus;
+}
+
+/** A room's impulse response: noise, each channel independent (a wide stereo tail), fading as (1 − t)^decay. */
+function impulse(c: AudioContext, seconds: number, decay: number): AudioBuffer {
+  const length = Math.floor(c.sampleRate * seconds);
+  const buf = c.createBuffer(2, length, c.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const data = buf.getChannelData(ch);
+    for (let i = 0; i < length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / length) ** decay;
+  }
+  return buf;
+}
 
 /**
  * Create / resume the AudioContext. Call from a user gesture (SPEC §9: created / resumed on the first gesture);
@@ -81,16 +113,16 @@ export function isMuted(): boolean {
   return muted;
 }
 
-function tone(midi: number, at: number, env: typeof NOTE): void {
+function tone(midi: number, at: number, env: typeof NOTE, wave: OscillatorType = 'sine'): void {
   if (!ctx) return;
   const osc = ctx.createOscillator();
   const g = ctx.createGain();
-  osc.type = 'sine';
+  osc.type = wave;
   osc.frequency.value = midiToHz(midi);
   g.gain.setValueAtTime(0, at);
   g.gain.linearRampToValueAtTime(env.gain, at + env.attack);
   g.gain.exponentialRampToValueAtTime(0.0001, at + env.attack + env.decay);
-  osc.connect(g).connect(ctx.destination);
+  osc.connect(g).connect(output(ctx));
   osc.start(at);
   osc.stop(at + env.attack + env.decay + 0.05);
 }

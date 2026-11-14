@@ -2,19 +2,20 @@
 import { describe, expect, it } from 'vitest';
 import { slotHarmony } from './harmony';
 import { CONCERT_VIEW, dockHex } from './hex';
-import { INVERSION_STRIP, layoutHex, travelSteps } from './hexLayout';
+import { layoutHex, travelSteps } from './hexLayout';
 
 const dock = (chord: string, scale?: string) => dockHex([slotHarmony({ chord, scale })], 0, CONCERT_VIEW);
 
 describe('travel plan', () => {
-  it('same key, the new root up to a 5th above: slide right by the steps (C → G7: 4; F Lydian → G7: 1; Dm7 → G7: 3)', () => {
-    expect(travelSteps(dock('C'), dock('G7'))).toBe(4);
+  it('same key, the new root up to a 4th above: slide right by the steps (F Lydian → G7: 1; Dm7 → G7: 3)', () => {
     expect(travelSteps(dock('Fmaj7#11'), dock('G7'))).toBe(1);
     expect(travelSteps(dock('Dm7'), dock('G7'))).toBe(3);
     expect(travelSteps(dock('G7'), dock('Cmaj7'))).toBe(3);
   });
 
-  it('same key, the new root further up: slide left, down to it (G7 → F Lydian: −1; C → A Aeolian: −2)', () => {
+  it('same key, the new root further up (a 5th or more): slide left, down to it — a return mirrors its move', () => {
+    expect(travelSteps(dock('G7'), dock('Dm7'))).toBe(-3); // Dm7 → G7 went 3 right
+    expect(travelSteps(dock('C'), dock('G7'))).toBe(-3);
     expect(travelSteps(dock('G7'), dock('Fmaj7#11'))).toBe(-1);
     expect(travelSteps(dock('C'), dock('Am7', 'aeolian'))).toBe(-2);
   });
@@ -29,7 +30,7 @@ describe('travel plan', () => {
   it('in the same key the grid is identical, so one cell-width step moves every ball onto its degree', () => {
     const a = layoutHex(dock('C').hex, 1200, 300, 0.24);
     const b = layoutHex(dock('G7').hex, 1200, 300, 0.24);
-    const k = travelSteps(dock('C'), dock('G7'))!;
+    const k = travelSteps(dock('C'), dock('G7'))!; // −3
     for (const p of b.cells) {
       const from = a.cells.find((q) => q.cell.r === p.cell.r && q.cell.c === p.cell.c - k);
       if (!from) continue; // enters from off the grid
@@ -41,22 +42,13 @@ describe('travel plan', () => {
 
 describe('hex layout', () => {
   const l = layoutHex(dock('Dm7').hex, 1200, 300, 0.24);
-  it('every cell placed, inside the dock, above the inversion strip', () => {
+  it('every cell placed, inside the dock', () => {
     expect(l.cells).toHaveLength(dock('Dm7').hex.cells.length);
     for (const { cx, cy } of l.cells) {
       expect(cx).toBeGreaterThan(0);
       expect(cx).toBeLessThan(1200);
-      expect(cy + l.size.ry).toBeLessThanOrEqual(300 - INVERSION_STRIP + 0.01);
+      expect(cy + l.size.ry).toBeLessThanOrEqual(300 + 0.01);
     }
-  });
-  it('inversion labels under the bottom row only, with their tips', () => {
-    for (const i of l.inversions) {
-      const cell = l.cells.find((c) => c.cell === i.cell)!;
-      expect([i.cell.r, i.cx]).toEqual([0, cell.cx]);
-      expect(i.cy).toBeGreaterThan(cell.cy + l.size.ry); // just under its cell
-    }
-    expect(l.inversions.find((i) => i.label === 'root')!.tip).toBe('Root position');
-    expect(l.inversions.find((i) => i.label === '1st')!.tip).toBe('1st inversion');
   });
   it('border buttons: one centred on a whole-step border; none on a half step', () => {
     const d = l.cells.find((c) => c.cell.r === 0 && c.cell.name === 'D')!;

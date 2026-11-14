@@ -1,0 +1,701 @@
+{
+  "app": "honeycomb",
+  "v": 2,
+  "kind": "progression",
+  "progression": {
+    "title": "Rhythm changes in B♭ (demo)",
+    "timeSignature": "4/4",
+    "barsPerRow": 4,
+    "instrument": "concert",
+    "bars": [
+      [
+        {
+          "chord": "Bbmaj7"
+        },
+        {
+          "chord": "Gm7",
+          "scale": "aeolian"
+        }
+      ],
+      [
+        {
+          "chord": "Cm7"
+        },
+        {
+          "chord": "F7"
+        }
+      ],
+      [
+        {
+          "chord": "Dm7",
+          "scale": "phrygian"
+        },
+        {
+          "chord": "G7",
+          "scale": "phrygian-dominant"
+        }
+      ],
+      [
+        {
+          "chord": "Cm7"
+        },
+        {
+          "chord": "F7"
+        }
+      ],
+      [
+        {
+          "chord": "Fm7"
+        },
+        {
+          "chord": "Bb7"
+        }
+      ],
+      [
+        {
+          "chord": "Ebmaj7",
+          "scale": "lydian"
+        },
+        {
+          "chord": "Ebm6"
+        }
+      ],
+      [
+        {
+          "chord": "Dm7",
+          "scale": "phrygian"
+        },
+        {
+          "chord": "G7",
+          "scale": "phrygian-dominant"
+        }
+      ],
+      [
+        {
+          "chord": "Cm7"
+        },
+        {
+          "chord": "F7"
+        }
+      ],
+      [
+        {
+          "chord": "Bbmaj7"
+        },
+        {
+          "chord": "Gm7",
+          "scale": "aeolian"
+        }
+      ],
+      [
+        {
+          "chord": "Cm7"
+        },
+        {
+          "chord": "F7"
+        }
+      ],
+      [
+        {
+          "chord": "Dm7",
+          "scale": "phrygian"
+        },
+        {
+          "chord": "G7",
+          "scale": "phrygian-dominant"
+        }
+      ],
+      [
+        {
+          "chord": "Cm7"
+        },
+        {
+          "chord": "F7"
+        }
+      ],
+      [
+        {
+          "chord": "Fm7"
+        },
+        {
+          "chord": "Bb7"
+        }
+      ],
+      [
+        {
+          "chord": "Ebmaj7",
+          "scale": "lydian"
+        },
+        {
+          "chord": "Ebm6"
+        }
+      ],
+      [
+        {
+          "chord": "Cm7"
+        },
+        {
+          "chord": "F7"
+        }
+      ],
+      [
+        {
+          "chord": "Bb6"
+        }
+      ],
+      [
+        {
+          "chord": "D7"
+        }
+      ],
+      [
+        {
+          "chord": "D7"
+        }
+      ],
+      [
+        {
+          "chord": "G7"
+        }
+      ],
+      [
+        {
+          "chord": "G7"
+        }
+      ],
+      [
+        {
+          "chord": "C7"
+        }
+      ],
+      [
+        {
+          "chord": "C7"
+        }
+      ],
+      [
+        {
+          "chord": "F7"
+        }
+      ],
+      [
+        {
+          "chord": "F7"
+        }
+      ],
+      [
+        {
+          "chord": "Bbmaj7"
+        },
+        {
+          "chord": "Gm7",
+          "scale": "aeolian"
+        }
+      ],
+      [
+        {
+          "chord": "Cm7"
+        },
+        {
+          "chord": "F7"
+        }
+      ],
+      [
+        {
+          "chord": "Dm7",
+          "scale": "phrygian"
+        },
+        {
+          "chord": "G7",
+          "scale": "phrygian-dominant"
+        }
+      ],
+      [
+        {
+          "chord": "Cm7"
+        },
+        {
+          "chord": "F7"
+        }
+      ],
+      [
+        {
+          "chord": "Fm7"
+        },
+        {
+          "chord": "Bb7"
+        }
+      ],
+      [
+        {
+          "chord": "Ebmaj7",
+          "scale": "lydian"
+        },
+        {
+          "chord": "Ebm6"
+        }
+      ],
+      [
+        {
+          "chord": "Cm7"
+        },
+        {
+          "chord": "F7"
+        }
+      ],
+      [
+        {
+          "chord": "Bb6"
+        }
+      ]
+    ],
+    "melody": [
+      {
+        "pitch": 62,
+        "d": "h"
+      },
+      {
+        "pitch": 65,
+        "d": "h"
+      },
+      {
+        "pitch": 63,
+        "d": "h"
+      },
+      {
+        "pitch": 63,
+        "d": "h"
+      },
+      {
+        "pitch": 65,
+        "d": "h"
+      },
+      {
+        "pitch": 65,
+        "d": "h"
+      },
+      {
+        "pitch": 63,
+        "d": "h"
+      },
+      {
+        "pitch": 63,
+        "d": "h"
+      },
+      {
+        "pitch": 63,
+        "d": "h"
+      },
+      {
+        "pitch": 62,
+        "d": "h"
+      },
+      {
+        "pitch": 62,
+        "d": "h"
+      },
+      {
+        "pitch": 60,
+        "d": "h"
+      },
+      {
+        "pitch": 60,
+        "d": "h"
+      },
+      {
+        "pitch": 59,
+        "d": "h"
+      },
+      {
+        "pitch": 58,
+        "d": "h"
+      },
+      {
+        "pitch": 63,
+        "d": "h"
+      },
+      {
+        "pitch": 62,
+        "d": "h"
+      },
+      {
+        "pitch": 65,
+        "d": "h"
+      },
+      {
+        "pitch": 63,
+        "d": "h"
+      },
+      {
+        "pitch": 63,
+        "d": "h"
+      },
+      {
+        "pitch": 65,
+        "d": "h"
+      },
+      {
+        "pitch": 65,
+        "d": "h"
+      },
+      {
+        "pitch": 63,
+        "d": "h"
+      },
+      {
+        "pitch": 63,
+        "d": "h"
+      },
+      {
+        "pitch": 63,
+        "d": "h"
+      },
+      {
+        "pitch": 62,
+        "d": "h"
+      },
+      {
+        "pitch": 62,
+        "d": "h"
+      },
+      {
+        "pitch": 60,
+        "d": "h"
+      },
+      {
+        "pitch": 58,
+        "d": "h"
+      },
+      {
+        "pitch": 63,
+        "d": "h"
+      },
+      {
+        "pitch": 62,
+        "d": "h"
+      },
+      {
+        "d": "h"
+      },
+      {
+        "pitch": 62,
+        "d": "e"
+      },
+      {
+        "pitch": 66,
+        "d": "e"
+      },
+      {
+        "pitch": 69,
+        "d": "e"
+      },
+      {
+        "pitch": 72,
+        "d": "e"
+      },
+      {
+        "pitch": 74,
+        "d": "e"
+      },
+      {
+        "pitch": 72,
+        "d": "e"
+      },
+      {
+        "pitch": 69,
+        "d": "e"
+      },
+      {
+        "pitch": 66,
+        "d": "e"
+      },
+      {
+        "pitch": 74,
+        "d": "e"
+      },
+      {
+        "pitch": 72,
+        "d": "e"
+      },
+      {
+        "pitch": 69,
+        "d": "e"
+      },
+      {
+        "pitch": 66,
+        "d": "e"
+      },
+      {
+        "pitch": 62,
+        "d": "e"
+      },
+      {
+        "pitch": 66,
+        "d": "e"
+      },
+      {
+        "pitch": 69,
+        "d": "e"
+      },
+      {
+        "pitch": 72,
+        "d": "e"
+      },
+      {
+        "pitch": 55,
+        "d": "e"
+      },
+      {
+        "pitch": 59,
+        "d": "e"
+      },
+      {
+        "pitch": 62,
+        "d": "e"
+      },
+      {
+        "pitch": 65,
+        "d": "e"
+      },
+      {
+        "pitch": 67,
+        "d": "e"
+      },
+      {
+        "pitch": 65,
+        "d": "e"
+      },
+      {
+        "pitch": 62,
+        "d": "e"
+      },
+      {
+        "pitch": 59,
+        "d": "e"
+      },
+      {
+        "pitch": 67,
+        "d": "e"
+      },
+      {
+        "pitch": 65,
+        "d": "e"
+      },
+      {
+        "pitch": 62,
+        "d": "e"
+      },
+      {
+        "pitch": 59,
+        "d": "e"
+      },
+      {
+        "pitch": 55,
+        "d": "e"
+      },
+      {
+        "pitch": 59,
+        "d": "e"
+      },
+      {
+        "pitch": 62,
+        "d": "e"
+      },
+      {
+        "pitch": 65,
+        "d": "e"
+      },
+      {
+        "pitch": 60,
+        "d": "e"
+      },
+      {
+        "pitch": 64,
+        "d": "e"
+      },
+      {
+        "pitch": 67,
+        "d": "e"
+      },
+      {
+        "pitch": 70,
+        "d": "e"
+      },
+      {
+        "pitch": 72,
+        "d": "e"
+      },
+      {
+        "pitch": 70,
+        "d": "e"
+      },
+      {
+        "pitch": 67,
+        "d": "e"
+      },
+      {
+        "pitch": 64,
+        "d": "e"
+      },
+      {
+        "pitch": 72,
+        "d": "e"
+      },
+      {
+        "pitch": 70,
+        "d": "e"
+      },
+      {
+        "pitch": 67,
+        "d": "e"
+      },
+      {
+        "pitch": 64,
+        "d": "e"
+      },
+      {
+        "pitch": 60,
+        "d": "e"
+      },
+      {
+        "pitch": 64,
+        "d": "e"
+      },
+      {
+        "pitch": 67,
+        "d": "e"
+      },
+      {
+        "pitch": 70,
+        "d": "e"
+      },
+      {
+        "pitch": 65,
+        "d": "e"
+      },
+      {
+        "pitch": 69,
+        "d": "e"
+      },
+      {
+        "pitch": 72,
+        "d": "e"
+      },
+      {
+        "pitch": 75,
+        "d": "e"
+      },
+      {
+        "pitch": 77,
+        "d": "e"
+      },
+      {
+        "pitch": 75,
+        "d": "e"
+      },
+      {
+        "pitch": 72,
+        "d": "e"
+      },
+      {
+        "pitch": 69,
+        "d": "e"
+      },
+      {
+        "pitch": 77,
+        "d": "e"
+      },
+      {
+        "pitch": 75,
+        "d": "e"
+      },
+      {
+        "pitch": 72,
+        "d": "e"
+      },
+      {
+        "pitch": 69,
+        "d": "e"
+      },
+      {
+        "pitch": 65,
+        "d": "e"
+      },
+      {
+        "pitch": 69,
+        "d": "e"
+      },
+      {
+        "pitch": 72,
+        "d": "e"
+      },
+      {
+        "pitch": 75,
+        "d": "e"
+      },
+      {
+        "pitch": 74,
+        "d": "h"
+      },
+      {
+        "pitch": 77,
+        "d": "h"
+      },
+      {
+        "pitch": 75,
+        "d": "h"
+      },
+      {
+        "pitch": 75,
+        "d": "h"
+      },
+      {
+        "pitch": 77,
+        "d": "h"
+      },
+      {
+        "pitch": 77,
+        "d": "h"
+      },
+      {
+        "pitch": 75,
+        "d": "h"
+      },
+      {
+        "pitch": 75,
+        "d": "h"
+      },
+      {
+        "pitch": 75,
+        "d": "h"
+      },
+      {
+        "pitch": 74,
+        "d": "h"
+      },
+      {
+        "pitch": 74,
+        "d": "h"
+      },
+      {
+        "pitch": 72,
+        "d": "h"
+      },
+      {
+        "pitch": 70,
+        "d": "h"
+      },
+      {
+        "pitch": 69,
+        "d": "h"
+      },
+      {
+        "pitch": 74,
+        "d": "h"
+      },
+      {
+        "d": "h"
+      }
+    ]
+  }
+}

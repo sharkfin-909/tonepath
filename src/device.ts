@@ -15,6 +15,8 @@ export function onArrivalOf(d: DeviceSettings): OnArrival {
 
 export interface DeviceSettings {
   muted?: boolean;
+  /** The dock's layout (SPEC §8.5): the honeycomb (default) or one row, Linear. */
+  hexShape?: 'honeycomb' | 'linear';
   /** Play mode *On arrival* (SPEC §3.3). */
   playArrival?: OnArrival;
   /** Last-picked instrument: the default for new progressions (SPEC §10). */
@@ -23,6 +25,8 @@ export interface DeviceSettings {
   lastOpenId?: string;
   /** The bundled demo has been seeded once (deleting it is permanent). */
   seeded?: boolean;
+  /** Further bundled demos already added (by key), each once (SPEC §12.5). */
+  seededDemos?: string[];
   /** Last Export all (SPEC §3.5 backup reminder). */
   lastBackupAt?: string;
   /** The reminder was dismissed at this time; it returns after the next change. */

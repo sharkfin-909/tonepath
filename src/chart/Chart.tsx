@@ -252,7 +252,8 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
   return (
     <div
       className={['slot', active && 'active', active && playing && 'playing', inSelection && 'bar-selected'].filter(Boolean).join(' ')}
-      style={{ gridColumn: `span ${span}` }}
+      // --staff-top: where the stave's top line sits in the slot; the bar number sits just above it (CSS .bar-handle).
+      style={{ gridColumn: `span ${span}`, ['--staff-top' as string]: `${header + staffTop}px` }}
       data-slot={slot.index}
       onPointerDown={(e) => {
         // Notes handle their own click (a redraw here would remove the note before its click fires).
@@ -289,10 +290,8 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
           markOf={markOf}
         />
       </div>
-      <div
-        className={slot.barEnd ? 'bar-line' : 'slot-divider'}
-        style={{ top: header + staffTop, height: staffBottom - staffTop }}
-      />
+      {/* A bar line at the end of each bar; nothing between two chords in a bar (a chord change, not a bar). */}
+      {slot.barEnd && <div className="bar-line" style={{ top: header + staffTop, height: staffBottom - staffTop }} />}
     </div>
   );
 }

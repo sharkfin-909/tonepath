@@ -5,7 +5,7 @@
 import { layoutMeter, slotAt, slotsOf, type FormSlot, type Meter } from './form';
 import { scaleLabel, slotHarmony, type SlotHarmony } from './harmony';
 import { keyChords, type KeyChord } from './key';
-import { dockHex, type DockHex, type PitchRange } from './hex';
+import { dockHex, type DockHex, type HexShape, type PitchRange } from './hex';
 import { clefOf, hexRange, instrumentOf, toConcert, toWritten, writtenChord, type Clef, type Instrument } from './instruments';
 import { noteMark, type NoteMark } from './marks';
 import { formEnd } from './melody';
@@ -48,8 +48,8 @@ export interface InstrumentView {
   mark: (concertMidi: number, slot: ViewSlot) => NoteMark;
   /** The key's simple chords offered in the slot at `index`'s empty chord field (written; SPEC §4.2). */
   keyChords: (index: number) => KeyChord[];
-  /** The docked hex for the slot at `index` (SPEC §8.4). */
-  dock: (index: number) => DockHex;
+  /** The docked hex for the slot at `index` (SPEC §8.4), as the honeycomb or Linear (§8.5). */
+  dock: (index: number, shape?: HexShape) => DockHex;
 }
 
 const scaleText = (h: SlotHarmony) => (h.kind !== 'chord' ? '—' : h.scale ? scaleLabel(h.root, h.scale) : 'no scale fits');
@@ -78,7 +78,7 @@ export function instrumentView(p: Progression): InstrumentView {
     toConcert: (m) => toConcert(m, inst),
     name: (m, slot) => noteName(toWritten(m, inst), slot.spelling),
     mark: (m, slot) => noteMark(toWritten(m, inst), slot.harmony, slot.chord, inst),
-    dock: (index) => dockHex(slots.map((s) => s.harmony), index, range),
+    dock: (index, shape) => dockHex(slots.map((s) => s.harmony), index, range, shape),
     keyChords: (index) => keyChords(slots.slice(0, index).reverse().map((s) => s.harmony)),
   };
 }

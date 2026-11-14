@@ -230,10 +230,11 @@ export function caretFromClick(melody: MelodyEvent[], slots: FormSlot[], t: numb
 export type NudgeResult = { ok: true; melody: MelodyEvent[]; pitch: number } | { ok: false };
 
 /**
- * Nudge (SPEC §6.2 item 8): move the note just before the caret one step of its owning slot's scale
+ * Nudge (SPEC §6.2 item 8): move the note **at the caret** (the one it sits on; at the end of the melody, the last
+ * note before it) one step of its owning slot's scale
  * (`steps` = ±1), or with `octave` 12 semitones. `pitchClassesOf` gives a slot's step set (its scale, or a
  * no-fit chord's own tones); null = the slot has no scale, so only octave nudges work. A pitch off the set
- * moves to the nearest set tone in that direction. A rest before the caret, or leaving MIDI 0–127, → refused.
+ * moves to the nearest set tone in that direction. A rest there, or leaving MIDI 0–127, → refused.
  */
 export function nudge(
   melody: MelodyEvent[],
@@ -243,7 +244,7 @@ export function nudge(
   octave: boolean,
   pitchClassesOf: (slot: FormSlot) => Set<number> | null,
 ): NudgeResult {
-  const e = eventBefore(melody, caret);
+  const e = eventAt(melody, caret) ?? eventBefore(melody, caret);
   if (!e || !isNote(e.ev)) return { ok: false };
   let pitch: number;
   if (octave) pitch = e.ev.pitch + 12 * dir;
