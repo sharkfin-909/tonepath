@@ -2,7 +2,8 @@
 // ⋯ opens the bar menu. The handle shows on the active bar and on hover.
 import { useEffect, useRef, useState } from 'react';
 
-export type BarAction = 'insert-before' | 'insert-after' | 'duplicate' | 'copy' | 'paste' | 'split' | 'merge' | 'delete';
+import type { BarAction } from '../bars';
+export type { BarAction };
 
 export interface BarHandleProps {
   bar: number;

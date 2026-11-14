@@ -1,14 +1,12 @@
 // The chart (SPEC §3.1): rows of `barsPerRow` bars, a clef gutter per row, slots at time-proportional width.
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
-import { layoutMeter, slotAt, slotsOf, type FormSlot, type Meter } from '../form';
+import type { FormSlot, Meter } from '../form';
 import { eventsForSlot, type TimedEvent } from '../melody';
-import { noteName, slotSpelling } from '../spelling';
 import { parseChord, interpretation } from '../chords';
-import { scaleLabel, slotHarmony, type ScaleId, type SlotHarmony } from '../harmony';
-import type { ChordCommit, Progression, Slot } from '../progression';
+import { scaleLabel, type ScaleId, type SlotHarmony } from '../harmony';
+import type { ChordCommit, Progression } from '../progression';
 import { ClefGutter, SlotStave, staveMetrics } from '../notation/Stave';
-import { clefOf, instrumentOf, writtenChord, type Instrument } from '../instruments';
-import { noteMark } from '../marks';
+import type { InstrumentView, ViewSlot } from '../view';
 import { ChordField } from './ChordField';
 import { ScaleLabel } from './ScaleLabel';
 import { BarHandle, type BarAction } from './BarHandle';
@@ -19,6 +17,8 @@ const GUTTER_WIDTH = 46;
 
 export interface ChartProps {
   progression: Progression;
+  /** The progression in the instrument's written pitch (slots, chords, names, marks). */
+  view: InstrumentView;
   /** Caret time (form ticks); its slot is the active slot (tinted; drives the docked hex). */
   caret: number;
   /** A click on a slot (caret placement). */
@@ -39,10 +39,15 @@ export interface ChartProps {
   onBarAction: (bar: number, action: BarAction) => void;
   onAppendBar: () => void;
   canPaste: boolean;
-  /** Play mode (SPEC §3.3): the current slot. The caret, bar handles, "+" and all editing are hidden. */
+  /** Play mode (SPEC §3.3): the current slot. The caret, bar handles and "+" are hidden; chords and scales stay editable. */
   playIndex?: number | null;
   /** Stand mode (SPEC §3.4): read-only, nothing highlighted or clickable, fit the page with no zoom floor. */
   stand?: boolean;
+  /**
+   * Height budget (rendered px) to fit the rows into, when the chart's own area sizes to its content (the chart
+   * screen: the hex takes whatever the chart leaves). Without it the chart fits its parent's height.
+   */
+  maxHeight?: number;
 }
 
 function useWidth<T extends HTMLElement>() {
@@ -73,29 +78,24 @@ function useParentSize<T extends HTMLElement>() {
   return [ref, size] as const;
 }
 
-export function Chart({ progression, caret, onSlotClick, onEventClick, onTimeClick, onChordCommit, onScaleChange, editRequest, selection, onBarSelect, onBarAction, onAppendBar, canPaste, playIndex = null, stand = false }: ChartProps) {
+export function Chart({ progression, view, caret, onSlotClick, onEventClick, onTimeClick, onChordCommit, onScaleChange, editRequest, selection, onBarSelect, onBarAction, onAppendBar, canPaste, playIndex = null, stand = false, maxHeight }: ChartProps) {
   const playing = playIndex !== null;
-  /** Play and Stand both hide the caret, bar handles, "+" and editing. */
+  /** Play and Stand both hide the caret, bar handles and "+" (Play keeps chord and scale entry). */
   const readOnly = playing || stand;
-  const { bars, barsPerRow, timeSignature } = progression;
+  const { bars, barsPerRow } = progression;
   const [fitRef, area] = useParentSize<HTMLDivElement>();
   const chartRef = useRef<HTMLDivElement>(null);
-  const layout = layoutMeter(timeSignature);
-  const slots = slotsOf(bars, layout);
-  const activeSlot = stand ? -1 : playing ? playIndex : (slotAt(slots, caret)?.index ?? 0);
+  const { slots, meter: layout, clef, usedChords } = view;
+  const activeSlot = stand ? -1 : playing ? playIndex : view.slotAt(caret).index;
   const [editing, setEditing] = useState<{ bar: number; part: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const inst = instrumentOf(progression.instrument);
-  /** Chords already in the form (written, distinct, in order): autosuggest offers them first. */
-  const usedChords = [...new Set(progression.bars.flat().map((s) => writtenChord(s.chord, inst)).filter(Boolean))];
-  const clef = clefOf(inst, progression.concertClef);
 
-  const rows: FormSlot[][] = [];
+  const rows: ViewSlot[][] = [];
   for (const s of slots) (rows[Math.floor(s.bar / barsPerRow)] ??= []).push(s);
 
   // Chart zoom (SPEC §3.1): lay out at logical width area/z, scale by z. Fit every row, capped at 1.4×, floor 0.5.
   const staveHeight = staveMetrics().height;
-  const { zoom, scrolls } = fitZoom(rows.length, staveHeight, area.height, stand ? 0 : undefined);
+  const { zoom, scrolls } = fitZoom(rows.length, staveHeight, maxHeight ?? area.height, stand ? 0 : undefined);
   const header = headerPx(zoom);
   const zoomStyle = {
     width: area.width / zoom,
@@ -154,11 +154,10 @@ export function Chart({ progression, caret, onSlotClick, onEventClick, onTimeCli
             <SlotView
               key={slot.index}
               slot={slot}
-              data={bars[slot.bar][slot.part]}
+              view={view}
               active={slot.index === activeSlot}
               onActivate={stand ? () => {} : () => onSlotClick(slot)}
               clef={clef}
-              inst={inst}
               melody={progression.melody}
               caret={!readOnly && slot.index === activeSlot ? caret : undefined}
               playing={playing}
@@ -185,9 +184,16 @@ export function Chart({ progression, caret, onSlotClick, onEventClick, onTimeCli
               editing={editing?.bar === slot.bar && editing.part === slot.part}
               error={error}
               usedChords={usedChords}
-              onEdit={stand ? undefined : playing ? () => onSlotClick(slot) : () => startEditing({ bar: slot.bar, part: slot.part })}
+              onEdit={
+                stand
+                  ? undefined
+                  : () => {
+                      if (playing) onSlotClick(slot); // Play: the slot becomes current too
+                      startEditing({ bar: slot.bar, part: slot.part }); // chord entry in Write and Play
+                    }
+              }
               onCommit={(text, move) => commit(slot, text, move)}
-              onScaleChange={readOnly ? undefined : (scale) => onScaleChange(slot.bar, slot.part, scale)}
+              onScaleChange={stand ? undefined : (scale) => onScaleChange(slot.bar, slot.part, scale)} // Write and Play
             />
           ))}
         </div>
@@ -198,13 +204,11 @@ export function Chart({ progression, caret, onSlotClick, onEventClick, onTimeCli
 }
 
 interface SlotViewProps {
-  slot: FormSlot;
-  data: Slot;
+  slot: ViewSlot;
+  view: InstrumentView;
   active: boolean;
   onActivate: () => void;
   clef: 'treble' | 'bass';
-  /** The instrument view: labels, spelling and notation in written pitch (SPEC §10). */
-  inst: Instrument;
   melody: Progression['melody'];
   caret?: number;
   /** Play mode: the active slot gets the solid "current slot" highlight. */
@@ -231,18 +235,18 @@ interface SlotViewProps {
   onScaleChange?: (scale: ScaleId | null) => void;
 }
 
-function SlotView({ slot, data, active, onActivate, clef, inst, melody, caret, playing, onEventClick, onTimeClick, span, layout, header, barTools, inSelection, onAppend, showTimeSignature, editing, error, usedChords, onEdit, onCommit, onScaleChange }: SlotViewProps) {
+const NO_EVENTS: TimedEvent[] = [];
+
+function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing, onEventClick, onTimeClick, span, layout, header, barTools, inSelection, onAppend, showTimeSignature, editing, error, usedChords, onEdit, onCommit, onScaleChange }: SlotViewProps) {
   // Everything shown runs against the written chord; the stored melody stays concert (SPEC §5.3, §10).
-  const chord = writtenChord(data.chord, inst);
-  const harmony = slotHarmony({ ...data, chord });
-  const spelling = slotSpelling(harmony);
-  const spell = (midi: number) => noteName(midi + inst.semitones, spelling);
+  const { chord, harmony } = slot;
+  const spell = (midi: number) => view.name(midi, slot);
   const [ref, width] = useWidth<HTMLDivElement>();
   const { staffTop, staffBottom } = staveMetrics();
   // Unparseable time signatures are shown in the rail as typed; the stave shows (and beams by) the layout meter.
   const meter = showTimeSignature ? layout : undefined;
   /** Marks against this (owning) slot's written harmony (SPEC §7.2). */
-  const markOf = (e: TimedEvent) => ('pitch' in e.ev ? noteMark(e.ev.pitch + inst.semitones, harmony, chord, inst) : null);
+  const markOf = (e: TimedEvent) => ('pitch' in e.ev ? view.mark(e.ev.pitch, slot) : null);
 
   return (
     <div
@@ -275,7 +279,7 @@ function SlotView({ slot, data, active, onActivate, clef, inst, melody, caret, p
           clef={clef}
           start={slot.start}
           end={slot.end}
-          events={eventsForSlot(melody, slot)}
+          events={playing ? NO_EVENTS : eventsForSlot(melody, slot)} // Play: an empty stave to play over (SPEC §3.3)
           spell={spell}
           caret={caret}
           onEventClick={onEventClick}

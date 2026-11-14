@@ -8,6 +8,9 @@ import { TICKS, restsBetween, timeline } from './melody';
 import { withValidOverride } from './harmony';
 import type { Bar, MelodyEvent, Progression } from './progression';
 
+/** The bar menu's actions (SPEC §4.1). */
+export type BarAction = 'insert-before' | 'insert-after' | 'duplicate' | 'copy' | 'paste' | 'split' | 'merge' | 'delete';
+
 export type BarEdit = { ok: true; progression: Progression; caret: number } | { ok: false; message: string };
 
 /** What Copy puts on the in-app clipboard: a run of bars and their melody slices. */

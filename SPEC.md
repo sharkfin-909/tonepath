@@ -36,17 +36,19 @@ Pure modules (no React / DOM), each unit-tested with the tables in §14:
 ### 3.1 Chart screen (layout C) — [Whole-screen layout (docked hex)](issues/030-whole-screen-layout-docked-hex.md)
 
 ```
-┌────────┬──────────────────────────────────────────────┐
-│  rail  │  chart (auto-zoom; scrolls below the floor)  │
-│        ├──────────────────────────────────────────────┤
-│        │  docked hex (bottom 50%, fixed)              │
-└────────┴──────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────┐
+│  control header (wraps to two lines as needed)        │
+├───────────────────────────────────────────────────────┤
+│  chart (auto-zoom; scrolls below the floor)           │
+├───────────────────────────────────────────────────────┤
+│  docked hex (all the remaining height, full width)    │
+└───────────────────────────────────────────────────────┘
 ```
 
-- **Control rail** — full-height left column (~128px). Top to bottom: ← Library · title (inline rename) · instrument picker (+ Concert clef choice, §7.3) · bars per row · mute · Stand · **Write | Play** switch · length latch (`1 · whole` … `5 · 16th`, stacked) · Rest · undo / redo · Clear all · ▶ Chord · ▶ Bass · ▶ Scale · (Play only: *On arrival* dropdown) · readout of the caret's bar, chord and scale. No header bar; no toolbar strip between chart and hex.
+- **Control header** — a bar across the top, so the hex gets the full width. Left to right, in groups: ← Library · title (inline rename) | Stand · **Write | Play** switch | instrument picker (+ Concert clef choice, §7.3) · time signature · bars per row | mute · ▶ Chord · ▶ Bass · ▶ Scale · *On arrival* | (Write only) length latch `1 · whole` … `5 · 16th` · Rest · undo / redo · Clear all — and at the right end the **slot browser**: `‹ Bar n · chord · scale ›` (the caret's / current slot, with previous / next). Wraps to a second line on narrow windows. After any header button click or dropdown choice, **focus returns to the hex grid**, so Space and the other keys never act on the last-clicked control; the inline title / time-signature fields keep focus while editing. No toolbar strip between chart and hex.
 - **Chart** — rows of `barsPerRow` bars; each row has a **clef gutter** at its left (§7.3), then the slots at equal, time-proportional width. Bar lines heavier than slot dividers. In Write, each bar number carries a **⋯ bar handle** and a **"+"** follows the last bar (§4.1).
 - **Chart zoom** — automatic: scale so every row fits the chart area (cap ~1.4× on short forms), never below a readable floor (staff line gap ≈ 5px). Every row has the same height (fixed ledger-line headroom, §7.1); chord / scale labels keep their minimum sizes (§7.1) at any zoom. Below the floor the chart stops shrinking and **scrolls vertically**, keeping the caret's row (or, in Play, the current slot) in view. No manual zoom control.
-- **Split** — the hex takes the bottom 50%, fixed. No divider, no setting.
+- **Split** — the chart takes only the height its rows need (padding above; the stave's own ledger-line headroom is the gap below), up to half the space under the header; the **hex takes everything else**, with 12px padding around the grid. No divider, no setting.
 
 ### 3.2 Write mode (default)
 
@@ -54,10 +56,10 @@ Hex picks are recorded at the caret (§6). Opening a progression or reloading al
 
 ### 3.3 Play mode — [Play mode](issues/035-play-mode.md)
 
-- Switch: **Write | Play** at the top of the rail, or `P` (ignored while a text field has focus).
-- Same layout. Hex clicks **audition only** (never recorded). The caret is hidden; the **current slot** gets a solid full-width highlight in a colour distinct from Write's active-slot tint. Length latch, Rest, undo / redo and Clear all are **hidden** (not disabled); ▶ Chord, ▶ Scale, mute stay.
-- **← / →** move to the previous / next **slot** (a split bar = two stops), **wrapping** at both ends. Clicking a slot selects it; clicking a written note plays it and selects its slot. ↑ / ↓ do nothing. Chart scrolls to keep the current slot in view.
-- **On arrival** dropdown: **Silent** (default) · **Chord** (= ▶ Chord) · **Root note** (chord's bass — the slash bass if any — in concert octave 3, plain sine; `N.C.` silent). *On arrival* applies in **Write** too: writing the **first entry of a slot** (a note or rest at its start, incl. the wrap back to bar 1) sounds that slot's chord or root together with it. Moving the caret, ‹ › and finishing a slot are silent. The dropdown shows in both modes. C / B always play ▶ Chord / ▶ Bass; ⇧Space ▶ Scale; Space (or A) over a hex cell auditions it. A device setting.
+- Switch: **Write | Play** in the control header, or `P` (ignored while a text field has focus).
+- Same layout, but the **stave is cleared**: the written melody is hidden (bars, clef and chords stay) so you play over empty staves; it shows again in Write. Hex clicks **audition only** (never recorded). The caret is hidden; the **current slot** gets a solid full-width highlight in a colour distinct from Write's active-slot tint. Length latch, Rest, undo / redo and Clear all are **hidden** (not disabled); ▶ Chord, ▶ Scale, mute stay. **Chord and scale entry stay**: clicking a chord name (or an empty slot's `+`) edits it exactly as in Write (autosuggest, Tab / Enter to move on), and makes that slot current; the scale name under a chord opens its scale menu as in Write.
+- **← / →** move to the previous / next **slot** (a split bar = two stops), **wrapping** at both ends. Clicking a slot selects it. ↑ / ↓ do nothing. Chart scrolls to keep the current slot in view.
+- **On arrival** dropdown: **Silent** (default) · **Chord** (= ▶ Chord) · **Root note** (chord's bass — the slash bass if any — in concert octave 3, plain sine; `N.C.` silent) · **Bass note** (the same note an octave lower, concert octave 2) · **Bass note + chord** (both together). *On arrival* applies in **Write** too: writing the **first entry of a slot** (a note or rest at its start, incl. the wrap back to bar 1) sounds that slot's chord or root together with it. Moving the caret, ‹ › and finishing a slot are silent. The dropdown shows in both modes. C / B always play ▶ Chord / ▶ Bass; S / ⇧Space ▶ Scale; Space clicks whatever is under the pointer (§11), and A over a hex cell auditions it. In **Play** the sound waits for the **first note played** in the slot after arriving (hex click / Space / A), sounding together with it; arriving itself (←/→, < >, ‹ ›, slot click, entering Play) is silent. A device setting.
 - The hex remoulds on arrival exactly as in Write (pitch anchor kept), including the no-scale rules of §8.4: cells are inactive on `N.C.` / empty / unparseable slots and playable (chord tones) on no-fit chords; *On arrival* is silent where there is no chord.
 - Bar handles and "+" are hidden.
 - Entering Play starts on the caret's slot; leaving Play puts the caret at the **start of the current slot**.
@@ -65,7 +67,7 @@ Hex picks are recorded at the caret (§6). Opening a progression or reloading al
 
 ### 3.4 Stand mode
 
-- Stand button in the rail, or `\`. Hides the rail and the hex; shows a thin header (title, instrument, mute, ✎ Edit).
+- Stand button in the control header, or `\`. Hides the control header and the hex; shows a thin header (title, instrument, mute, ✎ Edit).
 - Read-only chart: no caret, no chord editing, no bar handles or "+". **Fit page**: every bar on one screen, auto-zoomed (no floor; 32 bars at 4/row fit on 1024×768). `\` or ✎ Edit returns to the mode it came from (Write or Play).
 
 ### 3.5 Library screen — [Progression library](issues/014-progression-library.md)
@@ -129,7 +131,7 @@ Every tone named or implied: `9` → 1 3 5 ♭7 9 (`maj9`, `m9` likewise); `11` 
   - Diminished: whole-half diminished
   - Augmented (3 ♯5, no 7): whole-tone → Lydian augmented
 - Fallback: valid chord but nothing fits (e.g. `C7sus4b9`) → **no scale**; the hex steps through the chord's own tones, entry allowed, the override menu is empty, and spelling uses the chord tones' lean ([Hex for slots without a scale](issues/038-hex-for-slots-without-a-scale.md); §8.4).
-- **Classification** by pitch class, chord tone > scale tone > chromatic. Empty, unparseable and `N.C.` slots have no scale and no chord tones: the hex is dimmed and inactive there, rests only (§8.4).
+- **Classification** by pitch class, chord tone > scale tone > chromatic. Empty, unparseable and `N.C.` slots have no scale and no chord tones: notes are **not checked** there (any note may be written or played, none is marked out of scale; §8.4).
 
 ### 5.3 Note names — [Enharmonic spelling](issues/007-enharmonic-spelling.md)
 
@@ -198,10 +200,10 @@ Reference implementation: the throwaway [VexFlow spike prototype](prototypes/vex
 
 ### 8.1 Geometry
 
-- Pointy-top hexes, **4 rows**. Each row sits **half a cell left** of the row below; the left edge is a diagonal climbing up-left.
+- Pointy-top hexes, **3 rows**. Each row sits **half a cell left** of the row below; the left edge is a diagonal climbing up-left.
 - Cell (row r = 0…3 from the bottom, column c from the left) = scale step `t₀ + c + 2r` of the active slot's scale (ascending through octaves; scales with ≠ 7 notes step through all their notes). Right = next scale note; up-left = a third; up-right = a fourth. The left column is a chain of thirds.
 - **Pitch anchor**: `t₀` = the lowest in-range tone of the active slot's scale at the bottom-left. When the active slot changes, notes stay in place; fills, rings and changed scale tones move.
-- **Fit range**: let N = number of scale steps in the instrument's practical written range. Top row length `top = max(4, N − 6)`; row r has `floor(top − (3 − r)/2)` cells (bottom → top: top−2, top−1, top−1, top), so the right edge is roughly vertical. Cell radius = the largest that fits the dock width and height; grid centred. `Concert` = fixed C3–C6 view.
+- **Fit range**: let N = number of scale steps in the instrument's practical written range. Top row length `top = max(4, N − 4)`; row r has `floor(top − (2 − r)/2)` cells (bottom → top: top−1, top−1, top), so the right edge is roughly vertical. Cells are **regular hexagons**, the largest that fit the dock's width and height (never stretched). Grid centred. `Concert` = fixed C3–C6 view.
 - Grey **out-of-range** cells appear only where the grid holds pitches outside the range (rare under Fit range); they are shown, not hidden, and inactive.
 
 ### 8.2 Cell styling (user theme)
@@ -210,45 +212,45 @@ Reference implementation: the throwaway [VexFlow spike prototype](prototypes/vex
 
   | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
   |---|---|---|---|---|---|---|
-  | `#12EAEA` neon ice | `#FFD52E` school-bus yellow | `#EC7C25` harvest orange | `#390099` navy electric | `#9E0059` dark raspberry | `#5BB561` moss green | `#53131E` night bordeaux |
+  | `#12EAEA` neon ice | `#FFD52E` school-bus yellow | `#EC7C25` harvest orange | `#390099` navy electric | `#9E0059` dark raspberry | `#5BB561` moss green | `#7B4A26` warm chestnut |
 
 - **Colour shows on triad cells only.** Every other cell is a neutral grey (`#CDC9C0`, thin `#BDB8AD` outline, grey note name) and shows its degree colour only while lit (below).
-- **Note name**: small, bold, near the top vertex of the cell (written pitch, no octave), in black or white, whichever reads better on the degree colour.
-- **Ball**: a round, off-white sphere (a radial gradient lit from the top left) sitting a little below the cell centre with a soft drop shadow, carrying the **degree number** in black. All balls are one size (36% of the cell radius). **Sharps** sit higher and **flats** lower than the default spot (by 16% of the cell radius); a dark **socket** at the default spot shows behind them (naturals cover it). **Triad tones** (root, 3rd, 5th as spelled, altered 5ths included; a sus 2nd / 4th stands in for a missing 3rd) stand out by their always-on colour and a bolder degree number.
+- **Note name**: small, bold, above the ball (written pitch, no octave), in black or white, whichever reads better on the degree colour.
+- **Ball**: a round, off-white sphere (a radial gradient lit from the top left) sitting at the cell centre with a soft drop shadow, carrying the **degree number** in black. All balls are one size (36% of the cell radius). **Sharps** sit to the right and **flats** to the left of the default spot (by 26% of the cell radius); a dark **socket** at the default spot shows behind them (naturals cover it). **Triad tones** (root, 3rd, 5th as spelled, altered 5ths included; a sus 2nd / 4th stands in for a missing 3rd) stand out by their always-on colour and a bolder degree number.
 - **Out of range**: the whole cell faded to 35%, no shadow.
 - **Transitions** when the hex changes (new active slot, Play arrival): cell colours fade, balls slide to their sharp / flat / natural spot with a slight settle, and sockets fade in / out — all ~180 ms, never blocking clicks; a new change takes over mid-way. Cells keep their place (keyed by row and column). Off under `prefers-reduced-motion`.
 - **Duplicates**: hovering a cell, or clicking it (for ~600 ms), lights **every cell with the same pitch** (shows the octave): each shows its degree colour and gets a white glow round its ball. Nudge target: a dashed halo around the ball.
-- No chromatic cells. Slots without a scale: §8.4.
+- No chromatic cells, but **chromatic entry**: small off-white buttons sit **on the border between two neighbouring cells of a row** (a step and the next step up), one for each pitch between them: one for a whole step, two for a wider gap (the semitone above the lower step and the one below the upper, higher on top), none for a half step; a row's outer edges count too. Each button shows its accidental (♯ / ♭ / ♮) **as the slot spells that pitch**, the way the note will be written — for suspensions, anticipations and other notes outside the slot scale. They show beside the hovered cell (both its borders) on desktop and always on touch screens (`hover: none`); a click (or Space / A over one) writes or auditions exactly like a cell click, and the cells holding that pitch light up while hovered. The note takes the slot's spelling and, if outside the scale, the usual out-of-scale mark (§7.2). Slots without a scale: §8.4.
 
 ### 8.3 Interaction
 
 - Write: click = audition (concert) + insert at the caret with the length latch (turns Rest off). Play: click = audition only. Space (or A) does the same for the cell under the pointer.
-- **Slot browser**: a `‹ Bar n · chord ›` pill at the dock's top left steps to the previous / next slot (wrapping): Write moves the caret to its start, Play arrives (with *On arrival*).
-- Out-of-range (grey) cells do nothing; neither do cells of a dimmed (inactive) hex (§8.4).
+- **Slot browser**: the `‹ Bar n · chord · scale ›` pill at the right end of the control header steps to the previous / next slot (wrapping; keys `<` / `>`): Write moves the caret to its start, Play arrives (with *On arrival*).
+- Out-of-range (grey) cells do nothing; the unchecked hex (§8.4) is fully playable.
 
 ### 8.4 Slots without a scale — [Hex for slots without a scale](issues/038-hex-for-slots-without-a-scale.md)
 
 | Active slot | Hex shows | Entry | Dock label | ▶ Chord / ▶ Scale / *On arrival* |
 |---|---|---|---|---|
-| `N.C.` | layout of the **nearest earlier slot with a scale** (else the next scaled slot after it; else Concert C major), **dimmed, every cell inactive** | rests only (Rest + length keys) | "N.C. — rests only" | silent |
-| Empty | as `N.C.` | rests only | "No chord yet: type one to enter notes" | silent |
-| Unparseable | as `N.C.` | rests only | "Chord not recognised: fix the symbol to enter notes" | silent |
-| Valid chord, **no scale fits** | steps through the **chord's own tones** (each cell = next chord tone up; same slant, 4 rows, Fit range, pitch anchor); triad cells coloured by spelled degree | normal | "No scale fits: chord tones only" | ▶ Chord normal; ▶ Scale plays the chord tones ascending over one octave; *On arrival* normal |
+| `N.C.` | layout of the **nearest earlier slot with a scale** (else the next scaled slot after it; else Concert C major), **fully playable** (the border buttons reach the other pitches) | **any note**, not checked (no out-of-scale marks; ↑ / ↓ nudge by semitone) | "N.C.: notes not checked" | silent |
+| Empty | as `N.C.` | as `N.C.` | "No chord yet: notes not checked" | silent |
+| Unparseable | as `N.C.` | as `N.C.` | "Chord not recognised: notes not checked" | silent |
+| Valid chord, **no scale fits** | steps through the **chord's own tones** (each cell = next chord tone up; same slant, 3 rows, Fit range, pitch anchor); triad cells coloured by spelled degree | normal | "No scale fits: chord tones only" | ▶ Chord normal; ▶ Scale plays the chord tones ascending over one octave; *On arrival* normal |
 
-- Glossary names: the first three rows are the **rests-only hex**, the last the **chord-tones hex**.
-- Clicking an empty / unparseable label focuses that slot's chord field. Notes already in such a slot are kept, with out-of-scale marks.
-- Play mode follows the same table (cells inactive in the first three rows, playable in the last).
+- Glossary names: the first three rows are the **unchecked hex**, the last the **chord-tones hex**.
+- Clicking an empty / unparseable label focuses that slot's chord field. Notes in such a slot are kept and never marked out of scale; they are checked again once the slot has a chord.
+- Play mode follows the same table (every row playable).
 
 ## 9. Audio — [Audition (etude)](issues/025-audition-etude.md), [Audition and chord preview](issues/012-audition-and-chord-preview.md), [Play mode](issues/035-play-mode.md)
 
-- Triggers: hex cell click (or Space / A over it); notation note click; nudge; ▶ Chord / C; ▶ Bass / B (the chord's bass, slash bass if any, in concert octave 3); ▶ Scale / ⇧Space; Play-mode *On arrival* (Chord / Root note).
+- Triggers: hex cell click (or Space / A over it); notation note click; nudge; ▶ Chord / C; ▶ Bass / B (the chord's bass, slash bass if any, in concert octave 3); ▶ Scale / S / ⇧Space; Play-mode *On arrival* (Chord / Root note).
 - Silent: caret moves, Rest insert, Clear all, chord / scale edits, instrument switch, delete, latch changes, mode switches.
 - **Timbre**: plain sine. Single notes 10 ms attack, ~0.9 s exponential decay; chord preview lower gain per voice, ~1.6 s decay. Sounds overlap.
 - **▶ Chord** voicing: root in concert octave 3; 3rd / 5th / 6th-or-7th close above; extensions (9, 11, 13, alterations) above the 7th; slash bass an octave below the root, not doubled; chord tones only.
 - **▶ Scale**: the active slot's scale ascending one octave from the tonic (tonic in concert octave 3), ~150 ms apart. No-fit chord: its chord tones ascending over one octave.
 - `N.C.` / empty / unparseable slots: ▶ Chord, ▶ Bass, ▶ Scale and *On arrival* silent (§8.4).
 - Always **concert pitch**; instrument range not applied.
-- **Mute**: speaker toggle in the rail, key `M`; a device setting. No volume slider.
+- **Mute**: speaker toggle in the control header, key `M`; a device setting. No volume slider.
 - `AudioContext` created / resumed on the first user gesture.
 
 ## 10. Instruments — [Instrument view](issues/011-instrument-view.md), [Instrument practical ranges](issues/013-instrument-practical-ranges.md), [Clef policy](issues/032-clef-policy.md)
@@ -285,9 +287,11 @@ Reference implementation: the throwaway [VexFlow spike prototype](prototypes/vex
 | ⌫ / Del | as §6.2; with a bar selection, ⌫ deletes the bar(s) | — | — |
 | click / ⇧click bar number | select bar / extend to a run | — | — |
 | ⌘C / ⌘V / ⌘D | with a bar selection: copy / paste (replace) / duplicate | — | — |
-| Space / `A` (pointer over a hex cell) | same as clicking it: write the note (plays) | audition the note | — |
-| ⇧Space | ▶ Scale | ▶ Scale | — |
+| Space | **click whatever is under the pointer**, anywhere in the app (hex cell, border button, note, slot, header button, dropdown, field) — the full press, as with the mouse button; held repeats ignored | same | same (only what is clickable in Stand) |
+| `A` (pointer over a hex cell or border button) | same as clicking it: write the note (plays) | audition the note | — |
+| `S` / ⇧Space | ▶ Scale | ▶ Scale | — |
 | `C` / `B` | ▶ Chord / ▶ Bass | ▶ Chord / ▶ Bass | — |
+| `<` / `>` (or `,` / `.`) | previous / next slot, wrapping (caret to its start) | previous / next slot, wrapping | — |
 | `M` | mute | mute | mute |
 | `P` | → Play | → Write | — |
 | `\` | → Stand | → Stand | back |
@@ -341,7 +345,7 @@ All shortcuts are ignored while a text field (title, chord symbol, time signatur
 
 ## 13. Glossary
 
-[CONTEXT.md](CONTEXT.md) is the source of truth for terms (Library, Envelope, Progression, Slot, Slot scale, Chord / scale tone, Etude, Melody event, Caret, Owning slot, Length / Rest latch, Nudge, Out-of-scale mark, Control rail, Chart zoom, Write / Play, Stand mode, Docked hex, Fit range, Pitch anchor, Degree colour, Note sphere, Clef, Instrument view, …). Avoid "passing note".
+[CONTEXT.md](CONTEXT.md) is the source of truth for terms (Library, Envelope, Progression, Slot, Slot scale, Chord / scale tone, Etude, Melody event, Caret, Owning slot, Length / Rest latch, Nudge, Out-of-scale mark, Control header, Chart zoom, Write / Play, Stand mode, Docked hex, Fit range, Pitch anchor, Degree colour, Note sphere, Clef, Instrument view, …). Avoid "passing note".
 
 ## 14. Test tables the build must ship
 
@@ -367,4 +371,4 @@ Accepted risks:
 
 ## 16. Out of scope for v1
 
-From the map: full-line / progression playback, playhead, BPM, metronome, timed slot auto-advance; instrument sounds beyond a sine; piano strip and keyboard note entry; computer-keyboard grid play; per-slot hex palettes; a separate notation strip; chromatic (out-of-scale) entry; dotted notes and ties; repeats and endings; path suggestion; accounts, backend, cloud sync; share-by-URL; per-slot sharps / flats switch; user-adjustable instrument ranges; library search / folders / tags / trash; a colour-blind pass on the hex theme.
+From the map: full-line / progression playback, playhead, BPM, metronome, timed slot auto-advance; instrument sounds beyond a sine; piano strip and keyboard note entry; computer-keyboard grid play; per-slot hex palettes; a separate notation strip; dotted notes and ties; repeats and endings; path suggestion; accounts, backend, cloud sync; share-by-URL; per-slot sharps / flats switch; user-adjustable instrument ranges; library search / folders / tags / trash; a colour-blind pass on the hex theme.

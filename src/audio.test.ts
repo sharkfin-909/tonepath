@@ -1,6 +1,7 @@
 // Voicings for ▶ Chord, ▶ Scale and Root note (SPEC §9).
 import { describe, expect, it } from 'vitest';
-import { chordVoicing, midiToHz, rootNote, scaleRun } from './audio';
+import { bassNote, chordVoicing, midiToHz, rootNote, scaleRun } from './audio';
+import { onArrivalOf } from './device';
 import { slotHarmony } from './harmony';
 
 const h = (chord: string, scale?: string) => slotHarmony({ chord, ...(scale ? { scale } : {}) });
@@ -50,6 +51,18 @@ describe('Root note', () => {
     expect(rootNote(h('G7'))).toBe(55);
     expect(rootNote(h('C/Bb'))).toBe(58);
     expect(rootNote(h('N.C.'))).toBeNull();
+  });
+});
+
+describe('Bass note', () => {
+  it('an octave below the root note (octave 2); the slash bass if any', () => {
+    expect(bassNote(h('G7'))).toBe(43);
+    expect(bassNote(h('C/Bb'))).toBe(46);
+    expect(bassNote(h('N.C.'))).toBeNull();
+  });
+  it('the on-arrival setting reads every option; anything else is Silent', () => {
+    for (const v of ['silent', 'chord', 'root', 'bass', 'bass-chord'] as const) expect(onArrivalOf({ playArrival: v })).toBe(v);
+    expect(onArrivalOf({ playArrival: 'loud' as never })).toBe('silent');
   });
 });
 

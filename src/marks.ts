@@ -15,13 +15,12 @@ export interface NoteMark {
 
 export function noteMark(writtenMidi: number, h: SlotHarmony, chord: string, inst: Instrument): NoteMark {
   const pcs = stepPitchClasses(h);
-  const outOfScale = !pcs || !pcs.has(((writtenMidi % 12) + 12) % 12);
+  // No chord (N.C., empty, unparseable): nothing to check against, so no out-of-scale mark.
+  const outOfScale = !!pcs && !pcs.has(((writtenMidi % 12) + 12) % 12);
   const range = !inst.range ? null : writtenMidi > inst.range.hi ? 'above' : writtenMidi < inst.range.lo ? 'below' : null;
   const reasons: string[] = [];
   if (outOfScale) {
-    if (h.kind === 'none') {
-      reasons.push(h.reason === 'nc' ? 'N.C.: no scale here' : h.reason === 'empty' ? 'no chord in this slot' : 'chord not recognised');
-    } else if (h.scale) reasons.push(`not in ${prettyName(scaleLabel(h.root, h.scale))}`);
+    if (h.kind === 'chord' && h.scale) reasons.push(`not in ${prettyName(scaleLabel(h.root, h.scale))}`);
     else reasons.push(`not a chord tone of ${prettyName(chord.trim())}`);
   }
   if (range) reasons.push(`${range} ${inst.name} range`);

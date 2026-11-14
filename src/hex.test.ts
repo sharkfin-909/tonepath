@@ -2,7 +2,7 @@
 // ii–V–I — Concert, plus trombone, violin and B♭ tenor sax (written view), and the §8.4 cases.
 import { describe, expect, it } from 'vitest';
 import { slotHarmony } from './harmony';
-import { CONCERT_VIEW, cellCentre, dockHex, hexGrid, hexRadius, slotHex, type SlotHex } from './hex';
+import { CONCERT_VIEW, cellCentre, dockHex, hexGrid, hexSize, slotHex, type SlotHex } from './hex';
 import { hexRange, instrumentOf, writtenChord } from './instruments';
 
 const hexFor = (chord: string, scale?: string): SlotHex => {
@@ -26,12 +26,12 @@ const octaveDegrees = (hex: SlotHex, root: string) => {
 };
 
 describe('test table 6: hex layout (Concert C3–C6)', () => {
-  it('Dm7 (D Dorian): 14·15·15·16 cells, anchor C3, top cell C6', () => {
+  it('Dm7 (D Dorian): 17·17·18 cells, anchor C3, top cell C6', () => {
     const hex = hexFor('Dm7');
     expect(hex.stepsInRange).toBe(22);
-    expect(hex.rowLengths).toEqual([14, 15, 15, 16]);
+    expect(hex.rowLengths).toEqual([17, 17, 18]);
     expect(hex.anchor).toBe(48);
-    const top = row(hex, 3);
+    const top = row(hex, 2);
     expect(top[top.length - 1].midi).toBe(84);
     expect(hex.cells.every((c) => c.inRange)).toBe(true);
   });
@@ -39,7 +39,7 @@ describe('test table 6: hex layout (Concert C3–C6)', () => {
   it('cell (r, c) = scale step c + 2r: right = step, up-left = a third, left column = chain of thirds', () => {
     const hex = hexFor('Dm7');
     for (const c of hex.cells) expect(c.step).toBe(c.c + 2 * c.r);
-    expect([0, 1, 2, 3].map((r) => row(hex, r)[0].name)).toEqual(['C', 'E', 'G', 'B']);
+    expect([0, 1, 2].map((r) => row(hex, r)[0].name)).toEqual(['C', 'E', 'G']);
     expect(row(hex, 0).slice(0, 4).map((c) => c.name)).toEqual(['C', 'D', 'E', 'F']);
   });
 
@@ -68,13 +68,13 @@ describe('test table 6: hex layout (Concert C3–C6)', () => {
   it('8-note scale: G half-whole (G7b9) degrees 1 2 3 3 4 5 6 7', () => {
     const hex = hexFor('G7b9');
     expect(octaveDegrees(hex, 'G')).toEqual([1, 2, 3, 3, 4, 5, 6, 7]);
-    expect(hex.rowLengths).toEqual([16, 17, 17, 18]); // 24 steps in C3–C6 (no C in G half-whole)
+    expect(hex.rowLengths).toEqual([19, 19, 20]); // 24 steps in C3–C6 (no C in G half-whole)
   });
 
   it('6-note scale: C whole-tone (C7#5) degrees 1 2 3 4 5 7', () => {
     const hex = hexFor('C7#5');
     expect(octaveDegrees(hex, 'C')).toEqual([1, 2, 3, 4, 5, 7]);
-    expect(hex.rowLengths).toEqual([11, 12, 12, 13]); // 19 steps (C3 … C6)
+    expect(hex.rowLengths).toEqual([14, 14, 15]); // 19 steps (C3 … C6)
   });
 
   it('G altered, scale-spelled (override on G7b5b9): degrees 1 2 3 3 5 6 7', () => {
@@ -85,7 +85,7 @@ describe('test table 6: hex layout (Concert C3–C6)', () => {
   it('G7alt: anchor moves to Db3 (lowest in-range altered tone); chord spelling renames the #5 / #9', () => {
     const hex = hexFor('G7alt');
     expect(hex.anchor).toBe(49);
-    expect(hex.rowLengths).toEqual([13, 14, 14, 15]);
+    expect(hex.rowLengths).toEqual([16, 16, 17]);
     const names = row(hex, 0).slice(0, 7).map((c) => `${c.name}${c.degree}`);
     expect(names).toEqual(['Db5', 'D#5', 'F7', 'G1', 'Ab2', 'A#2', 'B3']);
   });
@@ -103,18 +103,29 @@ describe('test table 6: hex layout (Concert C3–C6)', () => {
 });
 
 describe('hexGrid and fitting', () => {
+  it('cells are regular hexagons in any dock shape (never stretched or squashed)', () => {
+    const g = hexGrid(new Set([0, 2, 4, 5, 7, 9, 11]), CONCERT_VIEW);
+    const size = hexSize(g, 400, 1000, 12);
+    expect(size.ry).toBeCloseTo(size.rx);
+    const wide = hexSize(g, 4000, 200, 12);
+    expect(wide.ry).toBeCloseTo(wide.rx);
+  });
+
   it('out-of-range cells only in a limited range, and only past the top', () => {
     const tiny = hexGrid(new Set([0, 2, 4, 5, 7, 9, 11]), { lo: 60, hi: 64, limited: true });
-    expect(tiny.rowLengths).toEqual([2, 3, 3, 4]);
+    expect(tiny.rowLengths).toEqual([3, 3, 4]);
     expect(tiny.cells.filter((c) => !c.inRange).every((c) => c.midi > 64)).toBe(true);
   });
 
-  it('radius = the largest that fits width and height; grid centred', () => {
+  it('size = the largest regular hex that fits; grid centred', () => {
     const g = hexGrid(new Set([0, 2, 4, 5, 7, 9, 11]), CONCERT_VIEW);
-    const R = hexRadius(g, 1152, 400, 12);
-    expect(R).toBeCloseTo(Math.min((1152 - 24) / (Math.sqrt(3) * 16), (400 - 24) / 6.5));
-    const xs = g.cells.map((c) => cellCentre(c, g, R, 1152, 400).cx);
-    const w = Math.sqrt(3) * R;
+    const size = hexSize(g, 1152, 400, 12, 28);
+    expect(size.rx).toBeCloseTo(Math.min((1152 - 24) / (Math.sqrt(3) * 18), (400 - 56) / 5));
+    expect(size.ry).toBeCloseTo(size.rx);
+    const ys = g.cells.map((c) => cellCentre(c, g, size, 1152, 400).cy);
+    expect((Math.min(...ys) - size.ry + Math.max(...ys) + size.ry) / 2).toBeCloseTo(200); // centred vertically
+    const xs = g.cells.map((c) => cellCentre(c, g, size, 1152, 400).cx);
+    const w = Math.sqrt(3) * size.rx;
     expect((Math.min(...xs) - w / 2 + Math.max(...xs) + w / 2) / 2).toBeCloseTo(576, 0);
   });
 });
@@ -126,21 +137,21 @@ describe('test table 6: hex layout per instrument (written pitch, Fit range)', (
     if (!h) throw new Error('no hex');
     return h;
   };
-  const top = (hex: SlotHex) => row(hex, 3)[row(hex, 3).length - 1];
+  const top = (hex: SlotHex) => row(hex, 2)[row(hex, 2).length - 1];
 
-  it('trombone E2–B♭4 over Dm7: 18 steps → 10·11·11·12, anchor E2, top cell A4, all in range', () => {
+  it('trombone E2–B♭4 over Dm7: 18 steps → 13·13·14, anchor E2, top cell A4, all in range', () => {
     const hex = hexIn('trombone', 'Dm7');
     expect(hex.stepsInRange).toBe(18);
-    expect(hex.rowLengths).toEqual([10, 11, 11, 12]);
+    expect(hex.rowLengths).toEqual([13, 13, 14]);
     expect(hex.anchor).toBe(40);
     expect(top(hex).midi).toBe(69);
     expect(hex.cells.every((c) => c.inRange)).toBe(true);
   });
 
-  it('violin G3–E7 over Dm7: 27 steps → 19·20·20·21, anchor G3, top cell E7', () => {
+  it('violin G3–E7 over Dm7: 27 steps → 22·22·23, anchor G3, top cell E7', () => {
     const hex = hexIn('violin', 'Dm7');
     expect(hex.stepsInRange).toBe(27);
-    expect(hex.rowLengths).toEqual([19, 20, 20, 21]);
+    expect(hex.rowLengths).toEqual([22, 22, 23]);
     expect(hex.anchor).toBe(55);
     expect(top(hex).midi).toBe(100);
   });
@@ -148,7 +159,7 @@ describe('test table 6: hex layout per instrument (written pitch, Fit range)', (
   it('B♭ tenor sax over Dm7 shows written Em7 (E Dorian): B♭3–F♯6 → 19 steps, anchor B3, names up a M9', () => {
     const hex = hexIn('bb-tenor-sax', 'Dm7');
     expect(hex.stepsInRange).toBe(19);
-    expect(hex.rowLengths).toEqual([11, 12, 12, 13]);
+    expect(hex.rowLengths).toEqual([14, 14, 15]);
     expect(hex.anchor).toBe(59);
     expect(top(hex).midi).toBe(90);
     expect(row(hex, 0).slice(0, 7).map((c) => `${c.name}${c.degree}${c.role[0]}`)).toEqual([
@@ -180,7 +191,7 @@ describe('test table 6: hex layout per instrument (written pitch, Fit range)', (
 
   it('a tiny range leaves grey out-of-range cells (shown, inactive)', () => {
     const hex = slotHex(slotHarmony({ chord: 'C' }), { lo: 60, hi: 67, limited: true })!;
-    expect(hex.rowLengths).toEqual([2, 3, 3, 4]);
+    expect(hex.rowLengths).toEqual([3, 3, 4]);
     expect(hex.cells.some((c) => !c.inRange)).toBe(true);
   });
 });
@@ -189,10 +200,10 @@ describe('test table 6: §8.4 slots without a scale', () => {
   const hs = (...chords: string[]) => chords.map((chord) => slotHarmony({ chord }));
   const pitches = (hex: SlotHex) => hex.cells.map((c) => c.midi);
 
-  it('N.C. after a scaled slot: that slot\'s layout, rests only', () => {
+  it('N.C. after a scaled slot: that slot\'s layout, unchecked', () => {
     const d = dockHex(hs('Dm7', 'G7', 'N.C.'), 2);
-    expect(d.mode).toBe('rests-only');
-    expect(d.label).toBe('N.C. — rests only');
+    expect(d.mode).toBe('unchecked');
+    expect(d.label).toBe('N.C.: notes not checked');
     expect(d.labelEditsChord).toBe(false);
     expect(pitches(d.hex)).toEqual(pitches(hexFor('G7')));
     expect(d.hex.cells.find((c) => c.name === 'G')!.degree).toBe(1); // G Mixolydian rings
@@ -214,8 +225,8 @@ describe('test table 6: §8.4 slots without a scale', () => {
   });
 
   it('empty and unparseable slots: their labels, which edit the chord', () => {
-    expect(dockHex(hs('Dm7', ''), 1)).toMatchObject({ mode: 'rests-only', label: 'No chord yet: type one to enter notes', labelEditsChord: true });
-    expect(dockHex(hs('Dm7', 'Hm7'), 1)).toMatchObject({ label: 'Chord not recognised: fix the symbol to enter notes', labelEditsChord: true });
+    expect(dockHex(hs('Dm7', ''), 1)).toMatchObject({ mode: 'unchecked', label: 'No chord yet: notes not checked', labelEditsChord: true });
+    expect(dockHex(hs('Dm7', 'Hm7'), 1)).toMatchObject({ label: 'Chord not recognised: notes not checked', labelEditsChord: true });
   });
 
   it('a no-fit chord (C7sus4b9) shows the chord-tones hex: each cell the next chord tone, all white', () => {
@@ -249,5 +260,44 @@ describe('triad tones (always coloured)', () => {
   });
   it('a slash bass is not a triad tone', () => {
     expect(triadNames('C/D')).toEqual(['C', 'E', 'G']);
+  });
+});
+
+describe('cell look (SPEC §8.2)', () => {
+  it('degree colour with readable ink: dark on light colours, white on dark ones', () => {
+    const cells = hexFor('Bbm7').cells;
+    const of = (deg: number) => cells.find((c) => c.degree === deg)!;
+    expect(of(2)).toMatchObject({ colour: '#FFD52E', ink: '#1D1B19' }); // yellow
+    expect(of(4)).toMatchObject({ colour: '#390099', ink: '#FFFFFF' }); // navy
+  });
+
+  it('spelled accidental: sharp balls high, flat balls low, naturals home', () => {
+    const acc = (chord: string, name: string) => hexFor(chord).cells.find((c) => c.name === name)!.accidental;
+    expect(acc('G7alt', 'D#')).toBe(1);
+    expect(acc('Bbm7', 'Db')).toBe(-1);
+    expect(acc('Dm7', 'F')).toBe(0);
+  });
+
+  it('chromatic entry: buttons on the borders between neighbouring steps, spelled as written', () => {
+    const hex = hexFor('Dm7'); // D Dorian: D E F G A B C
+    const cell = (name: string) => hex.cells.find((c) => c.name === name && c.r === 0)!;
+    const right = (name: string) => hex.borders.find((b) => b.r === 0 && b.x === cell(name).x + 0.5)?.buttons ?? [];
+    const d = cell('D');
+    expect(right('D').map((b) => [b.midi, b.name])).toEqual([[d.midi + 1, 'Eb']]); // D–E: one pitch between, as the slot spells it
+    expect(right('E')).toEqual([]); // E–F: a half step, no border button
+    const flats = hexFor('Bbm7').borders.flatMap((b) => b.buttons.map((x) => x.glyph));
+    expect(flats.every((g) => g === '♭' || g === '♮')).toBe(true); // a flat key spells its in-betweens with flats
+  });
+
+  it('a wider gap gets two buttons, lower pitch first (the chord-tones hex)', () => {
+    const hex = dockHex([slotHarmony({ chord: 'C7sus4b9' })], 0).hex; // chord tones C D♭ F G B♭
+    const two = hex.borders.find((b) => b.buttons.length === 2)!;
+    expect(two.buttons[1].midi - two.buttons[0].midi).toBeGreaterThan(0);
+  });
+
+  it('playable: in range, with or without a chord', () => {
+    const hs = (...chords: string[]) => chords.map((chord) => slotHarmony({ chord }));
+    expect(dockHex(hs('Dm7'), 0).hex.cells.every((c) => c.playable)).toBe(true);
+    expect(dockHex(hs('Dm7', 'N.C.'), 1).hex.cells.every((c) => c.playable)).toBe(true);
   });
 });

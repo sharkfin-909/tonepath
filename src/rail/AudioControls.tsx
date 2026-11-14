@@ -1,4 +1,4 @@
-// Rail audio controls (SPEC §3.1, §9): mute (speaker, M), ▶ Chord (C), ▶ Bass (B), ▶ Scale (⇧Space).
+// Rail audio controls (SPEC §3.1, §9): mute (speaker, M), ▶ Chord (C), ▶ Bass (B), ▶ Scale (S / ⇧Space).
 export interface AudioControlsProps {
   muted: boolean;
   onToggleMute: () => void;
@@ -25,7 +25,7 @@ export function AudioControls({ muted, onToggleMute, onChord, onBass, onScale }:
       <button type="button" className="rail-button" title="Play the bass (B)" onClick={onBass}>
         ▶ Bass
       </button>
-      <button type="button" className="rail-button" title="Play the scale (⇧Space)" onClick={onScale}>
+      <button type="button" className="rail-button" title="Play the scale (S)" onClick={onScale}>
         ▶ Scale
       </button>
     </div>

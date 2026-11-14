@@ -6,10 +6,11 @@ import { isReadOnly } from './readOnly';
 
 export const DEVICE_KEY = 'honeycomb:device';
 
-export type OnArrival = 'silent' | 'chord' | 'root';
+export type OnArrival = 'silent' | 'chord' | 'root' | 'bass' | 'bass-chord';
+const ARRIVALS: OnArrival[] = ['silent', 'chord', 'root', 'bass', 'bass-chord'];
 
 export function onArrivalOf(d: DeviceSettings): OnArrival {
-  return d.playArrival === 'chord' || d.playArrival === 'root' ? d.playArrival : 'silent';
+  return ARRIVALS.includes(d.playArrival as OnArrival) ? (d.playArrival as OnArrival) : 'silent';
 }
 
 export interface DeviceSettings {

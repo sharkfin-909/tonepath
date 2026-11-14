@@ -46,6 +46,12 @@ export function rootNote(h: SlotHarmony): number | null {
   return OCTAVE_3 + pc(h.bass ?? h.root);
 }
 
+/** *On arrival: Bass note*: the chord's bass (slash bass if any) an octave below the root note (concert octave 2). */
+export function bassNote(h: SlotHarmony): number | null {
+  const m = rootNote(h);
+  return m === null ? null : m - 12;
+}
+
 export const midiToHz = (m: number) => 440 * 2 ** ((m - 69) / 12);
 
 // ---------------------------------------------------------------- engine
@@ -119,5 +125,12 @@ export function playScale(h: SlotHarmony): void {
 export function playRoot(h: SlotHarmony): void {
   const c = ready();
   const m = rootNote(h);
+  if (c && m !== null) tone(m, c.currentTime, NOTE);
+}
+
+/** *On arrival: Bass note* (and the bass of *Bass note + chord*): the bass an octave lower than the root note. */
+export function playBass(h: SlotHarmony): void {
+  const c = ready();
+  const m = bassNote(h);
   if (c && m !== null) tone(m, c.currentTime, NOTE);
 }

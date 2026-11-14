@@ -100,17 +100,3 @@ export function ClearAll({ disabled, onClear }: { disabled: boolean; onClear: ()
     </button>
   );
 }
-
-/** Readout of the caret's bar, chord and scale. */
-export function CaretReadout({ bar, chord, scale }: { bar: number; chord: string; scale: string }) {
-  return (
-    <dl className="caret-readout" aria-live="polite">
-      <dt>Bar</dt>
-      <dd>{bar}</dd>
-      <dt>Chord</dt>
-      <dd>{chord || '—'}</dd>
-      <dt>Scale</dt>
-      <dd>{scale}</dd>
-    </dl>
-  );
-}

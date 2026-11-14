@@ -29,10 +29,8 @@ describe('note marks', () => {
     expect(mark(62, 'C7sus4b9').reason).toBe('not a chord tone of C7sus4♭9');
   });
 
-  it('slots without a scale mark every note', () => {
-    expect(mark(60, 'N.C.').reason).toBe('N.C.: no scale here');
-    expect(mark(60, '').reason).toBe('no chord in this slot');
-    expect(mark(60, 'Hm7').reason).toBe('chord not recognised');
+  it('slots without a chord check nothing: no out-of-scale mark', () => {
+    for (const chord of ['N.C.', '', 'Hm7']) expect(mark(61, chord)).toMatchObject({ outOfScale: false, reason: null });
   });
 
   it('out of range in written pitch; Concert never', () => {
