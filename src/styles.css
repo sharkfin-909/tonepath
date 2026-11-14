@@ -83,6 +83,7 @@ body,
 }
 
 .dock {
+  position: relative;
   background: var(--dock-bg);
   display: grid;
   min-height: 0;
@@ -105,6 +106,60 @@ body,
 .hex-cell text {
   pointer-events: none;
   font-family: inherit;
+}
+
+/* Degree colour: always on triad cells; other cells stay neutral until hovered. */
+/* Slot-change transitions (SPEC §8.2): colours fade, balls slide, sockets fade — all ~180 ms, never blocking. */
+.hex-bg {
+  fill: var(--deg);
+  transition: fill 180ms ease, stroke 180ms ease;
+}
+.hex-name {
+  fill: var(--deg-ink);
+  transition: fill 180ms ease;
+}
+.hex-ball {
+  transition: transform 180ms cubic-bezier(0.3, 0.7, 0.4, 1.2); /* a slight overshoot: the ball settles */
+}
+.hex-socket {
+  transition: opacity 180ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hex-bg,
+  .hex-name,
+  .hex-ball,
+  .hex-socket {
+    transition: none;
+  }
+}
+.hex-cell.muted .hex-bg {
+  fill: #cdc9c0;
+  stroke: #bdb8ad;
+  stroke-width: 1;
+}
+.hex-cell.muted .hex-name {
+  fill: #5e5a53;
+}
+.hex-cell.muted.lit .hex-bg {
+  fill: var(--deg);
+  stroke: none;
+}
+.hex-cell.muted.lit .hex-name {
+  fill: var(--deg-ink);
+}
+/* The ball's default spot: a dark socket, seen when a sharp / flat ball sits above / below it. */
+.hex-socket {
+  fill: rgba(29, 27, 25, 0.45);
+  pointer-events: none;
+}
+
+/* Every cell with the hovered / clicked pitch: a white glow round its ball. */
+.hex-lit {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 3;
+  filter: drop-shadow(0 0 3px #ffffff) drop-shadow(0 0 7px rgba(255, 255, 255, 0.85));
+  pointer-events: none;
 }
 
 /* Rests-only hex (SPEC §8.4): dimmed, every cell inactive. */
@@ -302,6 +357,55 @@ button.dock-label {
   color: #b71c1c;
   font-size: 12px;
   white-space: nowrap;
+}
+
+/* Chord autosuggest (SPEC §4.2). */
+.chord-suggest {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 4px);
+  z-index: 20;
+  min-width: 100%;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.06);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.chord-suggest li {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.chord-suggest li.selected {
+  background: var(--focus);
+  color: #fff;
+}
+
+.chord-suggest-symbol {
+  font-weight: 600;
+  min-width: 4.5em;
+}
+
+.chord-suggest-tones {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.chord-suggest li.selected .chord-suggest-tones {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.slot:last-child .chord-suggest {
+  left: auto;
+  right: 0;
 }
 
 .chord-field[aria-invalid='true'] {
@@ -1077,4 +1181,42 @@ button.dock-label {
   margin: 0 0 12px;
   font-size: 12px;
   color: #b71c1c;
+}
+
+/* Slot browser on the dock (‹ Bar 4 · Bbm7 ›): previous / next slot. */
+.slot-nav {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+}
+
+.slot-nav-button {
+  width: 26px;
+  height: 24px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.slot-nav-button:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.slot-nav-label {
+  padding: 0 4px;
+  font-weight: 600;
+  white-space: nowrap;
 }

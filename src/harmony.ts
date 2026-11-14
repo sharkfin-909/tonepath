@@ -180,6 +180,17 @@ export function withValidOverride<S extends Slot>(slot: S): S {
   return rest as S;
 }
 
+/**
+ * The chord's triad pitch classes: root, 3rd and 5th as spelled (altered 5ths included); a chord with no 3rd
+ * takes its sus 2nd / 4th in its place. Everything else (6ths, 7ths, extensions, a slash bass) is not triad.
+ */
+export function triadPitchClasses(h: Extract<SlotHarmony, { kind: 'chord' }>): Set<number> {
+  const num = (iv: string) => Number(/^\d+/.exec(iv)?.[0]);
+  const hasThird = h.intervals.some((iv) => num(iv) === 3);
+  const core = h.intervals.filter((iv) => [1, 3, 5].includes(num(iv)) || (!hasThird && [2, 4].includes(num(iv))));
+  return new Set(core.map((iv) => pcOf(h.root, iv)));
+}
+
 export type PitchRole = 'chord' | 'scale' | 'chromatic';
 
 /** Classify a pitch (MIDI or pitch class) against a slot: chord tone > scale tone > chromatic. */

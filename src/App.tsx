@@ -18,14 +18,14 @@ import {
 import { BarsPerRow, CaretReadout, ClearAll, TimeSignatureField, TitleField } from './rail/RailSettings';
 import { InstrumentPicker } from './rail/InstrumentPicker';
 import { concertChordText, hexRange, instrumentOf, toConcert, toWritten, writtenChord } from './instruments';
-import { scaleLabel, slotHarmony, stepPitchClasses, type ScaleId } from './harmony';
+import { scaleLabel, slotHarmony, stepPitchClasses, type ScaleId, type SlotHarmony } from './harmony';
 import { layoutMeter, slotAt, slotsOf, stepSlot, type FormSlot } from './form';
 import {
   backspaceAt,
   caretFromClick,
   deleteAt,
   formEnd,
-  insertAt,
+  insertWrapping,
   melodyEnd,
   nudge,
   snapToEvent,
@@ -248,15 +248,25 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
     return { p, slots: slotsOf(p.bars, layoutMeter(p.timeSignature)) };
   };
 
+  /** *On arrival*: the slot's chord, its root (bass), or nothing. */
+  const sound = (how: OnArrival, h: SlotHarmony) => {
+    if (how === 'chord') playChord(h);
+    else if (how === 'root') playRoot(h);
+  };
+
   /** Insert a pitch (or a rest, null) at the caret with length d; a refusal flashes that length's button. */
   const insert = (d: Duration, pitch: number | null) => {
     const { p, slots: s } = formNow();
-    const r = insertAt(p.melody, s, caretAt, d, pitch);
+    const r = insertWrapping(p.melody, s, caretAt, d, pitch); // past the end: continues from the start
     if (!r.ok) {
       setRefusal((old) => ({ d, message: r.message, n: (old?.n ?? 0) + 1 }));
       return;
     }
     setRefusal(null);
+    // *On arrival* in Write: the first entry of a slot (written at its start) sounds the slot's chord / root with it.
+    const at = caretAt >= formEnd(s) ? 0 : caretAt; // where insertWrapping put it
+    const slot = slotAt(s, at);
+    if (slot && slot.start === at) sound(onArrival, slotHarmony(p.bars[slot.bar][slot.part]));
     update(() => ({ ...p, melody: r.melody }));
     setCaret(r.caret);
   };
@@ -412,9 +422,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
   const arrive = (index: number) => {
     setPlayIndex(index);
     const sl = slots[index];
-    const h = slotHarmony(progression.bars[sl.bar][sl.part]);
-    if (onArrival === 'chord') playChord(h);
-    else if (onArrival === 'root') playRoot(h);
+    sound(onArrival, slotHarmony(progression.bars[sl.bar][sl.part]));
   };
 
   /** P / the switch: entering Play starts on the caret's slot; leaving puts the caret at the current slot's start. */
@@ -438,6 +446,25 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
     }
     if (caretAt >= slot.start && caretAt < slot.end) return;
     setCaret(slot.start);
+  };
+
+  /** C = ▶ Chord, B = ▶ Bass (Write and Play). True when the key was one of them. */
+  const soundKey = (e: KeyboardEvent) => {
+    const k = e.key.toLowerCase();
+    if (k !== 'c' && k !== 'b') return false;
+    if (!e.repeat) (k === 'c' ? playChord : playRoot)(harmonyRef.current);
+    return true;
+  };
+
+  /** ‹ / › dock buttons: the previous / next slot (wrapping). Write moves the caret to its start; Play arrives. */
+  const browse = (dir: -1 | 1) => {
+    const next = stepSlot(active.index, dir, slots.length);
+    if (playing) {
+      arrive(next);
+      return;
+    }
+    setSelection(null);
+    setCaret(slots[next].start);
   };
 
   /** Write-mode keys (SPEC §11); all ignored while a text field has focus. */
@@ -471,10 +498,10 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
         handled();
         arrive(stepSlot(active.index, e.key === 'ArrowLeft' ? -1 : 1, slots.length));
       } else if (e.key === ' ') {
+        handled(); // Space = click the hovered hex cell (the hex listens); ⇧Space = ▶ Scale
+        if (!e.repeat && e.shiftKey) playScale(harmonyRef.current);
+      } else if (soundKey(e)) {
         handled();
-        if (e.repeat) return;
-        if (e.shiftKey) playScale(harmonyRef.current);
-        else playChord(harmonyRef.current);
       } else if (e.key === 'm' || e.key === 'M') {
         handled();
         toggleMute();
@@ -509,10 +536,8 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     switch (e.key) {
       case ' ':
-        handled();
-        if (e.repeat) return;
-        if (e.shiftKey) playScale(harmonyRef.current);
-        else playChord(harmonyRef.current);
+        handled(); // Space = click the hovered hex cell (the hex listens); ⇧Space = ▶ Scale
+        if (!e.repeat && e.shiftKey) playScale(harmonyRef.current);
         return;
       case 'ArrowLeft':
       case 'ArrowRight': {
@@ -531,6 +556,10 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
         handled();
         onDelete(e.key === 'Backspace');
         return;
+    }
+    if (soundKey(e)) {
+      handled();
+      return;
     }
     if (e.shiftKey) return;
     if (e.key === 'm' || e.key === 'M') {
@@ -643,18 +672,18 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
           muted={muted}
           onToggleMute={toggleMute}
           onChord={() => playChord(activeHarmony)}
+          onBass={() => playRoot(activeHarmony)}
           onScale={() => playScale(activeHarmony)}
         />
-        {playing ? (
-          <label className="rail-setting on-arrival">
-            <span className="rail-label">On arrival</span>
-            <select className="rail-select" value={onArrival} onChange={(e) => setOnArrival(e.target.value as OnArrival)}>
-              <option value="silent">Silent</option>
-              <option value="chord">Chord</option>
-              <option value="root">Root note</option>
-            </select>
-          </label>
-        ) : (
+        <label className="rail-setting on-arrival">
+          <span className="rail-label">On arrival</span>
+          <select className="rail-select" value={onArrival} onChange={(e) => setOnArrival(e.target.value as OnArrival)}>
+            <option value="silent">Silent</option>
+            <option value="chord">Chord</option>
+            <option value="root">Root note</option>
+          </select>
+        </label>
+        {!playing && (
           <>
         <LengthLatch
           value={length}
@@ -714,6 +743,17 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
           </p>
         )}
         <section className="dock" aria-label="Docked hex">
+          <div className="slot-nav">
+            <button type="button" className="slot-nav-button" title="Previous slot" aria-label="Previous slot" onClick={() => browse(-1)}>
+              ‹
+            </button>
+            <span className="slot-nav-label">
+              Bar {active.bar + 1} · {activeWrittenChord || '—'}
+            </span>
+            <button type="button" className="slot-nav-button" title="Next slot" aria-label="Next slot" onClick={() => browse(1)}>
+              ›
+            </button>
+          </div>
           <DockedHex
             dock={dock}
             onLabelClick={() => setEditRequest((r) => ({ bar: active.bar, part: active.part, n: (r?.n ?? 0) + 1 }))}

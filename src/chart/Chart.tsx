@@ -86,6 +86,8 @@ export function Chart({ progression, caret, onSlotClick, onEventClick, onTimeCli
   const [editing, setEditing] = useState<{ bar: number; part: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inst = instrumentOf(progression.instrument);
+  /** Chords already in the form (written, distinct, in order): autosuggest offers them first. */
+  const usedChords = [...new Set(progression.bars.flat().map((s) => writtenChord(s.chord, inst)).filter(Boolean))];
   const clef = clefOf(inst, progression.concertClef);
 
   const rows: FormSlot[][] = [];
@@ -182,6 +184,7 @@ export function Chart({ progression, caret, onSlotClick, onEventClick, onTimeCli
               onAppend={!readOnly && slot.index === slots.length - 1 ? onAppendBar : undefined}
               editing={editing?.bar === slot.bar && editing.part === slot.part}
               error={error}
+              usedChords={usedChords}
               onEdit={stand ? undefined : playing ? () => onSlotClick(slot) : () => startEditing({ bar: slot.bar, part: slot.part })}
               onCommit={(text, move) => commit(slot, text, move)}
               onScaleChange={readOnly ? undefined : (scale) => onScaleChange(slot.bar, slot.part, scale)}
@@ -224,10 +227,11 @@ interface SlotViewProps {
   error: string | null;
   onEdit?: () => void;
   onCommit: (text: string, move: -1 | 1 | null) => boolean;
+  usedChords: string[];
   onScaleChange?: (scale: ScaleId | null) => void;
 }
 
-function SlotView({ slot, data, active, onActivate, clef, inst, melody, caret, playing, onEventClick, onTimeClick, span, layout, header, barTools, inSelection, onAppend, showTimeSignature, editing, error, onEdit, onCommit, onScaleChange }: SlotViewProps) {
+function SlotView({ slot, data, active, onActivate, clef, inst, melody, caret, playing, onEventClick, onTimeClick, span, layout, header, barTools, inSelection, onAppend, showTimeSignature, editing, error, usedChords, onEdit, onCommit, onScaleChange }: SlotViewProps) {
   // Everything shown runs against the written chord; the stored melody stays concert (SPEC §5.3, §10).
   const chord = writtenChord(data.chord, inst);
   const harmony = slotHarmony({ ...data, chord });
@@ -247,7 +251,7 @@ function SlotView({ slot, data, active, onActivate, clef, inst, melody, caret, p
       data-slot={slot.index}
       onPointerDown={(e) => {
         // Notes handle their own click (a redraw here would remove the note before its click fires).
-        if (!(e.target as Element).closest('button, input, .scale-menu, .melody-event')) onActivate();
+        if (!(e.target as Element).closest('button, input, .scale-menu, .melody-event, .chord-suggest')) onActivate();
       }}
     >
       {barTools && <BarHandle bar={slot.bar} {...barTools} />}
@@ -258,7 +262,7 @@ function SlotView({ slot, data, active, onActivate, clef, inst, melody, caret, p
       )}
       <div className="slot-header" style={{ height: header }}>
         {editing ? (
-          <ChordField initial={chord} error={error} onCommit={onCommit} />
+          <ChordField initial={chord} error={error} onCommit={onCommit} used={usedChords} />
         ) : (
           <ChordLabel chord={chord} harmony={harmony} bar={slot.bar} part={slot.part} onEdit={onEdit} />
         )}

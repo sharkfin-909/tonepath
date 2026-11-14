@@ -2,7 +2,7 @@
 // 4 left-slanted rows; cell (r, c) = scale step t₀ + c + 2r; pitch anchor t₀ = lowest in-range scale tone;
 // Fit range row lengths; largest radius that fits. Pitches are in the view's pitch (written for an instrument).
 
-import { classify, scalePitchClasses, slotHarmony, type SlotHarmony } from './harmony';
+import { classify, scalePitchClasses, triadPitchClasses, slotHarmony, type SlotHarmony } from './harmony';
 import { pcName, slotSpelling, spelledDegree } from './spelling';
 
 export const ROWS = 4;
@@ -84,9 +84,11 @@ export type CellRole = 'chord' | 'scale';
 export interface HexCell extends GridCell {
   /** Note name, no octave (in the view's pitch). */
   name: string;
-  /** Spelled degree 1–7: colour of the degree ring. */
+  /** Spelled degree 1–7: the cell's degree colour. */
   degree: number;
   role: CellRole;
+  /** A triad tone (root, 3rd / sus, 5th): its cell always shows its degree colour. */
+  triad: boolean;
 }
 
 export interface SlotHex extends Omit<HexGrid, 'cells'> {
@@ -101,11 +103,12 @@ export function slotHex(h: SlotHarmony, range: PitchRange = CONCERT_VIEW): SlotH
   if (h.kind !== 'chord') return null;
   const grid = hexGrid(h.scale ? scalePitchClasses(h.root, h.scale) : h.chordTones, range);
   const sp = slotSpelling(h);
+  const triad = triadPitchClasses(h);
   return {
     ...grid,
     cells: grid.cells.map((cell) => {
       const name = pcName(cell.midi, sp);
-      return { ...cell, name, degree: spelledDegree(h.root, name), role: classify(cell.midi, h) === 'chord' ? 'chord' : 'scale' };
+      return { ...cell, name, degree: spelledDegree(h.root, name), role: classify(cell.midi, h) === 'chord' ? 'chord' : 'scale', triad: triad.has(cell.midi % 12) };
     }),
   };
 }
@@ -148,17 +151,20 @@ export function dockHex(harmonies: SlotHarmony[], active: number, range: PitchRa
   return { hex: slotHex(source ?? C_MAJOR, range)!, mode: 'rests-only', label, labelEditsChord: h.reason !== 'nc' };
 }
 
-/** Degree-ring palette, degrees 1–7 (SPEC §8.2, user theme). */
-export const DEGREE_COLOURS = ['#53131E', '#FFD52E', '#EC7C25', '#390099', '#9E0059', '#5BB561', '#12EAEA'];
+/** Degree colours, degrees 1–7 (SPEC §8.2, user theme). */
+export const DEGREE_COLOURS = ['#12EAEA', '#FFD52E', '#EC7C25', '#390099', '#9E0059', '#5BB561', '#53131E'];
 
 export const HEX_THEME = {
-  dock: '#D9D6CE',
-  chordFill: '#FFFFFF',
-  chordInk: '#1D1B19',
-  scaleFill: '#938581',
-  scaleInk: '#FFFFFF',
-  outFill: '#BDBAB3',
-  outInk: '#8A877F',
-  ringWidth: 10,
-  keyline: 2,
+  /** Note spheres: off-white with a lit top-left and a darker rim; black lettering. */
+  noteHighlight: '#FFFFFF',
+  noteFill: '#F3EFE6',
+  noteEdge: '#C9C2B4',
+  noteInk: '#1D1B19',
+  /** Ball radius as a fraction of the cell radius (one size for every tone; triads stand out by colour). */
+  triadNote: 0.36,
+  otherNote: 0.36,
+  /** Sharp balls sit this far (× cell radius) above the default spot, flat balls this far below. */
+  accidentalShift: 0.16,
+  /** Out-of-range cells: the whole cell faded. */
+  outOpacity: 0.35,
 } as const;

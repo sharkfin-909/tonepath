@@ -11,6 +11,7 @@ import {
   eventsForSlot,
   fitToForm,
   insertAt,
+  insertWrapping,
   melodyEnd,
   nudge,
   restsBetween,
@@ -324,5 +325,24 @@ describe('fitToForm (time signature change, import repair)', () => {
   it('rests are fitted too', () => {
     const f34 = slotsOf(bars(1, 1), layoutMeter('3/4'));
     expect(show(fitToForm([r('w'), n(60)], f34).melody)).toBe('rh rq rq 60q');
+  });
+});
+
+describe('writing past the end continues from the start', () => {
+  it('caret at the form end → the note goes in at time 0, overwriting', () => {
+    const full: MelodyEvent[] = Array.from({ length: 16 }, () => ({ pitch: 60, d: 'q' as const }));
+    const r = ok(insertWrapping(full, form44, 16 * q, 'q', 72));
+    expect(show(r.melody.slice(0, 2))).toBe('72q 60q');
+    expect(r.melody).toHaveLength(16);
+    expect(r.caret).toBe(q);
+  });
+  it('writing the last note of the form puts the caret at the start (first slot active)', () => {
+    const r = ok(insertWrapping([], form44, 15 * q, 'q', 60));
+    expect(r.caret).toBe(0);
+    expect(r.melody.at(-1)).toEqual({ pitch: 60, d: 'q' });
+  });
+  it('anywhere else it is a plain insert (a note that does not fit is still refused)', () => {
+    expect(ok(insertWrapping([], form44, 0, 'q', 60)).caret).toBe(q);
+    expect(insertWrapping([], form44, 15 * q, 'h', 60)).toMatchObject({ ok: false });
   });
 });

@@ -234,3 +234,20 @@ describe('test table 6: §8.4 slots without a scale', () => {
     expect(dockHex(hs('Dm7'), 0)).toMatchObject({ mode: 'scale', label: null });
   });
 });
+
+describe('triad tones (always coloured)', () => {
+  const triadNames = (chord: string) => [...new Set(hexFor(chord).cells.filter((c) => c.triad).map((c) => c.name))].sort();
+  it('root, 3rd and 5th; 7ths, extensions and scale tones are not', () => {
+    expect(triadNames('Dm7')).toEqual(['A', 'D', 'F']);
+    expect(triadNames('G13')).toEqual(['B', 'D', 'G']);
+    expect(triadNames('Cmaj7')).toEqual(['C', 'E', 'G']);
+  });
+  it('altered 5ths count; a sus 2nd / 4th stands in for the missing 3rd', () => {
+    expect(triadNames('Bm7b5')).toEqual(['B', 'D', 'F']);
+    expect(triadNames('G7alt')).toEqual(['B', 'D#', 'G']);
+    expect(triadNames('Csus4')).toEqual(['C', 'F', 'G']);
+  });
+  it('a slash bass is not a triad tone', () => {
+    expect(triadNames('C/D')).toEqual(['C', 'E', 'G']);
+  });
+});

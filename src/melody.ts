@@ -71,6 +71,17 @@ export type InsertResult =
   | { ok: false; message: string };
 
 /**
+ * Write-mode insert that keeps going past the end (SPEC §6.2): writing the form's last note puts the caret back at
+ * the start (first slot active), and a caret at the end of the form writes from the start, overwriting as usual.
+ */
+export function insertWrapping(melody: MelodyEvent[], slots: FormSlot[], caret: number, d: Duration, pitch: number | null): InsertResult {
+  const end = formEnd(slots);
+  const r = insertAt(melody, slots, caret >= end ? 0 : caret, d, pitch);
+  // Writing the last note of the form wraps the caret to the start: the first slot is active, ready to carry on.
+  return r.ok && r.caret >= end ? { ...r, caret: 0 } : r;
+}
+
+/**
  * Overwrite insert (SPEC §6.2 items 2–4): write a note (or a rest, pitch null) of length d at the caret.
  * Covered events are removed, an overhanging event's leftover becomes rests, later music never moves;
  * inserting past the melody's end fills the gap with rests. Refused if it would cross the caret's slot end
