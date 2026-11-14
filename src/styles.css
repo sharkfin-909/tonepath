@@ -1681,3 +1681,10 @@ textarea {
     justify-self: center;
   }
 }
+
+/* Ins: (instrument + clef) at the right end of the second row on wide screens; centred with the rest below 900px. */
+@media (min-width: 901px) {
+  .topbar .ins-group {
+    margin-left: auto;
+  }
+}
