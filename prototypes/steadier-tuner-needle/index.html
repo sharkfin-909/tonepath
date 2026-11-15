@@ -1,0 +1,565 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway. Ticket "Steadier tuner needle" (issues/062).
+  Question: how should the tuner's cents reading be smoothed so the needle is calm on a sustained note but still
+  follows a real pitch bend or a new note promptly? And should Practice's note detection use the same smoothing
+  or stay raw?
+
+  Compare (synthetic cents streams + optional mic → YIN):
+    A · Today          — every reading, 70 ms CSS ease (current production behaviour)
+    B · Moving average — mean of last N readings
+    C · Median         — median of last N (rejects single spikes)
+    D · Adaptive EMA   — exponential; alpha rises with |Δ¢| so big moves land fast, small wobble is damped
+    E · Hold name      — note name from raw (2-frame steady); needle from Adaptive EMA cents only
+
+  Scenarios drive a known pitch + noise at ~60 Hz (no detector lag). Mic mode runs real YIN for a HITL check.
+  Run: npm run proto:tuner   (or open this file)
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PROTOTYPE — Steadier tuner needle</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { font: 13px system-ui, sans-serif; background: #eceae4; color: #222; display: flex; flex-direction: column; overflow: hidden; }
+  #proto { background: #fffbe6; border-bottom: 1px solid #e5d9a8; padding: 6px 12px; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; flex: none; }
+  #proto .tag { background: #c0392b; color: #fff; font-weight: 700; padding: 1px 6px; border-radius: 3px; font-size: 11px; }
+  #proto label { display: inline-flex; gap: 4px; align-items: center; color: #555; }
+  #proto select, #proto button, #proto input[type=range] { font: 12px system-ui; }
+  #proto button { height: 28px; border: 1px solid #aaa; background: #fff; border-radius: 4px; cursor: pointer; padding: 0 9px; font-weight: 600; }
+  #proto button.on { background: #2d6a4f; color: #fff; border-color: #1b4332; }
+  #proto .hint { color: #777; font-size: 12px; }
+  #main { flex: 1; display: grid; grid-template-columns: 1fr 280px; min-height: 0; }
+  #lanes { overflow: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .lane {
+    background: #1a1d24; color: #eee; border-radius: 8px; padding: 10px 14px;
+    display: grid; grid-template-columns: 140px 1fr 72px 88px; gap: 12px; align-items: center;
+  }
+  .lane .who { font-weight: 700; font-size: 13px; }
+  .lane .who small { display: block; font-weight: 500; color: #9aa; font-size: 11px; margin-top: 2px; }
+  .lane[data-zone=in] { --zone: #5bd17a; }
+  .lane[data-zone=near] { --zone: #e0a84a; }
+  .lane[data-zone=off] { --zone: #e06a6a; }
+  .lane[data-zone=idle] { --zone: #666; }
+  .scale { position: relative; height: 28px; }
+  .scale::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 2px; background: rgba(255,255,255,0.25); }
+  .band { position: absolute; left: 45%; width: 10%; top: 4px; bottom: 4px; border-radius: 4px; background: rgba(91,209,122,0.22); }
+  .tick { position: absolute; top: 8px; bottom: 8px; width: 1px; background: rgba(255,255,255,0.45); }
+  .tick.z { top: 2px; bottom: 2px; width: 2px; margin-left: -1px; background: rgba(255,255,255,0.85); }
+  .needle {
+    position: absolute; top: 0; bottom: 0; width: 4px; margin-left: -2px; border-radius: 2px;
+    background: var(--zone); box-shadow: 0 0 8px var(--zone);
+  }
+  .lane.today .needle { transition: left 70ms linear, background 120ms ease; }
+  .cents { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 16px; color: var(--zone); text-align: right; }
+  .name { font-size: 22px; font-weight: 700; color: var(--zone); text-align: center; min-width: 64px; }
+  .name sub { font-size: 12px; font-weight: 600; opacity: 0.8; }
+  #side { border-left: 1px solid #ccc; background: #fff; padding: 12px; overflow: auto; font-size: 12px; }
+  #side h2 { margin: 0 0 8px; font-size: 13px; }
+  #side h3 { margin: 14px 0 6px; font-size: 12px; color: #555; }
+  #state { font-family: ui-monospace, Menlo, monospace; white-space: pre; line-height: 1.45; background: #f6f5f1; padding: 8px; border-radius: 4px; }
+  #spark { width: 100%; height: 72px; background: #1a1d24; border-radius: 4px; display: block; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; color: #555; }
+  .legend span::before { content: ''; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+  .legend .raw::before { background: #888; }
+  .legend .ma::before { background: #6ea8fe; }
+  .legend .med::before { background: #c4a0fe; }
+  .legend .ema::before { background: #5bd17a; }
+  #verdict { margin-top: 12px; padding: 8px; background: #f0f7ff; border: 1px solid #b6d0f0; border-radius: 4px; color: #234; }
+</style>
+</head>
+<body>
+<div id="proto">
+  <span class="tag">PROTOTYPE</span>
+  <strong>Steadier tuner needle</strong>
+  <label>Scenario
+    <select id="scenario">
+      <option value="steady">Steady A4</option>
+      <option value="vibrato">Vibrato ±15¢</option>
+      <option value="bend">Slow bend ±40¢</option>
+      <option value="noise">Breath / quantise noise</option>
+      <option value="jump">Note change A4→B4</option>
+      <option value="combo">Vibrato then jump</option>
+      <option value="mic">Mic (real instrument)</option>
+    </select>
+  </label>
+  <label>N <input id="n" type="range" min="3" max="15" value="5"><span id="nVal">5</span></label>
+  <label>EMA τ slow <input id="tauSlow" type="range" min="40" max="400" step="10" value="180"><span id="tauSlowVal">180</span>ms</label>
+  <label>EMA τ fast <input id="tauFast" type="range" min="10" max="120" step="5" value="35"><span id="tauFastVal">35</span>ms</label>
+  <button id="audible" type="button" title="Hear the synthetic tone">♪ Audible</button>
+  <button id="micBtn" type="button" title="Use microphone">🎤 Mic</button>
+  <span class="hint">Judge: calm on sustain, tracks bends/jumps, Practice notes below.</span>
+</div>
+<div id="main">
+  <div id="lanes"></div>
+  <aside id="side">
+    <h2>Live state</h2>
+    <canvas id="spark" width="256" height="72"></canvas>
+    <div class="legend">
+      <span class="raw">raw</span>
+      <span class="ma">mean</span>
+      <span class="med">median</span>
+      <span class="ema">adapt EMA</span>
+    </div>
+    <div id="state"></div>
+    <h3>Practice note-starts (2 equal MIDI frames)</h3>
+    <p class="hint">Same rule as production. Compare raw vs smoothed MIDI so we can decide whether Practice stays raw.</p>
+    <div id="practice"></div>
+    <div id="verdict">
+      After trying scenarios (and a real note if you can): pick a method + N/τ, and whether Practice uses the same path or stays raw. Reply in chat — that closes the ticket.
+    </div>
+  </aside>
+</div>
+<script type="module">
+/**
+ * Portable smoothers — the bit worth lifting if a method wins.
+ * Each takes a stream of { midi, cents } readings (null = silence) and returns the display value.
+ */
+const NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const nameOf = (midi) => `${NAMES[((midi % 12) + 12) % 12]}${Math.floor(midi / 12) - 1}`;
+
+function median(xs) {
+  const s = [...xs].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+
+/** Exact MIDI float from note+cents, then back — so smoothers can average across a note boundary carefully. */
+function toExact({ midi, cents }) { return midi + cents / 100; }
+function fromExact(exact) {
+  const midi = Math.round(exact);
+  return { midi, cents: Math.round((exact - midi) * 100) };
+}
+
+class MovingAverage {
+  constructor(n) { this.n = n; this.buf = []; }
+  reset() { this.buf = []; }
+  push(reading) {
+    if (!reading) { this.buf = []; return null; }
+    this.buf.push(toExact(reading));
+    if (this.buf.length > this.n) this.buf.shift();
+    return fromExact(this.buf.reduce((a, b) => a + b, 0) / this.buf.length);
+  }
+}
+
+class MovingMedian {
+  constructor(n) { this.n = n; this.buf = []; }
+  reset() { this.buf = []; }
+  push(reading) {
+    if (!reading) { this.buf = []; return null; }
+    this.buf.push(toExact(reading));
+    if (this.buf.length > this.n) this.buf.shift();
+    return fromExact(median(this.buf));
+  }
+}
+
+/**
+ * Adaptive EMA on the exact MIDI continuum.
+ * tauSlow when |Δ¢| is small; tauFast when large. Alpha from frame dt and tau.
+ */
+class AdaptiveEma {
+  constructor(tauSlowMs, tauFastMs) {
+    this.tauSlowMs = tauSlowMs;
+    this.tauFastMs = tauFastMs;
+    this.y = null;
+    this.lastT = null;
+  }
+  reset() { this.y = null; this.lastT = null; }
+  push(reading, tMs) {
+    if (!reading) { this.y = null; this.lastT = null; return null; }
+    const x = toExact(reading);
+    if (this.y === null) { this.y = x; this.lastT = tMs; return fromExact(x); }
+    const dt = Math.max(1, tMs - (this.lastT ?? tMs));
+    this.lastT = tMs;
+    const deltaCents = Math.abs((x - this.y) * 100);
+    // Blend tau: 0¢ → slow, ≥25¢ → fast
+    const w = Math.min(1, deltaCents / 25);
+    const tau = this.tauSlowMs + (this.tauFastMs - this.tauSlowMs) * w;
+    const alpha = 1 - Math.exp(-dt / tau);
+    this.y = this.y + alpha * (x - this.y);
+    return fromExact(this.y);
+  }
+}
+
+/** Hold the displayed note name from a raw 2-frame steady lock; smooth only the cents needle. */
+class HoldName {
+  constructor(ema) {
+    this.ema = ema;
+    this.lastMidi = null;
+    this.steady = null;
+  }
+  reset() { this.ema.reset(); this.lastMidi = null; this.steady = null; }
+  push(reading, tMs) {
+    if (!reading) { this.reset(); return null; }
+    const locked = reading.midi === this.lastMidi ? reading : null;
+    this.lastMidi = reading.midi;
+    if (locked) this.steady = locked.midi;
+    const smoothed = this.ema.push(reading, tMs);
+    if (this.steady === null || !smoothed) return null;
+    // Keep the locked name; report cents relative to that name (may exceed ±50 on a bend toward the neighbour).
+    const exact = toExact(smoothed);
+    return { midi: this.steady, cents: Math.round((exact - this.steady) * 100) };
+  }
+}
+
+/** Production-style note start: two equal MIDI frames, then emit on change. */
+class TwoFrameNotes {
+  constructor() { this.last = null; this.current = null; this.starts = []; }
+  reset() { this.last = null; this.current = null; this.starts = []; }
+  push(reading, tMs) {
+    const midi = reading && reading.midi === this.last ? reading.midi : null;
+    this.last = reading ? reading.midi : null;
+    if (midi !== null && midi !== this.current) {
+      this.current = midi;
+      this.starts.push({ midi, tMs });
+      return midi;
+    }
+    if (midi === null && reading === null) this.current = null;
+    return null;
+  }
+}
+
+// --- YIN (mic path only; same idea as src/listen/pitch.ts) ---
+function rms(buf) {
+  let s = 0;
+  for (let i = 0; i < buf.length; i++) s += buf[i] * buf[i];
+  return Math.sqrt(s / buf.length);
+}
+function detectPitch(buf, sampleRate) {
+  if (rms(buf) < 0.01) return null;
+  const w = Math.floor(buf.length / 2);
+  const tauMin = Math.max(2, Math.floor(sampleRate / 1600));
+  const tauMax = Math.min(w - 1, Math.ceil(sampleRate / 55));
+  const d = new Float32Array(tauMax + 1);
+  for (let tau = 1; tau <= tauMax; tau++) {
+    let sum = 0;
+    for (let i = 0; i < w; i++) { const diff = buf[i] - buf[i + tau]; sum += diff * diff; }
+    d[tau] = sum;
+  }
+  const cmnd = new Float32Array(tauMax + 1);
+  cmnd[0] = 1;
+  let running = 0;
+  for (let tau = 1; tau <= tauMax; tau++) {
+    running += d[tau];
+    cmnd[tau] = running === 0 ? 1 : (d[tau] * tau) / running;
+  }
+  let tau = -1;
+  for (let t = tauMin; t <= tauMax; t++) {
+    if (cmnd[t] < 0.12) {
+      while (t + 1 <= tauMax && cmnd[t + 1] < cmnd[t]) t++;
+      tau = t;
+      break;
+    }
+  }
+  if (tau < 0) {
+    let best = tauMin;
+    for (let t = tauMin + 1; t <= tauMax; t++) if (cmnd[t] < cmnd[best]) best = t;
+    if (cmnd[best] > 0.35) return null;
+    tau = best;
+  }
+  const a = tau > 1 ? cmnd[tau - 1] : cmnd[tau];
+  const b = cmnd[tau];
+  const c = tau < tauMax ? cmnd[tau + 1] : cmnd[tau];
+  const denom = a + c - 2 * b;
+  const shift = denom !== 0 ? (a - c) / (2 * denom) : 0;
+  const period = tau + Math.max(-1, Math.min(1, shift));
+  const clarity = Math.max(0, Math.min(1, 1 - b));
+  if (clarity < 0.85) return null;
+  const hz = sampleRate / period;
+  const exact = 69 + 12 * Math.log2(hz / 440);
+  const midi = Math.round(exact);
+  return { midi, cents: Math.round((exact - midi) * 100) };
+}
+
+// --- Synthetic reading stream (~60 Hz), known truth + noise ---
+function synthReading(scenario, tMs, t0) {
+  const t = (tMs - t0) / 1000;
+  const A4 = 69;
+  let exact = A4;
+  if (scenario === 'steady') exact = A4;
+  else if (scenario === 'vibrato') exact = A4 + 0.15 * Math.sin(t * 2 * Math.PI * 5.5);
+  else if (scenario === 'bend') exact = A4 + 0.4 * Math.sin(t * 2 * Math.PI * 0.35);
+  else if (scenario === 'noise') exact = A4 + (Math.random() - 0.5) * 0.18 + 0.04 * Math.sin(t * 40);
+  else if (scenario === 'jump') exact = t < 1.2 ? A4 : A4 + 2;
+  else if (scenario === 'combo') {
+    exact = t < 1.5 ? A4 + 0.15 * Math.sin(t * 2 * Math.PI * 5.5) : A4 + 2 + 0.05 * Math.sin(t * 2 * Math.PI * 5.5);
+  }
+  // Quantise like YIN: integer cents, occasional ±1¢ jitter on top of the model
+  const midi = Math.round(exact);
+  let cents = Math.round((exact - midi) * 100);
+  if (scenario === 'noise' || scenario === 'vibrato') cents += Math.random() < 0.08 ? (Math.random() < 0.5 ? -2 : 2) : 0;
+  return { midi, cents: Math.max(-50, Math.min(50, cents)), truth: exact };
+}
+
+// --- UI ---
+const LANES = [
+  { id: 'today', title: 'A · Today', blurb: 'raw + 70 ms CSS', cssEase: true },
+  { id: 'ma', title: 'B · Moving avg', blurb: 'mean of last N' },
+  { id: 'med', title: 'C · Median', blurb: 'median of last N' },
+  { id: 'ema', title: 'D · Adaptive EMA', blurb: 'τ slows on wobble' },
+  { id: 'hold', title: 'E · Hold name', blurb: 'steady name + EMA ¢' },
+];
+
+const lanesEl = document.getElementById('lanes');
+const laneDom = {};
+for (const L of LANES) {
+  const el = document.createElement('div');
+  el.className = 'lane' + (L.cssEase ? ' today' : '');
+  el.dataset.zone = 'idle';
+  el.innerHTML = `
+    <div class="who">${L.title}<small>${L.blurb}</small></div>
+    <div class="scale">
+      <span class="band"></span>
+      ${[-50,-25,0,25,50].map((c) => `<span class="tick${c === 0 ? ' z' : ''}" style="left:${50 + c}%"></span>`).join('')}
+      <span class="needle" style="left:50%; display:none"></span>
+    </div>
+    <div class="name">—</div>
+    <div class="cents"></div>`;
+  lanesEl.appendChild(el);
+  laneDom[L.id] = {
+    el,
+    needle: el.querySelector('.needle'),
+    name: el.querySelector('.name'),
+    cents: el.querySelector('.cents'),
+  };
+}
+
+const params = {
+  n: 5,
+  tauSlow: 180,
+  tauFast: 35,
+  scenario: 'steady',
+  audible: false,
+};
+const history = { raw: [], ma: [], med: [], ema: [], max: 120 };
+
+let ma, med, ema, hold, practiceRaw, practiceSmooth;
+let t0 = performance.now();
+let audio = null; // { ctx, osc, gain } for audible synth
+let mic = null;   // { stop, analyser, buf, ctx }
+
+function rebuild() {
+  ma = new MovingAverage(params.n);
+  med = new MovingMedian(params.n);
+  ema = new AdaptiveEma(params.tauSlow, params.tauFast);
+  hold = new HoldName(new AdaptiveEma(params.tauSlow, params.tauFast));
+  practiceRaw = new TwoFrameNotes();
+  practiceSmooth = new TwoFrameNotes();
+  for (const k of Object.keys(history)) if (k !== 'max') history[k] = [];
+  t0 = performance.now();
+}
+
+function zoneOf(cents, has) {
+  if (!has) return 'idle';
+  const a = Math.abs(cents);
+  return a <= 5 ? 'in' : a <= 15 ? 'near' : 'off';
+}
+
+function paintLane(id, reading) {
+  const d = laneDom[id];
+  if (!reading) {
+    d.el.dataset.zone = 'idle';
+    d.needle.style.display = 'none';
+    d.name.textContent = '—';
+    d.cents.textContent = '';
+    return;
+  }
+  const cents = Math.max(-50, Math.min(50, reading.cents));
+  d.el.dataset.zone = zoneOf(reading.cents, true);
+  d.needle.style.display = '';
+  d.needle.style.left = `${50 + cents}%`;
+  const n = nameOf(reading.midi);
+  const m = /^(.*?)(-?\d+)$/.exec(n);
+  d.name.innerHTML = m ? `${m[1]}<sub>${m[2]}</sub>` : n;
+  d.cents.textContent = `${reading.cents > 0 ? '+' : ''}${reading.cents} ¢`;
+}
+
+function pushHist(key, reading) {
+  history[key].push(reading ? toExact(reading) : null);
+  if (history[key].length > history.max) history[key].shift();
+}
+
+function drawSpark() {
+  const c = document.getElementById('spark');
+  const g = c.getContext('2d');
+  const W = c.width, H = c.height;
+  g.fillStyle = '#1a1d24';
+  g.fillRect(0, 0, W, H);
+  // ±50¢ around A4 centre line
+  const yOf = (exact) => {
+    if (exact === null) return null;
+    const cents = (exact - 69) * 100;
+    return H / 2 - (cents / 50) * (H / 2 - 4);
+  };
+  g.strokeStyle = 'rgba(255,255,255,0.15)';
+  g.beginPath(); g.moveTo(0, H / 2); g.lineTo(W, H / 2); g.stroke();
+  const series = [
+    ['raw', '#888'],
+    ['ma', '#6ea8fe'],
+    ['med', '#c4a0fe'],
+    ['ema', '#5bd17a'],
+  ];
+  for (const [key, color] of series) {
+    const arr = history[key];
+    if (!arr.length) continue;
+    g.strokeStyle = color;
+    g.beginPath();
+    let started = false;
+    for (let i = 0; i < arr.length; i++) {
+      const y = yOf(arr[i]);
+      if (y === null) { started = false; continue; }
+      const x = (i / (history.max - 1)) * W;
+      if (!started) { g.moveTo(x, y); started = true; }
+      else g.lineTo(x, y);
+    }
+    g.stroke();
+  }
+}
+
+function formatStarts(tracker) {
+  const recent = tracker.starts.slice(-6);
+  if (!recent.length) return '(none yet)';
+  return recent.map((s) => nameOf(s.midi)).join(' → ');
+}
+
+function setState(raw, outs, truth) {
+  const lines = [
+    `scenario   ${params.scenario}`,
+    `N / τ      ${params.n}  /  ${params.tauSlow}→${params.tauFast} ms`,
+    `truth      ${truth !== undefined ? (truth - 69) * 100 : '—'} ¢ from A4`,
+    `raw        ${raw ? `${nameOf(raw.midi)} ${raw.cents > 0 ? '+' : ''}${raw.cents}¢` : '—'}`,
+    `mean       ${outs.ma ? `${nameOf(outs.ma.midi)} ${outs.ma.cents > 0 ? '+' : ''}${outs.ma.cents}¢` : '—'}`,
+    `median     ${outs.med ? `${nameOf(outs.med.midi)} ${outs.med.cents > 0 ? '+' : ''}${outs.med.cents}¢` : '—'}`,
+    `adapt EMA  ${outs.ema ? `${nameOf(outs.ema.midi)} ${outs.ema.cents > 0 ? '+' : ''}${outs.ema.cents}¢` : '—'}`,
+    `hold name  ${outs.hold ? `${nameOf(outs.hold.midi)} ${outs.hold.cents > 0 ? '+' : ''}${outs.hold.cents}¢` : '—'}`,
+  ];
+  document.getElementById('state').textContent = lines.join('\n');
+  document.getElementById('practice').innerHTML = `
+    <div><b>raw path:</b> ${formatStarts(practiceRaw)} <span style="color:#888">(held ${practiceRaw.current === null ? '—' : nameOf(practiceRaw.current)})</span></div>
+    <div><b>EMA path:</b> ${formatStarts(practiceSmooth)} <span style="color:#888">(held ${practiceSmooth.current === null ? '—' : nameOf(practiceSmooth.current)})</span></div>`;
+}
+
+async function ensureAudible(exactMidi) {
+  if (!params.audible) {
+    if (audio) { audio.osc.stop(); audio.ctx.close(); audio = null; }
+    return;
+  }
+  if (!audio) {
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    gain.gain.value = 0.08;
+    osc.type = 'sawtooth';
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    audio = { ctx, osc, gain };
+  }
+  if (audio.ctx.state === 'suspended') await audio.ctx.resume();
+  const hz = 440 * 2 ** ((exactMidi - 69) / 12);
+  audio.osc.frequency.setTargetAtTime(hz, audio.ctx.currentTime, 0.01);
+}
+
+async function startMic() {
+  stopMic();
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false },
+  });
+  const ctx = new AudioContext();
+  if (ctx.state === 'suspended') await ctx.resume();
+  const source = ctx.createMediaStreamSource(stream);
+  const analyser = ctx.createAnalyser();
+  analyser.fftSize = 2048;
+  source.connect(analyser);
+  const buf = new Float32Array(analyser.fftSize);
+  mic = {
+    ctx, analyser, buf,
+    stop() {
+      stream.getTracks().forEach((t) => t.stop());
+      void ctx.close();
+    },
+  };
+  document.getElementById('micBtn').classList.add('on');
+  params.scenario = 'mic';
+  document.getElementById('scenario').value = 'mic';
+  rebuild();
+}
+
+function stopMic() {
+  if (mic) { mic.stop(); mic = null; }
+  document.getElementById('micBtn').classList.remove('on');
+}
+
+function tick(now) {
+  let raw = null;
+  let truth;
+  if (params.scenario === 'mic' && mic) {
+    mic.analyser.getFloatTimeDomainData(mic.buf);
+    raw = detectPitch(mic.buf, mic.ctx.sampleRate);
+  } else if (params.scenario !== 'mic') {
+    const s = synthReading(params.scenario, now, t0);
+    truth = s.truth;
+    raw = { midi: s.midi, cents: s.cents };
+    void ensureAudible(s.truth);
+  }
+
+  const outMa = ma.push(raw);
+  const outMed = med.push(raw);
+  const outEma = ema.push(raw, now);
+  const outHold = hold.push(raw, now);
+
+  paintLane('today', raw);
+  paintLane('ma', outMa);
+  paintLane('med', outMed);
+  paintLane('ema', outEma);
+  paintLane('hold', outHold);
+
+  practiceRaw.push(raw, now);
+  practiceSmooth.push(outEma, now);
+
+  pushHist('raw', raw);
+  pushHist('ma', outMa);
+  pushHist('med', outMed);
+  pushHist('ema', outEma);
+  drawSpark();
+  setState(raw, { ma: outMa, med: outMed, ema: outEma, hold: outHold }, truth);
+
+  requestAnimationFrame(tick);
+}
+
+// controls
+document.getElementById('n').oninput = (e) => {
+  params.n = Number(e.target.value);
+  document.getElementById('nVal').textContent = String(params.n);
+  rebuild();
+};
+document.getElementById('tauSlow').oninput = (e) => {
+  params.tauSlow = Number(e.target.value);
+  document.getElementById('tauSlowVal').textContent = String(params.tauSlow);
+  rebuild();
+};
+document.getElementById('tauFast').oninput = (e) => {
+  params.tauFast = Number(e.target.value);
+  document.getElementById('tauFastVal').textContent = String(params.tauFast);
+  rebuild();
+};
+document.getElementById('scenario').onchange = (e) => {
+  params.scenario = e.target.value;
+  if (params.scenario === 'mic') startMic().catch((err) => alert(err.message || 'Mic failed'));
+  else { stopMic(); rebuild(); }
+};
+document.getElementById('audible').onclick = () => {
+  params.audible = !params.audible;
+  document.getElementById('audible').classList.toggle('on', params.audible);
+  if (!params.audible) void ensureAudible(69);
+};
+document.getElementById('micBtn').onclick = () => {
+  if (mic) { stopMic(); params.scenario = 'steady'; document.getElementById('scenario').value = 'steady'; rebuild(); }
+  else startMic().catch((err) => alert(err.message || 'Mic failed'));
+};
+
+rebuild();
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

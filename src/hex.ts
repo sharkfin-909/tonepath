@@ -286,7 +286,7 @@ export function dockHex(harmonies: SlotHarmony[], active: number, range: PitchRa
 }
 
 /** Degree colours, degrees 1–7 (SPEC §8.2, user theme). */
-export const DEGREE_COLOURS = ['#12EAEA', '#FFD52E', '#EC7C25', '#390099', '#9E0059', '#5BB561', '#7B4A26'];
+export const DEGREE_COLOURS = ['#12EAEA', '#FFD52E', '#EC7C25', '#390099', '#9E0059', '#2F6B38', '#7B4A26'];
 
 /** Dark or white lettering for a degree colour (relative luminance). */
 export function inkOn(colour: string): string {

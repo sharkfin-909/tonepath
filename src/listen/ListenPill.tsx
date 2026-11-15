@@ -20,9 +20,11 @@ export interface ListenPillProps {
   auto?: boolean;
   /** Where the big tuner goes (above the hex): rendered there while listening, so only it redraws every frame. */
   tunerSlot?: HTMLElement | null;
+  /** Concert MIDI of the instrument's practical low, or null for Concert — sets the analysis window (issues/064). */
+  concertLowMidi?: number | null;
 }
 
-export function ListenPill({ onHeard, nameOf, onNote, auto = false, tunerSlot = null }: ListenPillProps) {
+export function ListenPill({ onHeard, nameOf, onNote, auto = false, tunerSlot = null, concertLowMidi = null }: ListenPillProps) {
   const [on, setOn] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [frame, setFrame] = useState<{ midi: number | null; cents: number; level: number }>({ midi: null, cents: 0, level: 0 });
@@ -60,14 +62,17 @@ export function ListenPill({ onHeard, nameOf, onNote, auto = false, tunerSlot = 
     }
     setError(null);
     try {
-      listening.current = await startListening((h) => {
-        setFrame({ midi: h.midi, cents: h.cents, level: h.level });
-        if (h.noteStart !== null) noted.current?.(h.noteStart);
-        if (h.midi !== lastMidi.current) {
-          lastMidi.current = h.midi;
-          report.current(h.midi);
-        }
-      }, gainDb);
+      listening.current = await startListening(
+        (h) => {
+          setFrame({ midi: h.midi, cents: h.cents, level: h.level });
+          if (h.noteStart !== null) noted.current?.(h.noteStart);
+          if (h.midi !== lastMidi.current) {
+            lastMidi.current = h.midi;
+            report.current(h.midi);
+          }
+        },
+        { gainDb, concertLowMidi },
+      );
       setOn(true);
       return true;
     } catch (err) {
@@ -87,6 +92,11 @@ export function ListenPill({ onHeard, nameOf, onNote, auto = false, tunerSlot = 
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reacts to Practice starting / ending
   }, [auto]);
+
+  // Retune YIN's window when the instrument changes while listening (issues/064).
+  useEffect(() => {
+    listening.current?.setConcertLowMidi(concertLowMidi);
+  }, [concertLowMidi]);
 
   const meter = meterPosition(frame.level); // dB scale
   const mark = meterPosition(ONSET_GATE); // where a note starts to count
@@ -130,12 +140,13 @@ export function ListenPill({ onHeard, nameOf, onNote, auto = false, tunerSlot = 
 }
 
 /**
- * The big tuner above the hex (SPEC §9.2): the note name and octave, the cents off, and a needle on a ±50 ¢ scale —
- * green within ±5 ¢, amber within ±15 ¢, red beyond. A dash when nothing clear is heard.
+ * The big tuner above the hex (SPEC §9.2): the note name and octave, a ±50 ¢ scale, the cents off.
+ * In tune (±10 ¢): the green band glows and the needle hides. Needle only in amber (±15 ¢) or red.
  */
 function Tuner({ name, cents }: { name: string | null; cents: number }) {
-  const zone = name === null ? 'idle' : Math.abs(cents) <= 5 ? 'in' : Math.abs(cents) <= 15 ? 'near' : 'off';
+  const zone = name === null ? 'idle' : Math.abs(cents) <= 10 ? 'in' : Math.abs(cents) <= 15 ? 'near' : 'off';
   const m = /^(.*?)(-?\d+)$/.exec(name ?? '');
+  const showNeedle = zone === 'near' || zone === 'off';
   return (
     <div className="tuner" data-zone={zone} role="status" aria-label={name === null ? 'Tuner: no note' : `Tuner: ${name}, ${cents} cents`}>
       <div className="tuner-note">
@@ -147,9 +158,9 @@ function Tuner({ name, cents }: { name: string | null; cents: number }) {
           <span key={c} className={c === 0 ? 'tuner-tick zero' : 'tuner-tick'} style={{ left: `${50 + c}%` }} />
         ))}
         <span className="tuner-band" />
-        {name !== null && <span className="tuner-needle" style={{ left: `${50 + Math.max(-50, Math.min(50, cents))}%` }} />}
+        {showNeedle && <span className="tuner-needle" style={{ left: `${50 + Math.max(-50, Math.min(50, cents))}%` }} />}
       </div>
-      <div className="tuner-cents">{name === null ? '' : `${cents > 0 ? '+' : ''}${cents} ¢`}</div>
+      <div className="tuner-cents">{name === null || zone === 'in' ? '' : `${cents > 0 ? '+' : ''}${cents} ¢`}</div>
     </div>
   );
 }

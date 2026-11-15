@@ -29,14 +29,24 @@ resolved into a decision a build slice can be cut from.
 
 ## Decisions so far
 
-<!-- one line per closed ticket: - [title](file) — gist -->
+- [Steadier tuner needle](062-steadier-tuner-needle.md) — adaptive EMA needle (τ ~180→35 ms, display-only); hold
+  locked MIDI through unlocks for tuner *and* Practice; clear after ~150 ms silence; Practice never uses EMA
+- [Analysis in an AudioWorklet](063-analysis-in-an-audioworklet.md) — stay on rAF + AnalyserNode; window length
+  dominates latency; revisit only for timed Practice or after adaptive windows
+- [Analysis window by register](064-analysis-window-by-register.md) — fftSize + minHz from instrument concert
+  low (512…4096); Concert stays 2048/55 Hz; no dual/last-pitch windows yet
+- [Echo guard with speakers](065-echo-guard-with-speakers.md) — keep 250 ms deaf + ±octave while ringing; Silent
+  false-counts at the same rate → not echo leakage ([Baseline false counts](067-baseline-false-counts.md))
 
 ## Not yet specified
 
+- **[Practice feedback](066-practice-feedback.md)** — **shelved** while Listen audio fixes ship; resume after
+  [Baseline false counts](067-baseline-false-counts.md) (a scorecard would poison on false counts).
 - **Practice beyond the five rules**: a timed / BPM mode (the form moves on the beat and Practice scores what you
-  played against it) — depends on how responsive detection becomes ([Analysis in an AudioWorklet](063-analysis-in-an-audioworklet.md)).
+  played against it) — hangs on detection responsiveness in general (adaptive windows first; worklet only if
+  audio-clock lock under load becomes necessary).
 - **Instrument-specific tuning of the detector** (thresholds, clarity cut-off, octave-error guards per instrument
-  family) — only worth specifying once real-instrument findings exist.
+  family) — after [Baseline false counts](067-baseline-false-counts.md); still needs real-instrument HITL per family.
 
 ## Out of scope
 

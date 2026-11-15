@@ -14,6 +14,7 @@
   --note-name: #1d1b19; /* note names in the grid (with a white glow) */
   --grid-glow: #f5e9b0; /* the glow around the honeycomb */
   --grid-glow-opacity: 0.65;
+  --hex-trigger: #3dff7a; /* heard / flashed / hovered pitch: cells + out-of-scale border buttons */
   /* Inner glow round the header and the hex panel: the grid glow's colour, softer. */
   --panel-glow: inset 0 0 28px color-mix(in srgb, var(--grid-glow) 38%, transparent);
   --line: #1d1b19;
@@ -216,8 +217,19 @@ body,
   opacity: 1;
   pointer-events: auto;
 }
-.hex-acc:hover circle {
-  stroke: #ffffff;
+.hex-acc.lit {
+  /* Out-of-scale pitch heard / flashed: force visible even without hover. */
+  opacity: 1;
+  pointer-events: auto;
+}
+.hex-acc-lit {
+  fill: none;
+  stroke: var(--hex-trigger);
+  stroke-width: 3;
+  pointer-events: none;
+}
+.hex-acc:hover circle:not(.hex-acc-lit) {
+  stroke: var(--hex-trigger);
   stroke-width: 2;
 }
 @media (hover: none) {
@@ -227,10 +239,10 @@ body,
   }
 }
 
-/* Every cell with the hovered / clicked pitch: a white glow inside its edge (DockedHex: blurred, clipped). */
+/* Every cell with the hovered / clicked / heard pitch: bright green glow inside its edge. */
 .hex-lit {
   fill: none;
-  stroke: #ffffff;
+  stroke: var(--hex-trigger);
   pointer-events: none;
 }
 
@@ -1902,14 +1914,19 @@ textarea {
   background: rgba(255, 255, 255, 0.25);
 }
 .tuner-band {
-  /* ±5 ¢: in tune */
+  /* ±10 ¢: in tune — quiet until locked, then glows instead of a centred needle */
   position: absolute;
-  left: 45%;
-  width: 10%;
+  left: 40%;
+  width: 20%;
   top: 4px;
   bottom: 4px;
   border-radius: 4px;
   background: rgba(91, 209, 122, 0.22);
+  transition: background 120ms ease, box-shadow 120ms ease;
+}
+.tuner[data-zone='in'] .tuner-band {
+  background: rgba(91, 209, 122, 0.55);
+  box-shadow: 0 0 14px 2px rgba(91, 209, 122, 0.85), inset 0 0 8px rgba(91, 209, 122, 0.5);
 }
 .tuner-tick {
   position: absolute;
@@ -1934,7 +1951,8 @@ textarea {
   border-radius: 2px;
   background: var(--zone);
   box-shadow: 0 0 8px var(--zone);
-  transition: left 70ms linear, background 120ms ease;
+  /* Needle position is smoothed in JS (adaptive EMA); only the colour eases. */
+  transition: background 120ms ease;
 }
 .tuner-cents {
   min-width: 56px;

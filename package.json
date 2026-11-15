@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "proto:tuner": "python3 -m http.server 8765 --directory prototypes"
   },
   "dependencies": {
     "@tonaljs/interval": "^5.1.1",

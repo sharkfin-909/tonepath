@@ -4,6 +4,9 @@
 // - OnsetDetector: a note start = the level jumping well above its recent average, past a noise gate, with a lockout
 //   so one note isn't counted twice. Re-attacking the same pitch counts; a held note doesn't.
 // - NoteTracker: played notes from those readings — an attack, or a slur to a new pitch (what Practice counts).
+// - SteadyHold: two equal MIDI frames to lock, then hold through brief unlocks; clear after real silence.
+// - AdaptiveEma: display-only cents needle smoother (fast on big Δ¢, slow on wobble).
+// - analysisWindow: fftSize + minHz from the instrument's concert low (or Concert defaults).
 // No Web Audio here: everything takes samples, so it is tested with synthetic tones.
 
 export interface Pitch {
@@ -96,6 +99,109 @@ export function hzToNote(hz: number): { midi: number; cents: number } {
   const exact = 69 + 12 * Math.log2(hz / 440);
   const midi = Math.round(exact);
   return { midi, cents: Math.round((exact - midi) * 100) };
+}
+
+/** Concert frequency of a MIDI note (A4 = 440). */
+export function midiToHz(midi: number): number {
+  return 440 * 2 ** ((midi - 69) / 12);
+}
+
+/** Exact MIDI float from a note+cents reading. */
+export function toExact(midi: number, cents: number): number {
+  return midi + cents / 100;
+}
+
+/** Allowed AnalyserNode fftSizes for Listen (issues/064). */
+const FFT_SIZES = [512, 1024, 2048, 4096] as const;
+
+/**
+ * Analysis window for an instrument: smallest fftSize whose half-window covers one period at `concertLowMidi`,
+ * or Concert defaults (2048 / 55 Hz) when `concertLowMidi` is null.
+ */
+export function analysisWindow(
+  sampleRate: number,
+  concertLowMidi: number | null,
+): { fftSize: (typeof FFT_SIZES)[number]; minHz: number } {
+  const minHz = concertLowMidi === null ? 55 : midiToHz(concertLowMidi);
+  const need = Math.ceil(sampleRate / minHz);
+  let fftSize: (typeof FFT_SIZES)[number] = 4096;
+  for (const n of FFT_SIZES) {
+    if (n / 2 >= need) {
+      fftSize = n;
+      break;
+    }
+  }
+  return { fftSize, minHz };
+}
+
+/** Clear the held note after this long with no clear pitch (issues/062). */
+export const HOLD_RELEASE_MS = 150;
+
+/**
+ * Two-frame MIDI lock, then hold through brief unlocks (tuner + Practice). Clears only after `releaseMs` of
+ * no clear pitch — so the display doesn't flash through "—" and Practice doesn't see false silence.
+ */
+export class SteadyHold {
+  private lastRaw: number | null = null;
+  private held: number | null = null;
+  private silentSince = -Infinity;
+
+  constructor(private readonly releaseMs = HOLD_RELEASE_MS) {}
+
+  /** The MIDI to publish this frame (null = nothing held). */
+  push(reading: { midi: number } | null, timeMs: number): number | null {
+    const locked = reading && reading.midi === this.lastRaw ? reading.midi : null;
+    this.lastRaw = reading ? reading.midi : null;
+    if (!reading) {
+      if (this.silentSince === -Infinity) this.silentSince = timeMs;
+      if (timeMs - this.silentSince >= this.releaseMs) this.held = null;
+      return this.held;
+    }
+    this.silentSince = -Infinity;
+    if (locked !== null) this.held = locked;
+    return this.held;
+  }
+}
+
+/** Adaptive-EMA time constants for the tuner needle (issues/062). */
+export const EMA_TAU_SLOW_MS = 180;
+export const EMA_TAU_FAST_MS = 35;
+
+/**
+ * Display-only smoother on the exact-MIDI continuum: τ slows when |Δ¢| is small, speeds up toward `tauFastMs`
+ * when the change is large (≥ ~25 ¢). Freezes across gaps; reset when the held note clears.
+ */
+export class AdaptiveEma {
+  private y: number | null = null;
+  private lastT: number | null = null;
+
+  constructor(
+    private readonly tauSlowMs = EMA_TAU_SLOW_MS,
+    private readonly tauFastMs = EMA_TAU_FAST_MS,
+  ) {}
+
+  reset(): void {
+    this.y = null;
+    this.lastT = null;
+  }
+
+  /** Smoothed exact MIDI, or null if never fed. `exact` null = freeze. */
+  push(exact: number | null, timeMs: number): number | null {
+    if (exact === null) return this.y;
+    if (this.y === null) {
+      this.y = exact;
+      this.lastT = timeMs;
+      return exact;
+    }
+    const dt = Math.max(1, timeMs - (this.lastT ?? timeMs));
+    this.lastT = timeMs;
+    const deltaCents = Math.abs((exact - this.y) * 100);
+    const w = Math.min(1, deltaCents / 25);
+    const tau = this.tauSlowMs + (this.tauFastMs - this.tauSlowMs) * w;
+    const alpha = 1 - Math.exp(-dt / tau);
+    this.y += alpha * (exact - this.y);
+    return this.y;
+  }
 }
 
 export interface OnsetOptions {

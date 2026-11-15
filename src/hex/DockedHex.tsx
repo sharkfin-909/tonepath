@@ -55,7 +55,7 @@ export interface DockedHexProps {
   onLabelClick?: () => void;
   /** The playable written pitch under the pointer (a cell or a border button), or null: what A would pick (Space clicks it). */
   onHoverPitch?: (written: number | null) => void;
-  /** Listen (SPEC §9.2): the written pitch the mic hears; its cells light. */
+  /** Listen (SPEC §9.2): the written pitch the mic hears; its cells light, or its border button if out of scale. */
   heard?: number | null;
   /** Practice (SPEC §3.7): what moves the form on — pitch classes (written) or Follow's exact next note. Ringed. */
   targets?: { pcs: Set<number> | null; midi: number | null } | null;
@@ -203,21 +203,26 @@ export function DockedHex({ dock, onPick, halo, onLabelClick, onHoverPitch, hear
           {/* Chromatic entry (suspensions, anticipations): on the border between two cells of a row, the pitch(es)
               between those steps. Drawn above every cell, as a button overlaps both. */}
           {pick &&
-            layout.buttons.map(({ border, button, i, cx, cy }) => (
-              <BorderButtonView
-                key={buttonKey(border, i)}
-                cx={cx}
-                cy={cy}
-                R={layout.size.rx}
-                glyph={button.glyph}
-                label={prettyName(button.name)}
-                shown={shown(border)}
-                onClick={() => pick(button.midi, buttonKey(border, i))}
-                pop={popOf(buttonKey(border, i))}
-                onEnter={() => setHover({ kind: 'border', r: border.r, x: border.x, i })}
-                onLeave={() => setHover(null)}
-              />
-            ))}
+            layout.buttons.map(({ border, button, i, cx, cy }) => {
+              // Out-of-scale pitches live on borders, not cells — light the button when heard / flashed / hovered.
+              const lit = button.midi === heard || button.midi === flash || button.midi === hoverMidi;
+              return (
+                <BorderButtonView
+                  key={buttonKey(border, i)}
+                  cx={cx}
+                  cy={cy}
+                  R={layout.size.rx}
+                  glyph={button.glyph}
+                  label={prettyName(button.name)}
+                  shown={shown(border) || lit}
+                  lit={lit}
+                  onClick={() => pick(button.midi, buttonKey(border, i))}
+                  pop={popOf(buttonKey(border, i))}
+                  onEnter={() => setHover({ kind: 'border', r: border.r, x: border.x, i })}
+                  onLeave={() => setHover(null)}
+                />
+              );
+            })}
         </svg>
       )}
       {label &&
@@ -377,6 +382,8 @@ interface BorderButtonProps {
   label: string;
   /** Next to the hovered cell, or hovered itself (always on touch screens: CSS). */
   shown: boolean;
+  /** Heard / flashed / hovered out-of-scale pitch: glow like a lit cell. */
+  lit: boolean;
   onClick: () => void;
   onEnter: () => void;
   onLeave: () => void;
@@ -384,11 +391,13 @@ interface BorderButtonProps {
   pop: number;
 }
 
-function BorderButtonView({ cx, cy, R, glyph, label, shown, onClick, onEnter, onLeave, pop }: BorderButtonProps) {
+function BorderButtonView({ cx, cy, R, glyph, label, shown, lit, onClick, onEnter, onLeave, pop }: BorderButtonProps) {
   const r = R * T.accidentalButton;
+  const cls = ['hex-acc', shown && 'shown', lit && 'lit'].filter(Boolean).join(' ');
   return (
-    <g className={shown ? 'hex-acc shown' : 'hex-acc'} role="button" aria-label={label} onClick={onClick} onMouseEnter={onEnter} onMouseLeave={onLeave}>
+    <g className={cls} role="button" aria-label={label} onClick={onClick} onMouseEnter={onEnter} onMouseLeave={onLeave}>
       <g key={pop} className={pop > 0 ? 'hex-pop' : undefined}>
+        {lit && <circle cx={cx} cy={cy} r={r + Math.max(2, r * 0.35)} className="hex-acc-lit" filter="url(#hex-lit-blur)" />}
         <circle cx={cx} cy={cy} r={r} fill="url(#hex-note-sphere)" filter="url(#hex-note-shadow)" />
         <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central" fontSize={Math.max(10, r * 1.45)} fontWeight={700} className="hex-ball-ink">
           {glyph}

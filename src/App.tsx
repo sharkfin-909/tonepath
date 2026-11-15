@@ -535,7 +535,14 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
           >
             Grid
           </button>}
-          <ListenPill onHeard={setHeardConcert} nameOf={(m) => view.name(m, active)} onNote={onPracticeNote} auto={session.practice} tunerSlot={tunerSlot} />
+          <ListenPill
+            onHeard={setHeardConcert}
+            nameOf={(m) => view.name(m, active)}
+            onNote={onPracticeNote}
+            auto={session.practice}
+            tunerSlot={tunerSlot}
+            concertLowMidi={view.inst.range ? view.toConcert(view.inst.range.lo) : null}
+          />
           {linear && (
             <div className="octave-switch" role="group" aria-label="Octave">
               <button type="button" className="octave-step" aria-label="Octave down" title="Octave down" disabled={octave <= octaves.min} onClick={() => setOctave(octave - 12)}>

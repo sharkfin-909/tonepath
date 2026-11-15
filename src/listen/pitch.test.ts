@@ -1,6 +1,19 @@
 // Pitch and onset detection on synthetic signals (SPEC §9.2, prototype).
 import { describe, expect, it } from 'vitest';
-import { NoteTracker, ONSET_GATE, OnsetDetector, detectPitch, hzToNote, meterPosition, rms } from './pitch';
+import {
+  AdaptiveEma,
+  HOLD_RELEASE_MS,
+  NoteTracker,
+  ONSET_GATE,
+  OnsetDetector,
+  SteadyHold,
+  analysisWindow,
+  detectPitch,
+  hzToNote,
+  meterPosition,
+  midiToHz,
+  rms,
+} from './pitch';
 
 const SR = 48000;
 const N = 2048;
@@ -96,5 +109,52 @@ describe('level meter', () => {
   it('dB scale: −60 dBFS → 0, 0 dBFS → 1; the onset gate sits about 40% along', () => {
     expect([meterPosition(0), meterPosition(0.001), meterPosition(1), meterPosition(2)]).toEqual([0, 0, 1, 1]);
     expect(meterPosition(ONSET_GATE)).toBeCloseTo(0.39, 2);
+  });
+});
+
+describe('SteadyHold', () => {
+  it('needs two equal frames to lock; holds through a brief unlock; clears after silence', () => {
+    const h = new SteadyHold();
+    expect(h.push({ midi: 69 }, 0)).toBeNull();
+    expect(h.push({ midi: 69 }, 16)).toBe(69);
+    expect(h.push({ midi: 70 }, 32)).toBe(69); // unlock: still holding A4
+    expect(h.push({ midi: 70 }, 48)).toBe(70); // new lock
+    expect(h.push(null, 64)).toBe(70);
+    expect(h.push(null, 64 + HOLD_RELEASE_MS - 1)).toBe(70);
+    expect(h.push(null, 64 + HOLD_RELEASE_MS)).toBeNull();
+  });
+});
+
+describe('AdaptiveEma', () => {
+  it('tracks a jump faster than a small wobble', () => {
+    const slow = new AdaptiveEma(180, 35);
+    const fast = new AdaptiveEma(180, 35);
+    slow.push(69, 0);
+    fast.push(69, 0);
+    // 16 ms later: ±2 ¢ wobble vs +50 ¢ jump
+    const afterWobble = slow.push(69.02, 16)!;
+    const afterJump = fast.push(69.5, 16)!;
+    expect(Math.abs(afterWobble - 69)).toBeLessThan(Math.abs(afterJump - 69));
+    expect(afterJump).toBeGreaterThan(69.1);
+  });
+
+  it('freezes across a gap and resets', () => {
+    const e = new AdaptiveEma();
+    expect(e.push(69, 0)).toBe(69);
+    expect(e.push(null, 16)).toBe(69);
+    e.reset();
+    expect(e.push(null, 32)).toBeNull();
+  });
+});
+
+describe('analysisWindow', () => {
+  const SR = 48000;
+  it('Concert defaults to 2048 / 55 Hz; bass needs 4096; flute can use 512', () => {
+    expect(analysisWindow(SR, null)).toEqual({ fftSize: 2048, minHz: 55 });
+    const bass = analysisWindow(SR, 28); // E1
+    expect(bass.fftSize).toBe(4096);
+    expect(bass.minHz).toBeCloseTo(midiToHz(28), 5);
+    const flute = analysisWindow(SR, 60); // C4
+    expect(flute.fftSize).toBe(512);
   });
 });
