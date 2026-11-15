@@ -21,6 +21,8 @@ export interface KeyContext {
   selection: { from: number } | null;
   /** The written pitch A would pick: the hovered hex cell or ♯ / ♭ button, if playable. */
   hovered: number | null;
+  /** Practice (SPEC §3.7): Play with the mic; keys 1–5 still choose the note length (it sets the note count). */
+  practice?: boolean;
 }
 
 export interface KeyResult {
@@ -63,7 +65,7 @@ export function keyIntent(e: KeyPress, ctx: KeyContext): KeyResult {
   if (plain && e.key === '\\') return handled({ type: 'stand', on: 'toggle' });
 
   if (ctx.mode === 'stand') {
-    // Stand: only M, Space = click (and \ above). Nothing is editable.
+    // Read (`stand`): only M, Space = click (and \ above). Nothing is editable.
     if (plain && (e.key === 'm' || e.key === 'M')) return handled({ type: 'toggle-mute' });
     if (plain && e.key === ' ' && !e.shiftKey) return e.repeat ? handled() : CLICK;
     if (plain && (e.key === ' ' || e.key.startsWith('Arrow') || e.key === 'Backspace')) return handled();
@@ -79,6 +81,8 @@ export function keyIntent(e: KeyPress, ctx: KeyContext): KeyResult {
     const r = shared(e, ctx);
     if (r) return r;
     if (e.key.startsWith('Arrow') || e.key === 'Backspace' || e.key === 'Delete') return handled();
+    const d = ctx.practice && !e.shiftKey ? LENGTHS[Number(e.key) - 1] : undefined;
+    if (d && e.key.length === 1) return handled({ type: 'length', d });
     return NONE;
   }
 

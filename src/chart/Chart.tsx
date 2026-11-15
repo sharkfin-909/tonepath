@@ -40,9 +40,11 @@ export interface ChartProps {
   onBarAction: (bar: number, action: BarAction) => void;
   onAppendBar: () => void;
   canPaste: boolean;
+  /** Practice, Follow the etude (SPEC §3.7): show the written melody in Play after all, the notes already played green. */
+  follow?: { played: ReadonlySet<number> } | null;
   /** Play mode (SPEC §3.3): the current slot. The caret, bar handles and "+" are hidden; chords and scales stay editable. */
   playIndex?: number | null;
-  /** Stand mode (SPEC §3.4): read-only, nothing highlighted or clickable, fit the page with no zoom floor. */
+  /** Read mode (SPEC §3.4; `stand` in code): read-only, nothing highlighted or clickable, fit the page with no zoom floor. */
   stand?: boolean;
   /**
    * Height budget (rendered px) to fit the rows into, when the chart's own area sizes to its content (the chart
@@ -79,9 +81,9 @@ function useParentSize<T extends HTMLElement>() {
   return [ref, size] as const;
 }
 
-export function Chart({ progression, view, caret, onSlotClick, onEventClick, onTimeClick, onChordCommit, onScaleChange, editRequest, selection, onBarSelect, onBarAction, onAppendBar, canPaste, playIndex = null, stand = false, maxHeight }: ChartProps) {
+export function Chart({ progression, view, caret, onSlotClick, onEventClick, onTimeClick, onChordCommit, onScaleChange, editRequest, selection, onBarSelect, onBarAction, onAppendBar, canPaste, playIndex = null, stand = false, maxHeight, follow = null }: ChartProps) {
   const playing = playIndex !== null;
-  /** Play and Stand both hide the caret, bar handles and "+" (Play keeps chord and scale entry). */
+  /** Play and Read both hide the caret, bar handles and "+" (Play keeps chord and scale entry). */
   const readOnly = playing || stand;
   const { bars, barsPerRow } = progression;
   const [fitRef, area] = useParentSize<HTMLDivElement>();
@@ -162,6 +164,7 @@ export function Chart({ progression, view, caret, onSlotClick, onEventClick, onT
               melody={progression.melody}
               caret={!readOnly && slot.index === activeSlot ? caret : undefined}
               playing={playing}
+              follow={follow}
               onEventClick={stand ? undefined : onEventClick}
               onTimeClick={stand ? undefined : onTimeClick}
               span={2 / bars[slot.bar].length}
@@ -214,6 +217,7 @@ interface SlotViewProps {
   caret?: number;
   /** Play mode: the active slot gets the solid "current slot" highlight. */
   playing: boolean;
+  follow: { played: ReadonlySet<number> } | null;
   onEventClick?: (e: TimedEvent) => void;
   onTimeClick?: (t: number) => void;
   span: number;
@@ -238,13 +242,13 @@ interface SlotViewProps {
 
 const NO_EVENTS: TimedEvent[] = [];
 
-function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing, onEventClick, onTimeClick, span, layout, header, barTools, inSelection, onAppend, showTimeSignature, editing, error, usedChords, onEdit, onCommit, onScaleChange }: SlotViewProps) {
+function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing, follow, onEventClick, onTimeClick, span, layout, header, barTools, inSelection, onAppend, showTimeSignature, editing, error, usedChords, onEdit, onCommit, onScaleChange }: SlotViewProps) {
   // Everything shown runs against the written chord; the stored melody stays concert (SPEC §5.3, §10).
   const { chord, harmony } = slot;
   const spell = (midi: number) => view.name(midi, slot);
   const [ref, width] = useWidth<HTMLDivElement>();
   const { staffTop, staffBottom } = staveMetrics();
-  // Unparseable time signatures are shown in the rail as typed; the stave shows (and beams by) the layout meter.
+  // Unparseable time signatures are shown in the header as typed; the stave shows (and beams by) the layout meter.
   const meter = showTimeSignature ? layout : undefined;
   /** Marks against this (owning) slot's written harmony (SPEC §7.2). */
   const markOf = (e: TimedEvent) => ('pitch' in e.ev ? view.mark(e.ev.pitch, slot) : null);
@@ -281,7 +285,9 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
           clef={clef}
           start={slot.start}
           end={slot.end}
-          events={playing ? NO_EVENTS : eventsForSlot(melody, slot)} // Play: an empty stave to play over (SPEC §3.3)
+          // Play: an empty stave to play over (SPEC §3.3) — unless Practice follows the etude (§3.7).
+          events={playing && !follow ? NO_EVENTS : eventsForSlot(melody, slot)}
+          played={follow?.played}
           spell={spell}
           caret={caret}
           onEventClick={onEventClick}

@@ -1,4 +1,5 @@
-// Pure `hexLayout` module: where everything on the docked hex sits for a dock size (cells, border buttons), computed once — and the **travel plan** for a slot change: how far the degree pattern slides (SPEC §8.2).
+// Pure `hexLayout` module: where everything on the docked hex sits for a dock size (cells, border buttons),
+// computed once — and the **travel plan** for a slot change: how far the degree pattern slides (SPEC §8.2).
 // DockedHex renders the layout and plays the plan; it does no geometry of its own.
 
 import { cellCentre, hexSize, type BorderButton, type DockHex, type HexBorder, type HexCell, type HexSize, type SlotHex } from './hex';

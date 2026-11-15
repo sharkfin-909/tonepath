@@ -32,7 +32,7 @@ export function duplicateProgression(storage: Storage, p: StoredProgression, mak
   return addProgression(storage, { ...data, title: `${p.title} (copy)` }, makeId, now);
 }
 
-/** Rename from the library (same rules as the rail: trimmed, blank → "Untitled"). */
+/** Rename from the library (same rules as the header title: trimmed, blank → "Untitled"). */
 export function renameProgression(storage: Storage, p: StoredProgression, title: string, now = new Date()): StoredProgression {
   const next = setTitle(p, title);
   return next === p ? p : saveProgression(storage, { ...p, ...next }, now);

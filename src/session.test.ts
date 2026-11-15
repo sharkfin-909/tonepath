@@ -141,8 +141,33 @@ describe('Write: stepwise playback (` / ~)', () => {
   });
 });
 
+describe('Practice (SPEC §3.7)', () => {
+  it('is Play with the mic: entering, switching with Play, and leaving', () => {
+    const r = run([{ type: 'mode', mode: 'practice' }]);
+    expect(r.state).toMatchObject({ playIndex: 0, practice: true });
+    expect(run([{ type: 'mode', mode: 'practice' }, { type: 'mode', mode: 'play' }]).state).toMatchObject({ playIndex: 0, practice: false });
+    expect(run([{ type: 'mode', mode: 'practice' }, { type: 'mode', mode: 'write' }]).state).toMatchObject({ playIndex: null, practice: false });
+  });
+  it('On arrival sounds when the form moves on, and as a cue on entering Practice', () => {
+    const r = run([{ type: 'mode', mode: 'practice' }, { type: 'practice-advance', index: 1, landed: true }], { onArrival: 'bass-chord' });
+    expect(r.per.map(show)).toEqual([['chord D', 'bass D'], ['chord G', 'bass G']]);
+    expect(r.state.arrival).toBeNull(); // landed on the next chord: it sounded with that note
+  });
+
+  it('finishing a slot (note count, Follow): the arrival waits for the next note played — the new slot\'s first', () => {
+    const r = run([{ type: 'mode', mode: 'practice' }, { type: 'practice-advance', index: 1, landed: false }, { type: 'practice-note' }, { type: 'practice-note' }], { onArrival: 'chord' });
+    expect(r.per.map(show)).toEqual([['chord D'], [], ['chord G'], []]); // silent on the finishing note; then with the next
+  });
+
+  it('the mic moves the form on; a length choice there never inserts a rest', () => {
+    const r = run([{ type: 'mode', mode: 'practice' }, { type: 'practice-advance', index: 2, landed: true }, { type: 'toggle-rest' }, { type: 'length', d: 'e' }]);
+    expect(r.state).toMatchObject({ playIndex: 2, length: 'e' });
+    expect(r.p.melody).toEqual([]);
+  });
+});
+
 describe('browsing in Write', () => {
-  it('‹ › move the caret to the slot start, wrapping', () => {
+  it('< > move the caret to the slot start, wrapping', () => {
     expect(run([{ type: 'browse', dir: -1 }]).state.caret).toBe(3 * W);
     expect(run([{ type: 'browse', dir: 1 }]).state.caret).toBe(W);
   });

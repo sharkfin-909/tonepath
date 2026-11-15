@@ -1,9 +1,9 @@
 // Pure `view` module: the **Instrument view** (SPEC §5.3, §10) of a progression, computed once.
-// Stored chords and melody are concert; everything shown (chord labels, hex, spelling, marks, readout) is written
+// Stored chords and melody are concert; everything shown (chord labels, hex, spelling, marks) is written
 // pitch for the instrument. Callers read slots from here and never transpose themselves.
 
 import { layoutMeter, slotAt, slotsOf, type FormSlot, type Meter } from './form';
-import { scaleLabel, slotHarmony, type SlotHarmony } from './harmony';
+import { slotHarmony, type SlotHarmony } from './harmony';
 import { keyChords, type KeyChord } from './key';
 import { dockHex, type DockHex, type HexShape, type PitchRange } from './hex';
 import { clefOf, hexRange, instrumentOf, toConcert, toWritten, writtenChord, type Clef, type Instrument } from './instruments';
@@ -22,8 +22,6 @@ export interface ViewSlot extends FormSlot {
   /** Concert harmony: drives sound (SPEC §9). */
   concert: SlotHarmony;
   spelling: SlotSpelling;
-  /** Readout scale text: `D Dorian`, `no scale fits`, or `—` without a chord. */
-  scaleText: string;
 }
 
 export interface InstrumentView {
@@ -52,7 +50,6 @@ export interface InstrumentView {
   dock: (index: number, shape?: HexShape) => DockHex;
 }
 
-const scaleText = (h: SlotHarmony) => (h.kind !== 'chord' ? '—' : h.scale ? scaleLabel(h.root, h.scale) : 'no scale fits');
 
 export function instrumentView(p: Progression): InstrumentView {
   const inst = instrumentOf(p.instrument);
@@ -62,7 +59,7 @@ export function instrumentView(p: Progression): InstrumentView {
     const data = p.bars[s.bar][s.part];
     const chord = writtenChord(data.chord, inst);
     const harmony = slotHarmony({ ...data, chord });
-    return { ...s, data, chord, harmony, concert: slotHarmony(data), spelling: slotSpelling(harmony), scaleText: scaleText(harmony) };
+    return { ...s, data, chord, harmony, concert: slotHarmony(data), spelling: slotSpelling(harmony) };
   });
   const end = formEnd(slots);
   return {

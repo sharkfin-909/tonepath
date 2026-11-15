@@ -1,8 +1,9 @@
-// Pure `listen/pitch` module (SPEC §9.2, prototype): what a monophonic instrument is playing, from raw samples.
+// Pure `listen/pitch` module (SPEC §9.2): what a monophonic instrument is playing, from raw samples.
 // - detectPitch: YIN (de Cheveigné & Kawahara 2002) — difference function, cumulative-mean normalisation, absolute
 //   threshold, parabolic interpolation. Returns the fundamental and how clear (periodic) the frame is.
 // - OnsetDetector: a note start = the level jumping well above its recent average, past a noise gate, with a lockout
 //   so one note isn't counted twice. Re-attacking the same pitch counts; a held note doesn't.
+// - NoteTracker: played notes from those readings — an attack, or a slur to a new pitch (what Practice counts).
 // No Web Audio here: everything takes samples, so it is tested with synthetic tones.
 
 export interface Pitch {
@@ -19,6 +20,15 @@ export interface PitchOptions {
   maxHz?: number;
   /** Frames quieter than this RMS are silence. */
   gate?: number;
+}
+
+/** The level a note must pass to count as started (RMS): marked on the Listen meter. */
+export const ONSET_GATE = 0.015;
+
+/** A level (RMS) on the Listen meter's 0–1 scale: −60 dBFS … 0 dBFS, so quiet and loud both read usefully. */
+export function meterPosition(level: number): number {
+  if (level <= 0) return 0;
+  return Math.max(0, Math.min(1, (20 * Math.log10(level) + 60) / 60));
 }
 
 /** Root-mean-square level of a frame. */
@@ -106,7 +116,7 @@ export class OnsetDetector {
   private readonly gate: number;
   private readonly lockoutMs: number;
 
-  constructor({ ratio = 1.8, gate = 0.015, lockoutMs = 90 }: OnsetOptions = {}) {
+  constructor({ ratio = 1.8, gate = ONSET_GATE, lockoutMs = 90 }: OnsetOptions = {}) {
     this.ratio = ratio;
     this.gate = gate;
     this.lockoutMs = lockoutMs;
@@ -123,5 +133,36 @@ export class OnsetDetector {
     this.prev = level;
     if (onset) this.last = timeMs;
     return onset;
+  }
+}
+
+/**
+ * Played notes from the per-frame readings: a note starts on an attack (the next steady pitch after an onset, within
+ * `windowMs`), or when the steady pitch changes to another note without one — so slurred lines count too. A held
+ * note, or the same note through a brief dropout, doesn't count again.
+ */
+export class NoteTracker {
+  private pendingSince = -Infinity;
+  private current: number | null = null;
+  private silentSince = -Infinity;
+
+  constructor(private readonly windowMs = 250, private readonly releaseMs = 150) {}
+
+  /** The MIDI note that starts on this frame, or null. `midi` = the steady reading (null when unclear / silent). */
+  push(midi: number | null, onset: boolean, timeMs: number): number | null {
+    if (onset) this.pendingSince = timeMs;
+    if (midi === null) {
+      if (this.silentSince === -Infinity) this.silentSince = timeMs;
+      if (timeMs - this.silentSince >= this.releaseMs) this.current = null; // a real stop: the same note may start again
+      return null;
+    }
+    this.silentSince = -Infinity;
+    const attacked = timeMs - this.pendingSince <= this.windowMs;
+    if (attacked || midi !== this.current) {
+      this.pendingSince = -Infinity;
+      this.current = midi;
+      return midi;
+    }
+    return null;
   }
 }

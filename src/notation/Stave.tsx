@@ -72,6 +72,8 @@ export interface SlotStaveProps {
   meter: Meter;
   /** Marks for a note (SPEC §7.2); rests are never marked. */
   markOf?: (e: TimedEvent) => NoteMark | null;
+  /** Practice, Follow the etude (SPEC §3.7): melody indexes of the written notes already played — drawn green. */
+  played?: ReadonlySet<number>;
 }
 
 /** Time ↔ x anchors on a drawn stave: each tickable's start (where the caret sits), then the slot end. */
@@ -96,6 +98,8 @@ function vexKey(name: string): string {
 
 const VEX_DURATION: Record<Duration, string> = { w: 'w', h: 'h', q: 'q', e: '8', s: '16' };
 const CARET = '#2f6fdb';
+/** Practice, Follow: a written note already played. */
+const PLAYED = '#2e9d57';
 /** Mark colours (SPEC §7.2). */
 const OUT_OF_SCALE = '#D62728';
 const OUT_OF_RANGE = '#B5B5B5';
@@ -105,7 +109,7 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
  * One slot's stave (SPEC §7.1): no bar lines of its own (bar lines are chart chrome). Engraves the slot's events
  * in a SOFT voice padded with GhostNotes, accidentals per slot (no key signature), default beams, and the caret.
  */
-export function SlotStave({ width, timeSignature, clef, start, end, events, spell, caret, onEventClick, onTimeClick, meter, markOf }: SlotStaveProps) {
+export function SlotStave({ width, timeSignature, clef, start, end, events, spell, caret, onEventClick, onTimeClick, meter, markOf, played }: SlotStaveProps) {
   const anchors = useRef<Anchor[]>([]);
   const ref = useVexSvg(
     width,
@@ -134,7 +138,8 @@ export function SlotStave({ width, timeSignature, clef, start, end, events, spel
           const red = { fillStyle: OUT_OF_SCALE, strokeStyle: OUT_OF_SCALE };
           note.setKeyStyle(0, red).setStemStyle(red);
           note.setFlagStyle(red);
-        } else if (caret !== undefined && e.start === caret) note.setStyle({ fillStyle: CARET, strokeStyle: CARET });
+        } else if (played?.has(e.i)) note.setStyle({ fillStyle: PLAYED, strokeStyle: PLAYED });
+        else if (caret !== undefined && e.start === caret) note.setStyle({ fillStyle: CARET, strokeStyle: CARET });
         timed.push({ t: e.start, note });
         clickable.push({ e, note, mark });
       }
@@ -221,7 +226,7 @@ export function SlotStave({ width, timeSignature, clef, start, end, events, spel
         svg.svg.appendChild(g);
       }
     },
-    [timeSignature, clef, start, end, events, spell, caret, onEventClick, meter, markOf],
+    [timeSignature, clef, start, end, events, spell, caret, onEventClick, meter, markOf, played],
   );
   return (
     <div

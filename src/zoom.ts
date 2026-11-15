@@ -35,7 +35,7 @@ export interface Fit {
 
 /**
  * The largest zoom in [min, max] at which every row fits `height` (rendered px). Below `min` the chart doesn't
- * shrink further and scrolls. Stand mode passes min = 0 (no floor).
+ * shrink further and scrolls. Read mode passes min = 0 (no floor).
  */
 export function fitZoom(rows: number, staveHeight: number, height: number, min = ZOOM_FLOOR, max = ZOOM_CAP): Fit {
   if (rows <= 0 || height <= 0) return { zoom: max, scrolls: false };

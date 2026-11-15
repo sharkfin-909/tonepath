@@ -57,9 +57,11 @@ export interface DockedHexProps {
   onHoverPitch?: (written: number | null) => void;
   /** Listen (SPEC §9.2): the written pitch the mic hears; its cells light. */
   heard?: number | null;
+  /** Practice (SPEC §3.7): what moves the form on — pitch classes (written) or Follow's exact next note. Ringed. */
+  targets?: { pcs: Set<number> | null; midi: number | null } | null;
 }
 
-export function DockedHex({ dock, onPick, halo, onLabelClick, onHoverPitch, heard = null }: DockedHexProps) {
+export function DockedHex({ dock, onPick, halo, onLabelClick, onHoverPitch, heard = null, targets = null }: DockedHexProps) {
   const [ref, { width, height }] = useSize<HTMLDivElement>();
   const { hex, mode, label, labelEditsChord } = dock;
   const layout: HexLayout | null = width > 0 && height > 0 ? layoutHex(hex, width, height, T.borderButtonGap) : null;
@@ -168,6 +170,7 @@ export function DockedHex({ dock, onPick, halo, onLabelClick, onHoverPitch, hear
                   onPick={pick}
                   halo={cell.midi === halo}
                   lit={cell.midi === hoverMidi || cell.midi === flash || cell.midi === heard}
+                  target={!!targets && (targets.midi !== null ? cell.midi === targets.midi : !!targets.pcs?.has(cell.midi % 12))}
                   onHover={setHover}
                 />
               ))}
@@ -267,9 +270,11 @@ interface CellProps {
   /** Same pitch as the hovered / just-clicked cell: colour shown and a white glow inside the cell edge. */
   lit: boolean;
   onHover: (target: HoverTarget | null) => void;
+  /** Practice: playing this note moves the form on — a dashed ring inside the cell. */
+  target?: boolean;
 }
 
-function Cell({ part, plain, cell, cx, cy, R, ry, onPick, halo, lit, onHover }: CellProps) {
+function Cell({ part, plain, cell, cx, cy, R, ry, onPick, halo, lit, onHover, target = false }: CellProps) {
   const active = cell.playable && !!onPick;
   const r = R * (cell.triad ? T.triadNote : T.otherNote);
   // Triad cells and a quartad's guide tone (7th / 6th) show their degree colour; the rest stay neutral until lit
@@ -282,6 +287,7 @@ function Cell({ part, plain, cell, cx, cy, R, ry, onPick, halo, lit, onHover }: 
     const clipId = `hex-clip-${cell.r}-${cell.c}`;
     return (
       <g className={`${className} hex-cell-top`} style={style} opacity={opacity}>
+        {target && <polygon className="hex-target" points={hexPoints(cx, cy, R * 0.86, ry * 0.86)} />}
         {/* Triad cells: a thin white edge (in the top layer, so no neighbour's fill covers it; off while colours travel). */}
         {cell.triad && !plain && <polygon className="hex-triad-edge" points={hexPoints(cx, cy, R - 0.75, ry - 0.75)} />}
         {lit && (

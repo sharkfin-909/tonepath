@@ -1,4 +1,4 @@
-// Instrument picker in the rail (SPEC §3.1, §10), with the Concert clef choice beside it (§7.3).
+// The header's **Ins:** instrument picker (SPEC §3.1, §10), with the clef choice beside it (§7.3).
 import { INSTRUMENTS } from '../instruments';
 
 export interface InstrumentPickerProps {

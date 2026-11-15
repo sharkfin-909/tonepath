@@ -104,7 +104,7 @@ export function familyOf(intervals: string[]): Family {
   return intervals.every((iv) => iv === '1P' || iv === '5P') ? 'major' : 'sus';
 }
 
-const pcOf = (root: string, interval: string) => (((chroma(root) ?? 0) + (semitones(interval) ?? 0)) % 12 + 12) % 12;
+export const pcOf = (root: string, interval: string) => (((chroma(root) ?? 0) + (semitones(interval) ?? 0)) % 12 + 12) % 12;
 
 /** Pitch classes of a scale type built on a root. */
 export function scalePitchClasses(root: string, id: ScaleId): Set<number> {

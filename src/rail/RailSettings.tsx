@@ -1,4 +1,4 @@
-// Control-rail settings (SPEC §3.1): inline title rename, time signature, bars per row, Clear all, caret readout.
+// Header settings (SPEC §3.1): inline title rename, time signature, bars per row, and the Clear ▾ menu (§6.2 item 10).
 import { useEffect, useRef, useState } from 'react';
 import { parseTimeSignature } from '../form';
 import { BARS_PER_ROW } from '../progression';

@@ -1,4 +1,5 @@
-// Rail audio controls (SPEC §3.1, §9): mute (speaker, M), ▶ Chord (C), ▶ Bass (B), ▶ Scale (S / ⇧Space).
+// Sound buttons in the header's sound pill (SPEC §3.1, §9): mute (speaker, M), ▶ Chord (C), ▶ Bass (B), ▶ Scale (S / ⇧Space).
+// (The `rail/` folder holds the header's controls; the name dates from the old left-hand control rail.)
 export interface AudioControlsProps {
   muted: boolean;
   onToggleMute: () => void;

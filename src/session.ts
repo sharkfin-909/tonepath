@@ -1,6 +1,7 @@
 // Pure `session` module: the **editing session** of the chart screen (SPEC §3.3, §6.2, §9, §11).
 // One function, `reduce(state, progression, intent)`, holds every Write / Play rule: the caret and latches, entry
-// with wrap-around, Write / Play / Stand, browsing slots, *On arrival*, the bar selection and clipboard.
+// with wrap-around, the modes (Write / Play / Practice; Read is `stand`), stepwise playback, browsing slots,
+// *On arrival*, the bar selection and clipboard, Clear notes / Clear all. Practice's note counting is `practice.ts`.
 // It returns the next state, an edit to commit (the caller records undo and saves), and effects to perform
 // (sounds, device settings, undo / redo). Nothing here touches React, storage or Web Audio.
 
@@ -38,7 +39,9 @@ export interface SessionState {
   rest: boolean;
   /** Play mode's current slot; null in Write (SPEC §3.3). */
   playIndex: number | null;
-  /** Stand mode (SPEC §3.4): a read-only page view over Write or Play. */
+  /** Practice (SPEC §3.7): Play driven by the mic — the notes you play move the form on. Only with playIndex. */
+  practice: boolean;
+  /** Read mode (SPEC §3.4; `stand` in code): a read-only page view over Write or Play. */
   stand: boolean;
   /** Play: the slot whose *On arrival* sound waits for its first played note (null = nothing waiting). */
   arrival: number | null;
@@ -68,12 +71,16 @@ export type Intent =
   | { type: 'step'; dir: -1 | 1 }
   /** ` (or ~), Write: stepwise playback — play the event at the caret and move past it, wrapping at the end. */
   | { type: 'step-play' }
-  /** ‹ › and < > : previous / next slot, wrapping. */
+  /** < > (or , .): previous / next slot, wrapping. */
   | { type: 'browse'; dir: -1 | 1 }
   | { type: 'event-click'; event: TimedEvent }
   | { type: 'time-click'; t: number }
   | { type: 'slot-click'; index: number }
-  | { type: 'mode'; mode: 'write' | 'play' | 'toggle' }
+  | { type: 'mode'; mode: 'write' | 'play' | 'practice' | 'toggle' }
+  /** Practice: the form moves on to a slot (the mic heard the right note). `landed`: that note is the new slot's first. */
+  | { type: 'practice-advance'; index: number; landed: boolean }
+  /** Practice: the mic heard a note (it brings a waiting *On arrival* sound). */
+  | { type: 'practice-note' }
   | { type: 'stand'; on: boolean | 'toggle' }
   | { type: 'sound'; what: 'chord' | 'bass' | 'scale' }
   | { type: 'toggle-mute' }
@@ -112,6 +119,7 @@ export function initialSession(p: Progression, device: { muted?: boolean; onArri
     length: 'q',
     rest: false,
     playIndex: null,
+    practice: false,
     stand: false,
     arrival: null,
     selection: null,
@@ -222,7 +230,7 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
     }
     case 'length':
       set({ length: intent.d });
-      if (s.rest) insert(intent.d, null); // Rest on: a length also inserts a rest (silent)
+      if (s.rest && !playing) insert(intent.d, null); // Rest on (Write): a length also inserts a rest (silent)
       return done();
     case 'toggle-rest':
       set({ rest: !s.rest });
@@ -277,14 +285,36 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
       return done();
     }
     case 'mode': {
-      const toPlay = intent.mode === 'toggle' ? !playing : intent.mode === 'play';
-      if (toPlay === playing) return done();
+      const toPlay = intent.mode === 'toggle' ? !playing : intent.mode !== 'write';
+      const practice = toPlay && intent.mode === 'practice';
+      if (toPlay === playing) {
+        set({ practice }); // Play ⇄ Practice keep the current slot
+        return done();
+      }
       if (toPlay) {
-        set({ selection: null });
-        arrive(view.slotAt(caret).index); // entering Play is an arrival too (silent until the first note)
-      } else set({ caret: active.start, playIndex: null, arrival: null });
+        set({ selection: null, practice });
+        const at = view.slotAt(caret).index;
+        if (practice) {
+          // Practice: the mic never "picks", so the starting slot's *On arrival* sounds now — a cue to start.
+          set({ playIndex: at, arrival: null });
+          effects.push(...arrivalSounds(s.onArrival, slots[at].concert));
+        } else arrive(at); // entering Play is an arrival too (silent until the first note)
+      } else set({ caret: active.start, playIndex: null, arrival: null, practice: false });
       return done();
     }
+    case 'practice-advance':
+      // *On arrival* sounds with the new slot's first note (SPEC §3.7): now, if the note that moved the form on landed
+      // there; otherwise (it finished the old slot) it waits for the next note played.
+      if (playing) {
+        if (intent.landed) {
+          set({ playIndex: intent.index, arrival: null });
+          effects.push(...arrivalSounds(s.onArrival, slots[intent.index].concert));
+        } else arrive(intent.index);
+      }
+      return done();
+    case 'practice-note':
+      if (playing) playedIn(active.index);
+      return done();
     case 'stand':
       set({ stand: intent.on === 'toggle' ? !s.stand : intent.on });
       return done();

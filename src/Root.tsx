@@ -1,5 +1,6 @@
 // The app's two screens (SPEC §3): the library and the chart screen for one progression.
-// Launch reopens the last-open progression, seeding the bundled demo on first launch (§12.5).
+// Launch reopens the last-open progression, seeding the bundled demo on first launch and each extra demo (rhythm
+// changes) once per device (§12.5).
 import { useCallback, useEffect, useState } from 'react';
 import demo from '../examples/demo.honeycomb.json';
 import rhythmChanges from '../examples/rhythm-changes.honeycomb.json';

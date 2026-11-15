@@ -1,5 +1,6 @@
-// `audio` module (SPEC §9): playNote / playChord / playScale / playRoot over Web Audio, plus mute.
-// The UI never touches Web Audio. Voicings are pure functions (tested); the engine is a thin sine synth.
+// `audio` module (SPEC §9): playNote / playChord / playScale / playRoot / playBass over Web Audio, plus mute.
+// The UI never touches Web Audio. Voicings are pure functions (tested); the engine is a thin sine synth through an
+// output bus with a generated-impulse convolution reverb (no library, no audio files).
 // Always concert pitch; no instrument range applied.
 
 import { semitones } from '@tonaljs/interval';

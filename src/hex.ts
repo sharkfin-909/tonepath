@@ -1,6 +1,9 @@
-// Pure `hex` module (SPEC §8.1–8.2): docked-hex grid layout for a slot + range + dock size.
-// 3 left-slanted rows; cell (r, c) = scale step t₀ + c + 2r; pitch anchor t₀ = lowest in-range scale tone;
-// Fit range row lengths; largest radius that fits. Pitches are in the view's pitch (written for an instrument).
+// Pure `hex` module (SPEC §8): the docked hex for a slot + range — its grid, cells and border buttons — and the dock
+// for the active slot (with its key and root, for the travel plan). Honeycomb: 3 left-slanted rows, cell (r, c) =
+// scale step t₀ + c + 2r, pitch anchor t₀ = lowest in-range scale tone, Fit range row lengths. Linear (§8.5): one
+// octave in one row. Cell size for a dock (`hexSize`, `cellCentre`); placing everything is `hexLayout.ts`. Also the
+// hex's proportions and timings (HEX_THEME; its colours are CSS tokens) and the degree colours. Pitches are in the
+// view's pitch (written for an instrument).
 
 import { classify, scalePitchClasses, triadPitchClasses, guidePitchClasses, slotHarmony, type SlotHarmony } from './harmony';
 import { keyOf, type Key } from './key';

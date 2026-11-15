@@ -1,6 +1,6 @@
 // Pitch and onset detection on synthetic signals (SPEC §9.2, prototype).
 import { describe, expect, it } from 'vitest';
-import { OnsetDetector, detectPitch, hzToNote, rms } from './pitch';
+import { NoteTracker, ONSET_GATE, OnsetDetector, detectPitch, hzToNote, meterPosition, rms } from './pitch';
 
 const SR = 48000;
 const N = 2048;
@@ -72,5 +72,29 @@ describe('OnsetDetector', () => {
     const p = new OnsetDetector({ lockoutMs: 90 });
     const r = [0, 0.2, 0.01, 0.3].map((l, i) => p.push(l, i * 16));
     expect(r.filter(Boolean)).toHaveLength(1);
+  });
+});
+
+describe('NoteTracker', () => {
+  const run = (frames: [number | null, boolean][]) => {
+    const t = new NoteTracker();
+    return frames.map(([m, o], i) => t.push(m, o, i * 16)).filter((x) => x !== null);
+  };
+  it('an attack starts a note once its pitch is steady; a held note counts once', () => {
+    expect(run([[null, true], [null, false], [67, false], [67, false], [67, false]])).toEqual([67]);
+  });
+  it('a slur (pitch change, no new attack) is a new note', () => {
+    expect(run([[null, true], [67, false], [67, false], [69, false], [71, false]])).toEqual([67, 69, 71]);
+  });
+  it('the same note re-attacked counts again; a brief dropout does not', () => {
+    expect(run([[67, true], [67, false], [67, true], [67, false]])).toEqual([67, 67]);
+    expect(run([[67, true], [null, false], [67, false]])).toEqual([67]); // 16 ms gap: same note
+  });
+});
+
+describe('level meter', () => {
+  it('dB scale: −60 dBFS → 0, 0 dBFS → 1; the onset gate sits about 40% along', () => {
+    expect([meterPosition(0), meterPosition(0.001), meterPosition(1), meterPosition(2)]).toEqual([0, 0, 1, 1]);
+    expect(meterPosition(ONSET_GATE)).toBeCloseTo(0.39, 2);
   });
 });

@@ -26,7 +26,7 @@ describe('instrument view', () => {
     expect(v.toWritten(62)).toBe(76);
     expect(v.toConcert(v.toWritten(62))).toBe(62);
     expect(v.name(62, v.slots[0])).toBe('E5');
-    expect(v.slots[0].scaleText).toBe('E Dorian');
+    expect(v.slots[0].harmony.kind === 'chord' && v.slots[0].harmony.scale).toBe('dorian'); // E Dorian, written
     expect(v.dock(0).hex.cells.find((c) => c.degree === 1)!.name).toBe('E');
   });
 
@@ -46,10 +46,5 @@ describe('instrument view', () => {
 
   it('used chords: written, distinct, in order, no empties', () => {
     expect(instrumentView(prog('concert', 'Dm7', '', 'G7', 'Dm7')).usedChords).toEqual(['Dm7', 'G7']);
-  });
-
-  it('readout scale text', () => {
-    const v = instrumentView(prog('concert', 'Dm7', 'N.C.', 'C7sus4b9'));
-    expect(v.slots.map((s) => s.scaleText)).toEqual(['D Dorian', '—', 'no scale fits']);
   });
 });

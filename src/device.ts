@@ -1,6 +1,6 @@
 // Device settings (SPEC §12.5): `honeycomb:device`, never exported. Reads / writes `muted`, `playArrival`,
-// `lastInstrument`, `lastOpenId`, `seeded`, `v`, `lastBackupAt` and `reminderDismissedAt`; unknown fields are
-// preserved untouched.
+// `lastInstrument`, `lastOpenId`, `seeded`, `seededDemos`, `v`, `lastBackupAt`, `reminderDismissedAt`, `hexShape`,
+// `practiceRule`, `practiceLoop` and `micGainDb`; unknown fields are preserved untouched.
 
 import { isReadOnly } from './readOnly';
 
@@ -15,6 +15,11 @@ export function onArrivalOf(d: DeviceSettings): OnArrival {
 
 export interface DeviceSettings {
   muted?: boolean;
+  /** Listen's input level control (SPEC §9.2), in dB: −12 … +24, default 0. */
+  micGainDb?: number;
+  /** Practice (SPEC §3.7): the advance rule, and whether the form loops (default) or stops at the end. */
+  practiceRule?: string;
+  practiceLoop?: boolean;
   /** The dock's layout (SPEC §8.5): the honeycomb (default) or one row, Linear. */
   hexShape?: 'honeycomb' | 'linear';
   /** Play mode *On arrival* (SPEC §3.3). */

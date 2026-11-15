@@ -51,6 +51,7 @@ describe('keymap (SPEC §11)', () => {
     expect(intent(key('ArrowRight'), p)).toEqual({ type: 'step', dir: 1 });
     expect(keyIntent(key('Backspace'), p)).toEqual({ intent: null, handled: true });
     expect(intent(key('3'), p)).toBeNull();
+    expect(intent(key('3'), ctx('play', { practice: true }))).toEqual({ type: 'length', d: 'q' }); // Practice: lengths set the count
     expect(intent(key('z', { metaKey: true }), p)).toBeNull();
   });
 

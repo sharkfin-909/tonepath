@@ -85,11 +85,6 @@ body,
   overflow-wrap: anywhere;
 }
 
-.rail-stub {
-  margin: 0;
-  font-size: 12px;
-  color: var(--muted);
-}
 
 .main {
   position: relative;
@@ -694,7 +689,7 @@ button.dock-label {
   pointer-events: none;
 }
 
-/* Undo / redo in the rail (SPEC §6.3). */
+/* Undo / redo in the header (SPEC §6.3). */
 .undo-controls {
   display: flex;
   gap: 2px;
@@ -974,7 +969,7 @@ button.dock-label {
   max-width: 220px;
 }
 
-/* Stand mode (SPEC §3.4): thin header + the whole form fitted to the page. */
+/* Read mode (SPEC §3.4; `stand` in code): thin header + the whole form fitted to the page. */
 .stand-layout {
   display: grid;
   grid-template-rows: auto 1fr;
@@ -1012,9 +1007,6 @@ button.dock-label {
   cursor: default;
 }
 
-.stand-button {
-  white-space: nowrap;
-}
 
 /* Library screen (SPEC §3.5). */
 .library {
@@ -1405,9 +1397,6 @@ textarea {
   gap: 6px 10px;
   min-width: 0;
 }
-.row-spacer {
-  margin-left: auto;
-}
 
 /* Icon-only header buttons (undo / redo): the standard curved-arrow icons. */
 .rail-button.icon-button {
@@ -1478,9 +1467,9 @@ textarea {
   padding: 3px 4px;
 }
 
-/* The mode switch sits top right of the header; the sound pill lines up under it (end of the second row). */
+/* The mode switch: at the end of the header's second row, after Ins:. */
 .mode-corner {
-  margin-left: auto;
+  display: flex;
 }
 
 /* Clear ▾ (SPEC §6.2 item 10): a small menu under the button; Clear all asks first. Light menu on the dark header. */
@@ -1547,8 +1536,7 @@ textarea {
   align-items: center;
   gap: 6px 16px;
 }
-.topbar-left,
-.topbar-right {
+.topbar-left {
   display: flex;
   align-items: center;
   gap: 8px 10px;
@@ -1648,11 +1636,6 @@ textarea {
   grid-column: 2;
   justify-self: center;
 }
-.topbar .topbar-right {
-  grid-row: 1;
-  grid-column: 3;
-  justify-content: flex-end;
-}
 .topbar .topbar-row {
   grid-row: 2;
   grid-column: 1 / -1;
@@ -1723,16 +1706,47 @@ textarea {
   color: var(--dock-bg);
 }
 .listen-meter {
-  width: 48px;
-  height: 5px;
+  position: relative;
+  width: 64px;
+  height: 6px;
   border-radius: 3px;
   background: rgba(255, 255, 255, 0.15);
   overflow: hidden;
 }
-.listen-meter span {
+.listen-meter-fill {
   display: block;
   height: 100%;
+  background: rgba(245, 233, 176, 0.45); /* below the mark: too quiet to count */
+}
+.listen-meter.over .listen-meter-fill {
   background: var(--grid-glow);
+}
+/* Where a note starts to count: playing should pass it, silence stay below it. */
+.listen-meter-mark {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  width: 2px;
+  margin-left: -1px;
+  background: #ffffff;
+}
+/* The input level control. */
+.listen-gain {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.listen-gain-label {
+  opacity: 0.75;
+}
+.listen-gain input[type='range'] {
+  width: 70px;
+  accent-color: var(--grid-glow);
+}
+.listen-gain-db {
+  min-width: 22px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
 }
 .listen-note {
   min-width: 52px;
@@ -1750,4 +1764,198 @@ textarea {
 }
 .listen-error {
   color: #ffb4a8;
+}
+
+/* Practice (SPEC §3.7): the panel at the top left of the hex panel, and the target rings on the hex. */
+.practice-panel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 10px 3px 4px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f3eee6;
+  font-size: 12px;
+  color-scheme: dark;
+}
+.practice-panel[data-flash] {
+  animation: practice-flash 600ms ease-out;
+}
+@keyframes practice-flash {
+  0% {
+    box-shadow: 0 0 0 0 var(--grid-glow);
+    background: color-mix(in srgb, var(--grid-glow) 45%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 10px transparent;
+    background: rgba(255, 255, 255, 0.08);
+  }
+}
+.practice-rule {
+  font: inherit;
+  font-size: 12px;
+  border-radius: 8px;
+  padding: 1px 4px;
+}
+.practice-count {
+  font-weight: 700;
+  font-size: 14px;
+  min-width: 40px;
+}
+.practice-target {
+  color: var(--grid-glow);
+  font-weight: 600;
+}
+.practice-loop {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+.hex-target {
+  fill: none;
+  stroke: var(--grid-glow);
+  stroke-width: 2.5;
+  stroke-dasharray: 5 4;
+  pointer-events: none;
+  filter: drop-shadow(0 0 3px rgba(245, 233, 176, 0.8));
+}
+@media (prefers-reduced-motion: reduce) {
+  .practice-panel[data-flash] {
+    animation: none;
+  }
+}
+
+/* The hex panel: the tuner (while listening) above the hex, which takes the rest. */
+.dock {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.dock-top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 0 10px;
+}
+.dock-top:has(.tuner, .practice-panel) {
+  padding-top: 8px;
+}
+.tuner-slot {
+  display: flex;
+  justify-content: center;
+}
+.tuner-slot:empty {
+  display: none;
+}
+
+/* The big tuner (SPEC §9.2): note, a ±50 ¢ scale with a needle, the cents off. */
+.tuner {
+  display: grid;
+  grid-template-columns: auto minmax(180px, 360px) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 6px 18px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  color: #f3eee6;
+  --zone: rgba(255, 255, 255, 0.5);
+}
+.tuner[data-zone='in'] {
+  --zone: #5bd17a;
+}
+.tuner[data-zone='near'] {
+  --zone: #f2b84b;
+}
+.tuner[data-zone='off'] {
+  --zone: #ff7a66;
+}
+.tuner-note {
+  min-width: 70px;
+  text-align: center;
+  font-size: 38px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--zone);
+  transition: color 120ms ease;
+}
+.tuner-note sub {
+  font-size: 16px;
+  font-weight: 600;
+  margin-left: 2px;
+  opacity: 0.8;
+}
+.tuner-scale {
+  position: relative;
+  height: 30px;
+}
+.tuner-scale::before {
+  /* the scale line */
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.25);
+}
+.tuner-band {
+  /* ±5 ¢: in tune */
+  position: absolute;
+  left: 45%;
+  width: 10%;
+  top: 4px;
+  bottom: 4px;
+  border-radius: 4px;
+  background: rgba(91, 209, 122, 0.22);
+}
+.tuner-tick {
+  position: absolute;
+  top: 9px;
+  bottom: 9px;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.45);
+}
+.tuner-tick.zero {
+  top: 2px;
+  bottom: 2px;
+  width: 2px;
+  margin-left: -1px;
+  background: rgba(255, 255, 255, 0.8);
+}
+.tuner-needle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  margin-left: -2px;
+  border-radius: 2px;
+  background: var(--zone);
+  box-shadow: 0 0 8px var(--zone);
+  transition: left 70ms linear, background 120ms ease;
+}
+.tuner-cents {
+  min-width: 56px;
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--zone);
+}
+@media (prefers-reduced-motion: reduce) {
+  .tuner-needle {
+    transition: none;
+  }
+}
+@media (max-width: 640px) {
+  .tuner {
+    gap: 10px;
+    padding: 4px 10px;
+    grid-template-columns: auto minmax(100px, 1fr) auto;
+  }
+  .tuner-note {
+    font-size: 28px;
+    min-width: 52px;
+  }
 }
