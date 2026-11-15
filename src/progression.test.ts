@@ -8,6 +8,7 @@ import {
   setConcertClef,
   setInstrument,
   setTimeSignature,
+  setEtudeName,
   setTitle,
   type Progression,
 } from './progression';
@@ -73,6 +74,15 @@ describe('rail settings', () => {
     expect(setTitle(p, '  Blues in F ').title).toBe('Blues in F');
     expect(setTitle({ ...p, title: 'X' }, '   ').title).toBe('Untitled');
     expect(setTitle(p, 'Untitled')).toBe(p);
+  });
+
+  it('etude name: trimmed; blank removes it; unchanged → same object', () => {
+    const p = newProgression();
+    const named = setEtudeName(p, '  Guide-tone lines ');
+    expect(named.etudeName).toBe('Guide-tone lines');
+    expect('etudeName' in setEtudeName(named, '   ')).toBe(false);
+    expect(setEtudeName(p, '  ')).toBe(p);
+    expect(setEtudeName(named, 'Guide-tone lines')).toBe(named);
   });
 
   it('time signature 3/4 stores as typed and re-fits the melody to the shorter bars', () => {

@@ -342,7 +342,7 @@ function Cell({ part, plain, cell, cx, cy, R, ry, onPick, halo, lit, onHover, ta
         {/* C cells: the octave number under the ball (C4 = middle C), so you can tell the Cs apart. */}
         {cell.name[0] === 'C' && (
           <text x={cx} y={cy + r + Math.max(7, R * 0.16)} textAnchor="middle" dominantBaseline="central" fontSize={Math.max(8, R * 0.2)} fontWeight={700} className="hex-octave">
-            {`oct-${octaveOf(cell)}`}
+            {`oct ${octaveOf(cell)}`}
           </text>
         )}
       </g>

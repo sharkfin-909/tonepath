@@ -5,12 +5,17 @@ const tenor = instrumentOf('bb-tenor-sax');
 const alto = instrumentOf('eb-alto-sax');
 
 describe('instruments', () => {
-  it('has the 14 instruments with stable ids; unknown → Concert', () => {
+  it('has the 16 instruments with stable ids; unknown → Concert', () => {
     expect(INSTRUMENTS.map((i) => i.id)).toEqual([
-      'concert', 'flute', 'violin', 'trombone', 'vibraphone', 'bb-trumpet', 'bb-clarinet', 'bb-soprano-sax',
+      'concert', 'flute', 'violin', 'viola', 'cello', 'trombone', 'vibraphone', 'bb-trumpet', 'bb-clarinet', 'bb-soprano-sax',
       'bb-tenor-sax', 'eb-alto-sax', 'eb-baritone-sax', 'f-horn', 'guitar', 'bass',
     ]);
     expect(instrumentOf('kazoo').id).toBe('concert');
+  });
+
+  it('viola reads alto clef (C3–E6), cello bass clef (C2–A5), both at pitch', () => {
+    expect(instrumentOf('viola')).toMatchObject({ clef: 'alto', semitones: 0, range: { lo: 48, hi: 88 } });
+    expect(instrumentOf('cello')).toMatchObject({ clef: 'bass', semitones: 0, range: { lo: 36, hi: 81 } });
   });
 
   it('semitones match the interval names', () => {

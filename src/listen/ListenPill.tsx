@@ -113,7 +113,7 @@ export function ListenPill({ onHeard, nameOf, onNote, auto = false, onListening,
     {on && tunerSlot && createPortal(<Tuner name={frame.midi === null ? null : nameOf(frame.midi)} cents={frame.cents} />, tunerSlot)}
     {/* While listening: the input level control and meter, in a pill as tall as the tuner, at the row's right end. */}
     {on && levelsSlot && createPortal(
-      <div className="listen-levels">
+      <div className="listen-levels well">
         <label className="listen-gain" title={`Input level ${gainDb > 0 ? '+' : ''}${gainDb} dB: playing should pass the mark, silence stay below it`}>
           <span className="listen-gain-label">In</span>
           <input
@@ -149,7 +149,7 @@ function Tuner({ name, cents }: { name: string | null; cents: number }) {
   const m = /^(.*?)(-?\d+)$/.exec(name ?? '');
   const showNeedle = zone === 'near' || zone === 'off';
   return (
-    <div className="tuner" data-zone={zone} role="status" aria-label={name === null ? 'Tuner: no note' : `Tuner: ${name}, ${cents} cents`}>
+    <div className="tuner well" data-zone={zone} role="status" aria-label={name === null ? 'Tuner: no note' : `Tuner: ${name}, ${cents} cents`}>
       <div className="tuner-note">
         {name === null ? '—' : prettyName(m ? m[1] : name)}
         {m && <sub>{m[2]}</sub>}

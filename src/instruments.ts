@@ -6,7 +6,7 @@ import { simplify, transpose } from '@tonaljs/note';
 import { parseChord, splitSymbols } from './chords';
 import { CONCERT_VIEW, type PitchRange } from './hex';
 
-export type Clef = 'treble' | 'bass';
+export type Clef = 'treble' | 'bass' | 'alto';
 
 export interface Instrument {
   /** Stable id (saved, exported). */
@@ -35,6 +35,8 @@ export const INSTRUMENTS: Instrument[] = [
   { id: 'concert', name: 'Concert', interval: '1P', semitones: 0, range: null, clef: null },
   row('flute', 'Flute', '1P', 0, 60, 96), // C4–C7
   row('violin', 'Violin', '1P', 0, 55, 100), // G3–E7
+  row('viola', 'Viola', '1P', 0, 48, 88, 'alto'), // C3–E6
+  row('cello', 'Cello', '1P', 0, 36, 81, 'bass'), // C2–A5
   row('trombone', 'Trombone', '1P', 0, 40, 70, 'bass'), // E2–B♭4
   row('vibraphone', 'Vibraphone', '1P', 0, 53, 89), // F3–F6
   row('bb-trumpet', 'B♭ trumpet', '2M', 2, 54, 84), // F♯3–C6

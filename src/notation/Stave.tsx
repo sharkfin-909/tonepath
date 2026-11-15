@@ -1,4 +1,5 @@
 // React wrappers around VexFlow staves (SPEC §7). Draw only after loadNotationFonts() resolves.
+import type { Clef } from '../instruments';
 import { useLayoutEffect, useRef } from 'react';
 import { Accidental, Formatter, GhostNote, Renderer, Stave, StaveNote, Voice, type RenderContext } from 'vexflow/core';
 import type { Meter } from '../form';
@@ -54,7 +55,7 @@ function useVexSvg(width: number, draw: (ctx: RenderContext) => void, deps: unkn
 export interface SlotStaveProps {
   width: number;
   timeSignature?: string;
-  clef: 'treble' | 'bass';
+  clef: Clef;
   /** The slot's time range (form ticks). */
   start: number;
   end: number;
@@ -124,7 +125,7 @@ export function SlotStave({ width, timeSignature, clef, start, end, events, spel
         const rest = !('pitch' in e.ev);
         const note = new StaveNote({
           clef,
-          keys: ['pitch' in e.ev ? vexKey(spell(e.ev.pitch)) : clef === 'bass' ? 'd/3' : 'b/4'],
+          keys: ['pitch' in e.ev ? vexKey(spell(e.ev.pitch)) : clef === 'bass' ? 'd/3' : clef === 'alto' ? 'c/4' : 'b/4'],
           duration: VEX_DURATION[e.ev.d] + (rest ? 'r' : ''),
           autoStem: true,
         });
@@ -249,7 +250,7 @@ export function SlotStave({ width, timeSignature, clef, start, end, events, spel
 }
 
 /** The clef drawn at the start of every row, in a gutter outside the slots (SPEC §7.3). */
-export function ClefGutter({ width, clef }: { width: number; clef: 'treble' | 'bass' }) {
+export function ClefGutter({ width, clef }: { width: number; clef: Clef }) {
   const ref = useVexSvg(
     width,
     (ctx) => {

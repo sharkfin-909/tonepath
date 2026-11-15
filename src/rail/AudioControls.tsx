@@ -26,7 +26,7 @@ export function AudioControls({ muted, onToggleMute, onChord, onBass, onScale }:
       <button type="button" className="rail-button" title="Play the bass (B)" onClick={onBass}>
         ▶ Bass
       </button>
-      <button type="button" className="rail-button" title="Play the scale (S)" onClick={onScale}>
+      <button type="button" className="rail-button" title="Play the scale (S or ⇧Space)" onClick={onScale}>
         ▶ Scale
       </button>
     </div>

@@ -9,7 +9,7 @@ export const DEVICE_KEY = 'honeycomb:device';
 export type OnArrival = 'silent' | 'chord' | 'root' | 'bass' | 'bass-chord';
 const ARRIVALS: OnArrival[] = ['silent', 'chord', 'root', 'bass', 'bass-chord'];
 
-/** UI labels for *On arrival* / next chord trigger (SPEC §3.3). */
+/** UI labels for *On arrival* — shown as *Audio on chord* (SPEC §3.3). */
 export const ON_ARRIVAL_LABELS: Record<OnArrival, string> = {
   silent: 'Silent',
   chord: 'Chord',
@@ -29,6 +29,8 @@ export interface DeviceSettings {
   /** Practice (SPEC §3.7): the advance rule, and whether the form loops (default) or stops at the end. */
   practiceRule?: string;
   practiceLoop?: boolean;
+  /** Practice: the note count per chord (count rules), default 4. */
+  practiceCount?: number;
   /** The dock's layout (SPEC §8.5): the honeycomb (default) or one row, Linear. */
   hexShape?: 'honeycomb' | 'linear';
   /** Play mode *On arrival* (SPEC §3.3). */

@@ -22,6 +22,8 @@ export type Bar = Slot[];
 
 export interface Progression {
   title: string;
+  /** The etude's own name (SPEC §3.1), shown above the title; omitted when blank. */
+  etudeName?: string;
   timeSignature: string;
   barsPerRow: number;
   instrument: string;
@@ -102,6 +104,14 @@ export function setScaleOverride(p: Progression, bar: number, part: number, scal
 }
 
 // ── Rail settings (SPEC §3.1, §4.1, §6.2 item 10). Each returns the same object when nothing changes. ────────
+
+/** The etude name, inline: trimmed; blank removes it. */
+export function setEtudeName(p: Progression, text: string): Progression {
+  const name = text.trim();
+  if (name === (p.etudeName ?? '')) return p;
+  const { etudeName: _, ...rest } = p;
+  return name ? { ...rest, etudeName: name } : rest;
+}
 
 /** Inline rename: trimmed; blank → "Untitled". */
 export function setTitle(p: Progression, text: string): Progression {

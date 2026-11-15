@@ -33,6 +33,12 @@ describe('test table 7: repairs', () => {
     expect(repaired({ ...base, title: '   ' }).title).toBe('Untitled');
     expect(repaired({ ...base, title: 3 }).title).toBe('Untitled');
   });
+  it('etude name: kept (trimmed) when a non-blank string, else left out', () => {
+    expect(repaired({ ...base, etudeName: ' Lines ' }).etudeName).toBe('Lines');
+    expect('etudeName' in repaired({ ...base, etudeName: '  ' })).toBe(false);
+    expect('etudeName' in repaired({ ...base, etudeName: 7 })).toBe(false);
+    expect('etudeName' in repaired(base)).toBe(false);
+  });
   it('bad timeSignature → 4/4', () => expect(repaired({ ...base, timeSignature: 'waltz' }).timeSignature).toBe('4/4'));
   it('barsPerRow outside 1–8 → 4', () => {
     expect(repaired({ ...base, barsPerRow: 9 }).barsPerRow).toBe(4);

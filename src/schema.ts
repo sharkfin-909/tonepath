@@ -75,8 +75,10 @@ export function repairProgression(x: Json): { progression: Progression; repairs:
   const bars = Array.isArray(x.bars) && x.bars.length ? x.bars.map(repairBar) : emptyBars();
   const events = Array.isArray(x.melody) ? x.melody.map(repairEvent).filter((e): e is MelodyEvent => e !== null) : [];
   const fit = fitToForm(events, slotsOf(bars, layoutMeter(timeSignature)));
+  const etudeName = typeof x.etudeName === 'string' && x.etudeName.trim() ? x.etudeName.trim() : '';
   const progression: Progression = {
     title,
+    ...(etudeName ? { etudeName } : {}),
     timeSignature,
     barsPerRow,
     instrument,
@@ -91,8 +93,8 @@ export function repairProgression(x: Json): { progression: Progression; repairs:
 
 /** File data for a progression: no ids, timestamps or device state. */
 export function fileData(p: Progression): Progression {
-  const { title, timeSignature, barsPerRow, instrument, concertClef, bars, melody } = p;
-  return { title, timeSignature, barsPerRow, instrument, ...(concertClef ? { concertClef } : {}), bars, melody };
+  const { title, etudeName, timeSignature, barsPerRow, instrument, concertClef, bars, melody } = p;
+  return { title, ...(etudeName ? { etudeName } : {}), timeSignature, barsPerRow, instrument, ...(concertClef ? { concertClef } : {}), bars, melody };
 }
 
 /** A filename-safe version of a title. */

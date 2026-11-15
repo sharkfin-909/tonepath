@@ -67,23 +67,34 @@ describe('Write: entry', () => {
   });
 });
 
-describe('Write: Explore hex panel (write-with)', () => {
+describe('Explore mode', () => {
+  const explore: Intent = { type: 'mode', mode: 'explore' };
   it('a pick only auditions: nothing written, the caret stays', () => {
-    const r = run([{ type: 'write-with', how: 'explore' }, pick(62)]);
+    const r = run([explore, pick(62)]);
     expect(r.p.melody).toEqual([]);
     expect(r.state.caret).toBe(0);
     expect(show(r.per[1])).toEqual(['note 62']);
   });
 
+  it('nothing edits the hidden melody: delete, nudge and Clear do nothing', () => {
+    const p = { ...prog(), melody: [{ pitch: 60, d: 'q' as const }] };
+    for (const i of [{ type: 'delete', back: true }, { type: 'nudge', dir: 1, octave: false }, { type: 'clear-notes' }] as Intent[]) {
+      const r = run([explore, i], { p, state: { caret: q } });
+      expect(r.p.melody).toEqual(p.melody);
+    }
+  });
+
   it('Rest on: a length key inserts nothing', () => {
-    const r = run([{ type: 'write-with', how: 'explore' }, { type: 'toggle-rest' }, { type: 'length', d: 'h' }]);
+    const r = run([explore, { type: 'toggle-rest' }, { type: 'length', d: 'h' }]);
     expect(r.p.melody).toEqual([]);
     expect(r.state.length).toBe('h');
   });
 
-  it('back to hex (or instrument): picks write again', () => {
-    expect(run([{ type: 'write-with', how: 'explore' }, { type: 'write-with', how: 'hex' }, pick(62)]).p.melody).toEqual([{ pitch: 62, d: 'q' }]);
-    expect(run([{ type: 'write-with', how: 'instrument' }, pick(62)]).p.melody).toEqual([{ pitch: 62, d: 'q' }]);
+  it('Write (or Practice, then Write) writes again; the input never stops hex picks writing', () => {
+    expect(run([explore, { type: 'mode', mode: 'write' }, pick(62)]).p.melody).toEqual([{ pitch: 62, d: 'q' }]);
+    expect(run([explore, { type: 'mode', mode: 'practice' }, { type: 'mode', mode: 'write' }, pick(62)]).p.melody).toEqual([{ pitch: 62, d: 'q' }]);
+    expect(run([{ type: 'input', how: 'instrument' }, pick(62)]).p.melody).toEqual([{ pitch: 62, d: 'q' }]);
+    expect(run([explore]).state).toMatchObject({ explore: true, playIndex: null });
   });
 });
 
@@ -155,6 +166,14 @@ describe('Write: stepwise playback (` / ~)', () => {
     expect(run([step], { p: melody, state: { caret: q } }).state.caret).toBe(2 * q); // mid-note: plays it, caret to its end
   });
 
+  it('back: the event before the caret, played, caret to its start; before the first, the last (wrapping)', () => {
+    const back: Intent = { type: 'step-play', dir: -1 };
+    const r = run([back, back, back, back], { p: melody, state: { caret: 2 * W } });
+    expect(r.per.map(show)).toEqual([['note 67'], [], ['note 62'], ['note 67']]);
+    expect(run([back], { p: melody, state: { caret: W } }).state.caret).toBe(W / 2); // the rest's start
+    expect(run([back, step], { p: melody, state: { caret: W } }).per.map(show)).toEqual([[], []]); // back onto the rest, then over it
+  });
+
   it('an empty melody or Play mode: nothing', () => {
     expect(run([step]).effects).toEqual([]);
     expect(run([{ type: 'mode', mode: 'play' }, step], { p: melody }).per[1]).toEqual([]);
@@ -162,21 +181,38 @@ describe('Write: stepwise playback (` / ~)', () => {
 });
 
 describe('Practice (SPEC §3.7)', () => {
+  it('input: hex panel by default; the dropdown switches it (kept across modes)', () => {
+    expect(run([]).state.input).toBe('hex');
+    const r = run([{ type: 'input', how: 'instrument' }, { type: 'mode', mode: 'practice' }, { type: 'mode', mode: 'write' }, { type: 'mode', mode: 'practice' }]);
+    expect(r.state).toMatchObject({ practice: true, input: 'instrument' });
+  });
+
+  it('a hex pick in Practice auditions and is never written', () => {
+    const r = run([{ type: 'mode', mode: 'practice' }, pick(62)]);
+    expect(r.p.melody).toEqual([]);
+    expect(show(r.per[1])).toContain('note 62');
+  });
+
   it('is Play with the mic: entering, switching with Play, and leaving', () => {
     const r = run([{ type: 'mode', mode: 'practice' }]);
     expect(r.state).toMatchObject({ playIndex: 0, practice: true });
     expect(run([{ type: 'mode', mode: 'practice' }, { type: 'mode', mode: 'play' }]).state).toMatchObject({ playIndex: 0, practice: false });
     expect(run([{ type: 'mode', mode: 'practice' }, { type: 'mode', mode: 'write' }]).state).toMatchObject({ playIndex: null, practice: false });
   });
-  it('On arrival sounds when the form moves on, and as a cue on entering Practice', () => {
+  it('entering Practice is silent: the first slot\'s On arrival waits for the first note played', () => {
+    const r = run([{ type: 'mode', mode: 'practice' }, { type: 'practice-note' }, { type: 'practice-note' }], { onArrival: 'chord' });
+    expect(r.per.map(show)).toEqual([[], ['chord D'], []]);
+  });
+
+  it('On arrival sounds when the form moves on (landed: with that note)', () => {
     const r = run([{ type: 'mode', mode: 'practice' }, { type: 'practice-advance', index: 1, landed: true }], { onArrival: 'bass-chord' });
-    expect(r.per.map(show)).toEqual([['chord D', 'bass D'], ['chord G', 'bass G']]);
+    expect(r.per.map(show)).toEqual([[], ['chord G', 'bass G']]);
     expect(r.state.arrival).toBeNull(); // landed on the next chord: it sounded with that note
   });
 
   it('finishing a slot (note count, Follow): the arrival waits for the next note played — the new slot\'s first', () => {
     const r = run([{ type: 'mode', mode: 'practice' }, { type: 'practice-advance', index: 1, landed: false }, { type: 'practice-note' }, { type: 'practice-note' }], { onArrival: 'chord' });
-    expect(r.per.map(show)).toEqual([['chord D'], [], ['chord G'], []]); // silent on the finishing note; then with the next
+    expect(r.per.map(show)).toEqual([[], [], ['chord G'], []]); // silent entry and finishing note; then with the next
   });
 
   it('the mic moves the form on; a length choice there never inserts a rest', () => {

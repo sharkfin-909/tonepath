@@ -1,7 +1,7 @@
-// Practice mode (SPEC §3.7): note counts from the selected length; the five advance rules.
+// Practice mode (SPEC §3.7): the note count (a number per chord); the five advance rules.
 import { describe, expect, it } from 'vitest';
 import { newProgression, type Progression } from './progression';
-import { ECHO_DEAF_MS, echoGuard, followEventIndex, guideTones, isEcho, noteCountFor, practiceNote, practiceTargets, startPractice, type AdvanceRule, type PracticeState } from './practice';
+import { ECHO_DEAF_MS, echoGuard, followEventIndex, guideTones, isEcho, practiceCount, practiceNote, practiceTargets, startPractice, type AdvanceRule, type PracticeState } from './practice';
 import { slotHarmony } from './harmony';
 import { instrumentView } from './view';
 
@@ -11,18 +11,22 @@ const prog = (melody: Progression['melody'] = []): Progression => ({
   bars: [[{ chord: 'Dm7' }, { chord: 'G7' }], [{ chord: 'Cmaj7' }], [{ chord: 'N.C.' }]],
   melody,
 });
-const ctx = (rule: AdvanceRule, p = prog(), length: 'q' | 'e' | 'h' = 'q') => ({ view: instrumentView(p), melody: p.melody, rule, length });
+const ctx = (rule: AdvanceRule, p = prog(), count = 2) => ({ view: instrumentView(p), melody: p.melody, rule, count });
 /** Play notes in order; the slots the form was on after each. */
-const play = (rule: AdvanceRule, notes: number[], p = prog(), length: 'q' | 'e' | 'h' = 'q') => {
+const play = (rule: AdvanceRule, notes: number[], p = prog(), count = 2) => {
   let s: PracticeState = startPractice(0);
-  return notes.map((m) => (s = practiceNote(s, m, ctx(rule, p, length)).state).slot);
+  return notes.map((m) => (s = practiceNote(s, m, ctx(rule, p, count)).state).slot);
 };
 
-describe('note count from the selected length', () => {
-  it('a half-bar slot in quarters is 2, a whole bar 4; in eighths 4 and 8', () => {
-    const v = instrumentView(prog());
-    expect([noteCountFor(v.slots[0], 'q'), noteCountFor(v.slots[2], 'q'), noteCountFor(v.slots[0], 'e'), noteCountFor(v.slots[2], 'e')]).toEqual([2, 4, 4, 8]);
-    expect(noteCountFor(v.slots[0], 'w')).toBe(1); // never 0
+describe('note count: a number per chord', () => {
+  it('one of 1, 2, 4, 8, 16, 32 (the nearest); anything not a number is the default 4', () => {
+    expect([1, 2, 4, 8, 16, 32].map(practiceCount)).toEqual([1, 2, 4, 8, 16, 32]);
+    expect([practiceCount(3.5), practiceCount(7), practiceCount(0), practiceCount(500)]).toEqual([4, 8, 1, 32]);
+    expect([practiceCount(undefined), practiceCount('6'), practiceCount(NaN)]).toEqual([4, 4, 4]);
+  });
+
+  it('the same count for every slot, whatever its length', () => {
+    expect(play('count', [60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71], prog(), 4)).toEqual([0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3]); // half bar and whole bar alike
   });
 });
 
@@ -43,8 +47,8 @@ describe('advance rules', () => {
     expect(practiceNote({ slot: 0, count: 1, follow: 0, lastFollowPc: null }, 60, ctx('count'))).toMatchObject({ advanced: true, landed: false });
   });
 
-  it('note count: after the slot’s count (quarters: 2 in a half bar)', () => {
-    expect(play('count', [60, 61, 62, 63, 64, 65])).toEqual([0, 1, 1, 2, 2, 2]);
+  it('note count: after the slot’s count (here 2)', () => {
+    expect(play('count', [60, 61, 62, 63, 64, 65])).toEqual([0, 1, 1, 2, 2, 3]);
   });
 
   it('count, then guide tone: fill the slot first, then land on a guide tone', () => {
@@ -86,9 +90,9 @@ describe('advance rules', () => {
 
   it('wraps from the last slot to the first; a next slot without a chord falls back to the count', () => {
     let s: PracticeState = { slot: 2, count: 0, follow: 0, lastFollowPc: null }; // Cmaj7 → N.C. next
-    for (const m of [60, 62, 64]) s = practiceNote(s, m, ctx('guide')).state;
+    for (const m of [60, 62, 64]) s = practiceNote(s, m, ctx('guide', prog(), 4)).state;
     expect(s.slot).toBe(2);
-    s = practiceNote(s, 65, ctx('guide')).state; // 4th note: the count of a whole bar in quarters
+    s = practiceNote(s, 65, ctx('guide', prog(), 4)).state; // 4th note: the count (4 here)
     expect(s.slot).toBe(3);
     const end = practiceNote({ slot: 3, count: 0, follow: 0, lastFollowPc: null }, 71, ctx('guide')); // N.C. → Dm7 (wraps)
     expect(end.state.slot).toBe(3); // B isn't a guide tone of Dm7 (F, C)
@@ -112,5 +116,9 @@ describe('echo guard: the mic hearing the app\'s own On arrival sound', () => {
     expect(isEcho(g, [...g.midis][1], 2000)).toBe(true);
     expect(echoGuard([], 0)).toBeNull();
     expect(echoGuard([{ type: 'chord', harmony: slotHarmony({ chord: 'N.C.' }) }], 0)).toBeNull();
+  });
+  it('a hex pick\'s audition is guarded like a single note (~1 s), so the mic doesn\'t count it again', () => {
+    const g = echoGuard([{ type: 'note', midi: 62 }], 0)!;
+    expect([isEcho(g, 62, 500), isEcho(g, 74, 500), isEcho(g, 64, 500), isEcho(g, 62, 1200)]).toEqual([true, true, false, false]);
   });
 });

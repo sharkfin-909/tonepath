@@ -1,11 +1,11 @@
 // Pure `practice` module (SPEC §3.7): improvisation practice over the form, driven by the notes the mic hears.
 // Each played note is counted in the current slot; an **advance rule** decides when the form moves on to the next
-// slot. All five rules are options; the note count target comes from the selected note length and the slot's length.
+// slot. All five rules are options; the note count target is the practice panel's number (notes per chord).
 
 import { chordVoicing, rootNote, bassNote } from './audio';
 import { pcOf, type SlotHarmony } from './harmony';
-import { TICKS, eventsForSlot } from './melody';
-import type { Duration, MelodyEvent } from './progression';
+import { eventsForSlot } from './melody';
+import type { MelodyEvent } from './progression';
 import type { InstrumentView, ViewSlot } from './view';
 
 export type AdvanceRule = 'guide' | 'chord-tone' | 'count' | 'count-then-guide' | 'follow';
@@ -13,7 +13,7 @@ export type AdvanceRule = 'guide' | 'chord-tone' | 'count' | 'count-then-guide' 
 export const ADVANCE_RULES: { id: AdvanceRule; label: string; hint: string }[] = [
   { id: 'guide', label: 'Guide tone', hint: 'Move on when you play a 3rd or 7th of the next chord' },
   { id: 'chord-tone', label: 'Chord tone', hint: 'Move on when you play any note of the next chord' },
-  { id: 'count', label: 'Note count', hint: 'Move on after the slot’s count of notes (from the selected length)' },
+  { id: 'count', label: 'Note count', hint: 'Move on after the count of notes (set in Notes:)' },
   { id: 'count-then-guide', label: 'Count, then guide tone', hint: 'Play the slot’s count of notes, then land on a guide tone of the next chord' },
   { id: 'follow', label: 'Follow the etude', hint: 'Play the written notes in order; the form follows you' },
 ];
@@ -33,8 +33,8 @@ export interface PracticeContext {
   view: InstrumentView;
   melody: MelodyEvent[];
   rule: AdvanceRule;
-  /** The selected note length: the count target is the slot's length in these. */
-  length: Duration;
+  /** The note count target per slot (the practice panel's number; at least 1). */
+  count: number;
 }
 
 export const startPractice = (slot: number): PracticeState => ({ slot, count: 0, follow: 0, lastFollowPc: null });
@@ -42,9 +42,13 @@ export const startPractice = (slot: number): PracticeState => ({ slot, count: 0,
 const mod12 = (n: number) => ((n % 12) + 12) % 12;
 const next = (view: InstrumentView, slot: number) => (slot + 1) % view.slots.length;
 
-/** How many notes fill a slot at the selected length (a 2-beat slot in quarters → 2). At least 1. */
-export function noteCountFor(slot: Pick<ViewSlot, 'start' | 'end'>, length: Duration): number {
-  return Math.max(1, Math.round((slot.end - slot.start) / TICKS[length]));
+/** The note counts the practice panel offers. */
+export const PRACTICE_COUNTS = [1, 2, 4, 8, 16, 32] as const;
+
+/** Practice's note count: one of PRACTICE_COUNTS (the nearest; the default 4 for anything not a number). */
+export function practiceCount(n: unknown): number {
+  if (typeof n !== 'number' || !Number.isFinite(n)) return 4;
+  return PRACTICE_COUNTS.reduce((best, c) => (Math.abs(c - n) < Math.abs(best - n) ? c : best), PRACTICE_COUNTS[0]);
 }
 
 /** A slot's guide tones (concert pitch classes): its 3rd (a sus chord's 4th) and its 7th or 6th. Empty without a chord. */
@@ -78,9 +82,8 @@ export interface PracticeTargets {
 
 /** What the player is aiming for in the current state (shown on the hex and in the practice panel). */
 export function practiceTargets(s: PracticeState, c: PracticeContext): PracticeTargets {
-  const slot = c.view.slots[s.slot];
   const nxt = c.view.slots[next(c.view, s.slot)];
-  const need = noteCountFor(slot, c.length);
+  const need = practiceCount(c.count);
   switch (c.rule) {
     case 'guide':
       return { pcs: orNull(guideTones(nxt)), midi: null, need: null };
@@ -120,7 +123,7 @@ export interface PracticeStep {
  */
 export function practiceNote(s: PracticeState, heard: number, c: PracticeContext, fromOnset = true): PracticeStep {
   const count = s.count + 1;
-  const need = noteCountFor(c.view.slots[s.slot], c.length);
+  const need = practiceCount(c.count);
   /** Landed on the next chord: this note is its first. */
   const advance = (): PracticeStep => ({
     state: { slot: next(c.view, s.slot), count: 1, follow: 0, lastFollowPc: mod12(heard) },
@@ -171,12 +174,16 @@ export interface EchoGuard {
 /** Ignore everything for this long after a sound starts (ms). */
 export const ECHO_DEAF_MS = 250;
 
-/** The guard for sounds just played: chord (rings ~3 s), root / bass note (~1 s). Null when nothing sounded. */
-export function echoGuard(sounds: { type: 'chord' | 'root' | 'bass'; harmony: SlotHarmony }[], now: number): EchoGuard | null {
+/** A sound the app plays: *On arrival* (a slot's chord, root or bass) or a note (a hex pick's audition). */
+export type AppSound = { type: 'chord' | 'root' | 'bass'; harmony: SlotHarmony } | { type: 'note'; midi: number };
+
+/** The guard for sounds just played: chord (rings ~3 s), a note — root, bass or a hex pick (~1 s). Null when nothing sounded. */
+export function echoGuard(sounds: AppSound[], now: number): EchoGuard | null {
   const midis = new Set<number>();
   let ring = 0;
   for (const e of sounds) {
-    const ms = e.type === 'chord' ? chordVoicing(e.harmony) : [e.type === 'root' ? rootNote(e.harmony) : bassNote(e.harmony)].filter((m): m is number => m !== null);
+    const ms =
+      e.type === 'note' ? [e.midi] : e.type === 'chord' ? chordVoicing(e.harmony) : [e.type === 'root' ? rootNote(e.harmony) : bassNote(e.harmony)].filter((m): m is number => m !== null);
     ms.forEach((m) => midis.add(m));
     if (ms.length) ring = Math.max(ring, e.type === 'chord' ? 3200 : 1100);
   }

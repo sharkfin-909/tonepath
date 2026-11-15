@@ -1,4 +1,5 @@
 // The chart (SPEC §3.1): rows of `barsPerRow` bars, a clef gutter per row, slots at time-proportional width.
+import type { Clef } from '../instruments';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import type { FormSlot, Meter } from '../form';
 import { eventsForSlot, type TimedEvent } from '../melody';
@@ -44,6 +45,8 @@ export interface ChartProps {
   follow?: { played: ReadonlySet<number> } | null;
   /** Play mode (SPEC §3.3): the current slot. The caret, bar handles and "+" are hidden; chords and scales stay editable. */
   playIndex?: number | null;
+  /** Explore (SPEC §3.2): empty staves like Play, and no caret, bar handles or "+"; chords and scales stay editable. */
+  explore?: boolean;
   /** Read mode (SPEC §3.4; `stand` in code): read-only, nothing highlighted or clickable, fit the page with no zoom floor. */
   stand?: boolean;
   /**
@@ -81,10 +84,10 @@ function useParentSize<T extends HTMLElement>() {
   return [ref, size] as const;
 }
 
-export function Chart({ progression, view, caret, onSlotClick, onEventClick, onTimeClick, onChordCommit, onScaleChange, editRequest, selection, onBarSelect, onBarAction, onAppendBar, canPaste, playIndex = null, stand = false, maxHeight, follow = null }: ChartProps) {
+export function Chart({ progression, view, caret, onSlotClick, onEventClick, onTimeClick, onChordCommit, onScaleChange, editRequest, selection, onBarSelect, onBarAction, onAppendBar, canPaste, playIndex = null, explore = false, stand = false, maxHeight, follow = null }: ChartProps) {
   const playing = playIndex !== null;
   /** Play and Read both hide the caret, bar handles and "+" (Play keeps chord and scale entry). */
-  const readOnly = playing || stand;
+  const readOnly = playing || stand || explore;
   const { bars, barsPerRow } = progression;
   const [fitRef, area] = useParentSize<HTMLDivElement>();
   const chartRef = useRef<HTMLDivElement>(null);
@@ -163,7 +166,7 @@ export function Chart({ progression, view, caret, onSlotClick, onEventClick, onT
               clef={clef}
               melody={progression.melody}
               caret={!readOnly && slot.index === activeSlot ? caret : undefined}
-              playing={playing}
+              playing={playing || explore}
               follow={follow}
               onEventClick={stand ? undefined : onEventClick}
               onTimeClick={stand ? undefined : onTimeClick}
@@ -212,7 +215,7 @@ interface SlotViewProps {
   view: InstrumentView;
   active: boolean;
   onActivate: () => void;
-  clef: 'treble' | 'bass';
+  clef: Clef;
   melody: Progression['melody'];
   caret?: number;
   /** Play mode: the active slot gets the solid "current slot" highlight. */

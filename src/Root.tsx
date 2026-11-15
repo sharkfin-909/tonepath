@@ -18,6 +18,7 @@ import {
   restoreProgression,
 } from './library';
 import { LibraryScreen } from './library/LibraryScreen';
+import { Tooltips } from './Tooltips';
 import { countUnreadable, listProgressions, onSaveStatus, type StoredProgression } from './storage';
 import { backupAge, isSafari, shouldRemind } from './backup';
 import { readDevice, writeDevice } from './device';
@@ -117,6 +118,7 @@ export function Root() {
     return (
       <>
         {banner}
+        <Tooltips />
         <App key={screen.progression.id} initial={screen.progression} renameOnOpen={screen.rename} onLibrary={toLibrary} />
       </>
     );
@@ -124,6 +126,7 @@ export function Root() {
   return (
     <>
     {banner}
+    <Tooltips />
     <LibraryScreen
       progressions={list}
       onExportOne={(p) => {

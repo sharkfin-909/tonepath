@@ -13,6 +13,7 @@ function InlineField({
   className,
   onCommit,
   startEditing = false,
+  placeholder,
 }: {
   value: string;
   label: string;
@@ -20,16 +21,18 @@ function InlineField({
   onCommit: (text: string) => void;
   /** Open in edit mode (a New progression opens with its title in edit, SPEC §3.5). */
   startEditing?: boolean;
+  /** Shown (muted) while the value is blank. */
+  placeholder?: string;
 }) {
   const [editing, setEditing] = useState(startEditing);
   const done = useRef(false);
   if (!editing) {
     return (
-      <button type="button" className={`inline-value ${className}`} title={`${label} (click to edit)`} onClick={() => {
+      <button type="button" className={`inline-value ${className}${!value && placeholder ? ' placeholder' : ''}`} title={`${label} (click to edit)`} onClick={() => {
         done.current = false;
         setEditing(true);
       }}>
-        {value || ' '}
+        {value || placeholder || ' '}
       </button>
     );
   }
@@ -60,6 +63,11 @@ function InlineField({
       onBlur={(e) => finish(e.currentTarget.value)}
     />
   );
+}
+
+/** The etude name above the title (SPEC §3.1): blank shows a muted "Etude name". */
+export function EtudeNameField({ name, onRename }: { name: string; onRename: (text: string) => void }) {
+  return <InlineField value={name} label="Etude name" className="etude-name" onCommit={onRename} placeholder="Etude name" />;
 }
 
 export function TitleField({ title, onRename, editing = false }: { title: string; onRename: (text: string) => void; editing?: boolean }) {
