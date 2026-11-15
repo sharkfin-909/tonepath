@@ -281,6 +281,14 @@ Reference implementation: the throwaway [VexFlow spike prototype](prototypes/vex
 - **Mute**: speaker toggle in the control header, key `M`; a device setting. No volume slider.
 - `AudioContext` created / resumed on the first user gesture.
 
+
+### 9.2 Listen (prototype) — toward an improvisation practice mode
+
+- **🎤 Listen** pill, bottom right of the hex panel. On: the browser asks for the microphone once; the mic is read every animation frame (no library): an AnalyserNode frame (2048 samples, ~43 ms) → **YIN pitch detection** (monophonic: voice, horns, strings, single-line guitar / bass; ~55 Hz – 1.6 kHz) and **onset detection** (level well above its recent average, still rising, past a noise gate; 90 ms lockout — a re-attack of the same note counts, a held note doesn't). A note is reported once it reads the same on two frames running (no flicker through the attack).
+- Shown: the **heard note** (written pitch, spelled for the active slot) with its cents off, an input level meter, and a running **count of note starts**; the heard note's cells **light on the hex** like a hovered cell.
+- The mic is opened with echo cancellation on (keeps the app's own sounds out) and noise suppression / auto gain off (they colour an instrument).
+- **Planned** (practice mode): every advance rule as an option — guide-tone target of the next chord; any chord tone of the next chord; note count then a target; follow the written etude — with the **note count from the selected note length** (e.g. quarter in 4/4 → 4 notes per bar of one chord).
+
 ## 10. Instruments — [Instrument view](issues/011-instrument-view.md), [Instrument practical ranges](issues/013-instrument-practical-ranges.md), [Clef policy](issues/032-clef-policy.md)
 
 | id | Name | Written = concert + | Practical written range | Clef |

@@ -55,9 +55,11 @@ export interface DockedHexProps {
   onLabelClick?: () => void;
   /** The playable written pitch under the pointer (a cell or a border button), or null: what A would pick (Space clicks it). */
   onHoverPitch?: (written: number | null) => void;
+  /** Listen (SPEC §9.2): the written pitch the mic hears; its cells light. */
+  heard?: number | null;
 }
 
-export function DockedHex({ dock, onPick, halo, onLabelClick, onHoverPitch }: DockedHexProps) {
+export function DockedHex({ dock, onPick, halo, onLabelClick, onHoverPitch, heard = null }: DockedHexProps) {
   const [ref, { width, height }] = useSize<HTMLDivElement>();
   const { hex, mode, label, labelEditsChord } = dock;
   const layout: HexLayout | null = width > 0 && height > 0 ? layoutHex(hex, width, height, T.borderButtonGap) : null;
@@ -165,7 +167,7 @@ export function DockedHex({ dock, onPick, halo, onLabelClick, onHoverPitch }: Do
                   ry={layout.size.ry}
                   onPick={pick}
                   halo={cell.midi === halo}
-                  lit={cell.midi === hoverMidi || cell.midi === flash}
+                  lit={cell.midi === hoverMidi || cell.midi === flash || cell.midi === heard}
                   onHover={setHover}
                 />
               ))}

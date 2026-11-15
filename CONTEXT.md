@@ -67,6 +67,7 @@ Honeycomb is a practice-etude tool: a chord-bar form with in-slot standard notat
 
 ## Sound and instrument
 
+- **Listen** — reading the microphone to detect the notes a player plays (pitch and note starts, one note at a time); the basis of the planned practice mode. _Avoid_: record (nothing is written down).
 - **Audition** — hearing a pitch (plain sine) when a docked-hex cell or an in-slot notation note is clicked. **Chord preview** (▶ Chord / Space) — active slot’s chord tones (root in concert octave 3; extensions above the 7th; slash bass below). **Scale peek** (▶ Scale / Shift+Space) — active slot’s scale ascending one octave from the tonic (~150 ms apart). **Mute** — per-device toggle (M / speaker by title). Sound is always concert pitch. No full-line playback in v1.
 - **Instrument** — an entry in the instrument list: name, **transposition** (written = concert + an interval, octave included) and a practical **written range**. `Concert` has no range.
 - **Instrument view** — the progression's chosen instrument (shown beside the title; new progressions default to the device's last pick). Chords, hex labels and notation show **written pitch**; typed input is read as written; the stored chart and sound stay in **concert pitch**. Computed once per change as slots with written chord, harmony and spelling (`view.ts`); nothing else transposes.

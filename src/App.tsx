@@ -20,6 +20,7 @@ import { HONEYCOMB, linearOctaves, type HexShape } from './hex';
 import { keyIntent } from './keymap';
 import { clickUnderPointer, trackPointer } from './pointerClick';
 import { instrumentView } from './view';
+import { ListenPill } from './listen/ListenPill';
 
 /** A CSS media query as React state (SPEC §3.6 responsive layout). */
 function useMediaQuery(query: string): boolean {
@@ -100,6 +101,8 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
       writeDevice(localStorage, { hexShape: on ? 'honeycomb' : 'linear' });
       return !on;
     });
+  /** Listen (SPEC §9.2): the concert note the mic hears, or null. */
+  const [heardConcert, setHeardConcert] = useState<number | null>(null);
   const [editRequest, setEditRequest] = useState<{ bar: number; part: number; n: number } | null>(null);
 
   const view = useMemo(() => instrumentView(progression), [progression]);
@@ -451,6 +454,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
           >
             Grid
           </button>}
+          <ListenPill onHeard={setHeardConcert} nameOf={(m) => view.name(m, active)} />
           {linear && (
             <div className="octave-switch" role="group" aria-label="Octave">
               <button type="button" className="octave-step" aria-label="Octave down" title="Octave down" disabled={octave <= octaves.min} onClick={() => setOctave(octave - 12)}>
@@ -470,6 +474,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
               hovered.current = p;
             }}
             halo={haloPitch === null ? null : view.toWritten(haloPitch)}
+            heard={heardConcert === null ? null : view.toWritten(heardConcert)}
           />
         </section>
       </main>
