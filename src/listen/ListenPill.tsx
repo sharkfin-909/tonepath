@@ -1,6 +1,6 @@
-// 🎤 Listen (SPEC §9.2): a pill at the bottom right of the hex panel. On: the mic is read every frame; the pill shows
-// the note being played (spelled for the active slot, written pitch), how far off it is, the input level control and meter,
-// and — portalled above the hex — the big tuner. Practice turns it on and off (`auto`) and receives each played note (`onNote`).
+// 🎤 Listen (SPEC §9.2): an on / off toggle in the hex panel's top left corner. On: the mic is read every frame; a pill
+// portalled to the row's right end shows the input level control and meter, and — portalled into the row's middle — the tuner shows
+// the note being played (spelled for the active slot, written pitch) and how far off it is. Practice turns it on and off (`auto`) and receives each played note (`onNote`).
 // Only a change of note is reported up (to light the hex), so the chart doesn't re-render 60 times a second.
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -14,17 +14,21 @@ export interface ListenPillProps {
   onHeard: (concertMidi: number | null) => void;
   /** A concert note's written name in the active slot, e.g. `Eb4`. */
   nameOf: (concertMidi: number) => string;
-  /** A note was played (an attack, or a slur to a new pitch): concert MIDI. Practice counts these (SPEC §3.7). */
+  /** A note was played (an attack, or a slur to a new pitch): concert MIDI. Write inserts; Practice counts (SPEC §3.7). */
   onNote?: (concertMidi: number, fromOnset: boolean) => void;
   /** Practice: listen without a click — on while true, off again when it turns false (if it started it). */
   auto?: boolean;
+  /** Mic on/off — App uses this in Write to mute note audition while listening. */
+  onListening?: (on: boolean) => void;
   /** Where the big tuner goes (above the hex): rendered there while listening, so only it redraws every frame. */
   tunerSlot?: HTMLElement | null;
+  /** Where the input level control and meter go (the row's right end): rendered there while listening. */
+  levelsSlot?: HTMLElement | null;
   /** Concert MIDI of the instrument's practical low, or null for Concert — sets the analysis window (issues/064). */
   concertLowMidi?: number | null;
 }
 
-export function ListenPill({ onHeard, nameOf, onNote, auto = false, tunerSlot = null, concertLowMidi = null }: ListenPillProps) {
+export function ListenPill({ onHeard, nameOf, onNote, auto = false, onListening, tunerSlot = null, levelsSlot = null, concertLowMidi = null }: ListenPillProps) {
   const [on, setOn] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [frame, setFrame] = useState<{ midi: number | null; cents: number; level: number }>({ midi: null, cents: 0, level: 0 });
@@ -55,6 +59,7 @@ export function ListenPill({ onHeard, nameOf, onNote, auto = false, tunerSlot = 
       listening.current?.stop();
       listening.current = null;
       setOn(false);
+      onListening?.(false);
       lastMidi.current = null;
       report.current(null);
       setFrame({ midi: null, cents: 0, level: 0 });
@@ -74,6 +79,7 @@ export function ListenPill({ onHeard, nameOf, onNote, auto = false, tunerSlot = 
         { gainDb, concertLowMidi },
       );
       setOn(true);
+      onListening?.(true);
       return true;
     } catch (err) {
       setError(err instanceof DOMException && err.name === 'NotAllowedError' ? 'Microphone blocked' : 'No microphone');
@@ -103,38 +109,42 @@ export function ListenPill({ onHeard, nameOf, onNote, auto = false, tunerSlot = 
   return (
     <>
     {on && tunerSlot && createPortal(<Tuner name={frame.midi === null ? null : nameOf(frame.midi)} cents={frame.cents} />, tunerSlot)}
-    <div className={on ? 'listen-pill on' : 'listen-pill'}>
-      <button type="button" className="listen-toggle" aria-pressed={on} title={on ? 'Stop listening' : 'Listen: detect the notes you play (mic)'} onClick={() => void toggle()}>
-        🎤 {on ? 'Listening' : 'Listen'}
-      </button>
-      {on && (
-        <>
-          <label className="listen-gain" title={`Input level ${gainDb > 0 ? '+' : ''}${gainDb} dB: playing should pass the mark, silence stay below it`}>
-            <span className="listen-gain-label">In</span>
-            <input
-              type="range"
-              min={INPUT_GAIN_DB.min}
-              max={INPUT_GAIN_DB.max}
-              step={1}
-              value={gainDb}
-              aria-label="Input level (dB)"
-              onChange={(e) => changeGain(Number(e.target.value))}
-              onDoubleClick={() => changeGain(0)}
-            />
-            <span className="listen-gain-db">{`${gainDb > 0 ? '+' : ''}${gainDb}`}</span>
-          </label>
-          <span className={frame.level >= ONSET_GATE ? 'listen-meter over' : 'listen-meter'} aria-hidden>
-            <span className="listen-meter-fill" style={{ width: `${Math.round(meter * 100)}%` }} />
-            <span className="listen-meter-mark" style={{ left: `${Math.round(mark * 100)}%` }} />
-          </span>
-          <span className="listen-note" aria-live="off">
-            {frame.midi === null ? '—' : nameOf(frame.midi)}
-            {frame.midi !== null && <small>{`${frame.cents > 0 ? '+' : ''}${frame.cents}¢`}</small>}
-          </span>
-        </>
-      )}
-      {error && <span className="listen-error">{error}</span>}
-    </div>
+    {/* A static on / off toggle like Grid (filled when on), in the hex panel's top left corner. */}
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      className={on ? 'listen-switch on' : 'listen-switch'}
+      title={on ? 'Stop listening' : 'Listen: detect the notes you play (mic)'}
+      onClick={() => void toggle()}
+    >
+      Listen
+    </button>
+    {/* While listening: the input level control and meter, in a pill as tall as the tuner, at the row's right end. */}
+    {on && levelsSlot && createPortal(
+      <div className="listen-levels">
+        <label className="listen-gain" title={`Input level ${gainDb > 0 ? '+' : ''}${gainDb} dB: playing should pass the mark, silence stay below it`}>
+          <span className="listen-gain-label">In</span>
+          <input
+            type="range"
+            min={INPUT_GAIN_DB.min}
+            max={INPUT_GAIN_DB.max}
+            step={1}
+            value={gainDb}
+            aria-label="Input level (dB)"
+            onChange={(e) => changeGain(Number(e.target.value))}
+            onDoubleClick={() => changeGain(0)}
+          />
+          <span className="listen-gain-db">{`${gainDb > 0 ? '+' : ''}${gainDb}`}</span>
+        </label>
+        <span className={frame.level >= ONSET_GATE ? 'listen-meter over' : 'listen-meter'} aria-hidden>
+          <span className="listen-meter-fill" style={{ width: `${Math.round(meter * 100)}%` }} />
+          <span className="listen-meter-mark" style={{ left: `${Math.round(mark * 100)}%` }} />
+        </span>
+      </div>,
+      levelsSlot,
+    )}
+    {error && <span className="listen-error">{error}</span>}
     </>
   );
 }

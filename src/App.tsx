@@ -109,6 +109,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
   /** Listen (SPEC §9.2): the concert note the mic hears, or null. */
   const [heardConcert, setHeardConcert] = useState<number | null>(null);
   const [tunerSlot, setTunerSlot] = useState<HTMLDivElement | null>(null);
+  const [levelsSlot, setLevelsSlot] = useState<HTMLDivElement | null>(null);
   // Practice (SPEC §3.7): which slot is being practised and how many notes were played in it; the rule and loop are
   // device settings.
   const [practice, setPractice] = useState<PracticeState | null>(null);
@@ -120,6 +121,8 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
   const [practiceAdvances, setPracticeAdvances] = useState(0);
   /** The app's own sounds the mic may hear while practising (On arrival). */
   const echoRef = useRef<EchoGuard | null>(null);
+  /** Write + Listen: skip note audition so the speaker does not re-trigger the mic. */
+  const listeningRef = useRef(false);
   /** Write: the last note sounded by ` (step-play) or a melody-note click, concert pitch; lights the hex (`n` replays). */
   const [sounded, setSounded] = useState<{ midi: number; n: number } | null>(null);
   const [editRequest, setEditRequest] = useState<{ bar: number; part: number; n: number } | null>(null);
@@ -151,9 +154,12 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
     }
     for (const e of effects) {
       switch (e.type) {
-        case 'note':
-          playNote(e.midi);
+        case 'note': {
+          const s = sessionRef.current;
+          const writing = s.playIndex === null && !s.practice && !s.stand;
+          if (!(writing && listeningRef.current)) playNote(e.midi);
           break;
+        }
         case 'chord':
           playChord(e.harmony);
           break;
@@ -300,20 +306,39 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
   // Follow (SPEC §3.7): the written notes played correctly this time through, marked on the staves.
   const [played, setPlayed] = useState<ReadonlySet<number>>(() => new Set());
   useEffect(() => {
-    const p = practiceRef.current.practice;
-    if (practiceSlot !== null && p && p.slot === practiceSlot) return; // the mic moved the form on: keep going
+    if (practiceSlot !== null && practice && practice.slot === practiceSlot) return; // the mic moved the form on: keep going
     setPractice(practiceSlot === null ? null : startPractice(practiceSlot)); // started, stopped or moved by hand
     setPlayed(new Set());
   }, [practiceSlot]);
   const practiceCtx = { view, melody: progression.melody, rule: practiceRule, length: session.length };
   const practiceTarget = practice ? practiceTargets(practice, practiceCtx) : null;
-  /** A note the mic heard (concert): count it; the right one moves the form on (or ends it, without Loop). */
-  const practiceRef = useRef({ practice, practiceCtx, practiceLoop, on: session.practice });
-  practiceRef.current = { practice, practiceCtx, practiceLoop, on: session.practice };
-  const onPracticeNote = useCallback((heard: number, fromOnset: boolean) => {
-    const { practice: p, practiceCtx: c, practiceLoop: loop, on } = practiceRef.current;
-    if (!on || !p) return;
+  /** Mic note starts: Practice advances the form; Write inserts like a hex pick. */
+  const micNoteRef = useRef({
+    practice,
+    practiceCtx,
+    practiceLoop,
+    practiceOn: session.practice,
+    view,
+    writeOn: !playing && !session.practice && !session.stand,
+  });
+  micNoteRef.current = {
+    practice,
+    practiceCtx,
+    practiceLoop,
+    practiceOn: session.practice,
+    view,
+    writeOn: !playing && !session.practice && !session.stand,
+  };
+  const onMicNote = useCallback((heard: number, fromOnset: boolean) => {
+    const { practice: p, practiceCtx: c, practiceLoop: loop, practiceOn, view: v, writeOn } = micNoteRef.current;
     if (isEcho(echoRef.current, heard, performance.now())) return; // the app's own On arrival sound
+    if (writeOn && !practiceOn) {
+      // One note per tonguing — wobble / legato retarget while holding is a slur, not a new note.
+      if (!fromOnset) return;
+      dispatchRef.current({ type: 'pick', written: v.toWritten(heard) });
+      return;
+    }
+    if (!practiceOn || !p) return;
     // This note is played in the current slot: a waiting On arrival sound (the slot was reached by finishing the one
     // before) sounds with it.
     dispatchRef.current({ type: 'practice-note' });
@@ -359,7 +384,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
           aria-checked={mode === m}
           className={mode === m ? 'mode-option on' : 'mode-option'}
           title={
-            m === 'play' ? 'Play: audition only (P)' : m === 'practice' ? 'Practice: play your instrument; the right notes move the form on (mic)' : m === 'write' ? 'Write: record hex picks (P)' : 'Read: read-only page view (\\)'
+            m === 'play' ? 'Play: audition only (P)' : m === 'practice' ? 'Practice: play your instrument; the right notes move the form on (mic)' : m === 'write' ? 'Write: hex picks or Listen (mic) at the caret (P)' : 'Read: read-only page view (\\)'
           }
           onClick={() => {
             if (m === 'read') return dispatch({ type: 'stand', on: true });
@@ -530,8 +555,10 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
           </p>
         )}
         <section ref={dockRef} className={linear ? 'dock linear' : 'dock'} aria-label="Docked hex" tabIndex={-1}>
-          {/* Grid on = the 3-row honeycomb; off = Linear (one row, by octave). SPEC §8.5. Not on phones (always Linear). */}
-          {!narrow && <button
+          {/* Grid on = the 3-row honeycomb; off = Linear (one row, by octave). SPEC §8.5. Not on phones (always Linear).
+              Absolutely positioned at the panel's bottom left. */}
+          {!narrow && (
+            <button
             type="button"
             className={linear ? 'grid-toggle' : 'grid-toggle on'}
             aria-pressed={!linear}
@@ -542,15 +569,22 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
             }}
           >
             Grid
-          </button>}
+          </button>
+          )}
+          {/* Listen (SPEC §9.2): top left corner; its tuner and levels portal into the row above the hex. */}
           <ListenPill
             onHeard={setHeardConcert}
             nameOf={(m) => view.name(m, active)}
-            onNote={onPracticeNote}
+            onNote={onMicNote}
+            onListening={(on) => {
+              listeningRef.current = on;
+            }}
             auto={session.practice}
             tunerSlot={tunerSlot}
+            levelsSlot={levelsSlot}
             concertLowMidi={view.inst.range ? view.toConcert(view.inst.range.lo) : null}
           />
+          {/* Linear (SPEC §8.5): the octave switch, under the row, centred at the panel's bottom. */}
           {linear && (
             <div className="octave-switch" role="group" aria-label="Octave">
               <button type="button" className="octave-step" aria-label="Octave down" title="Octave down" disabled={octave <= octaves.min} onClick={() => setOctave(octave - 12)}>
@@ -562,28 +596,34 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
               </button>
             </div>
           )}
-          {/* Above the hex: the practice panel (SPEC §3.7) and the big tuner (Listen, §9.2) while listening. */}
+          {/* One row above the hex (only when it has something): the practice panel (SPEC §3.7) and the tuner (Listen,
+              §9.2) in the middle; Listen's input level and meter at the end. */}
           <div className="dock-top">
-            {session.practice && practice && (
-              <PracticePanel
-                rule={practiceRule}
-                onRule={(r) => {
-                  setPracticeRule(r);
-                  writeDevice(localStorage, { practiceRule: r });
-                  setPractice(startPractice(practice.slot));
-                }}
-                loop={practiceLoop}
-                onLoop={(on) => {
-                  setPracticeLoop(on);
-                  writeDevice(localStorage, { practiceLoop: on });
-                }}
-                count={practice.count}
-                need={practiceTarget!.need}
-                targetNames={practiceTargetNames}
-                advanced={practiceAdvances}
-              />
-            )}
-            <div className="tuner-slot" ref={setTunerSlot} />
+            <div className="dock-top-mid">
+              {session.practice && practice && (
+                <PracticePanel
+                  rule={practiceRule}
+                  onRule={(r) => {
+                    setPracticeRule(r);
+                    writeDevice(localStorage, { practiceRule: r });
+                    setPractice(startPractice(practice.slot));
+                  }}
+                  loop={practiceLoop}
+                  onLoop={(on) => {
+                    setPracticeLoop(on);
+                    writeDevice(localStorage, { practiceLoop: on });
+                  }}
+                  count={practice.count}
+                  need={practiceTarget!.need}
+                  targetNames={practiceTargetNames}
+                  advanced={practiceAdvances}
+                />
+              )}
+              <div className="tuner-slot" ref={setTunerSlot} />
+            </div>
+            <div className="dock-top-side end">
+              <div className="levels-slot" ref={setLevelsSlot} />
+            </div>
           </div>
           <DockedHex
             dock={view.dock(active.index, shape)}
