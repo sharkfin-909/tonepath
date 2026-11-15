@@ -1,12 +1,12 @@
-# Honeycomb — domain glossary
+# Tonepath — domain glossary
 
-Honeycomb is a practice-etude tool: a chord-bar form with in-slot standard notation, and one docked hex grid for scale-tone entry.
+Tonepath is a practice-etude tool: a chord-bar form with in-slot standard notation, and one docked hex grid for scale-tone entry.
 
 ## Library and files
 
 - **Library** — all the user's progressions, autosaved in browser storage; listed on the library screen, newest edit first. **Demo progression** — the deletable ii–V–I opened on first launch.
 - **Backup** — an *Export all* bundle file; imports only ever add progressions, never overwrite.
-- **Envelope** — the wrapper every Honeycomb file has: `{ app: "honeycomb", v, kind }`, where `kind` is `progression` (one progression, *Export one*) or `library` (a bundle, *Export all*). Files never carry ids, timestamps or device settings.
+- **Envelope** — the wrapper every Tonepath file has: `{ app: "tonepath", v, kind }`, where `kind` is `progression` (one progression, *Export one*) or `library` (a bundle, *Export all*). Files never carry ids, timestamps or device settings.
 - **Device settings** — per-browser state, never exported: last-picked instrument, mute, Play-mode "On arrival", last-open progression, last backup date, reminder dismissal, whether the demo has been seeded.
 - **Schema version** — integer `v` on the device settings and every file; older data is upgraded by a chain of pure migration steps; data newer than the app is refused.
 

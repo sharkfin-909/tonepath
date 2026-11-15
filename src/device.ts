@@ -1,10 +1,10 @@
-// Device settings (SPEC §12.5): `honeycomb:device`, never exported. Reads / writes `muted`, `playArrival`,
+// Device settings (SPEC §12.5): `tonepath:device`, never exported. Reads / writes `muted`, `playArrival`,
 // `lastInstrument`, `lastOpenId`, `seeded`, `seededDemos`, `v`, `lastBackupAt`, `reminderDismissedAt`, `hexShape`,
 // `practiceRule`, `practiceLoop` and `micGainDb`; unknown fields are preserved untouched.
 
 import { isReadOnly } from './readOnly';
 
-export const DEVICE_KEY = 'honeycomb:device';
+export const DEVICE_KEY = 'tonepath:device';
 
 export type OnArrival = 'silent' | 'chord' | 'root' | 'bass' | 'bass-chord';
 const ARRIVALS: OnArrival[] = ['silent', 'chord', 'root', 'bass', 'bass-chord'];
@@ -68,7 +68,7 @@ export function writeDevice(storage: Storage, change: Partial<DeviceSettings>): 
   try {
     storage.setItem(DEVICE_KEY, JSON.stringify(next));
   } catch (err) {
-    console.warn('Honeycomb: could not save device settings', err);
+    console.warn('Tonepath: could not save device settings', err);
   }
   return next;
 }

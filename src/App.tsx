@@ -526,7 +526,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
         {/* Row 1: title (left) · sound pill (centre) · mode panel (right); row 2: the editing controls (SPEC §3.1). */}
         {/* Row 1, left: the app's name. */}
         <div className="topbar-left">
-          <span className="brand">WOODSHED</span>
+          <span className="brand">TONEPATH</span>
         </div>
         {/* Row 1, centred: sound and *Audio on chord* (*On arrival*), in a pill. */}
         <div className="sound-section group topbar-center">
@@ -557,7 +557,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
         {/* Row 1, right: the mode panel (Audio input: / Mode:), in a pill. */}
         <div className="mode-corner">{modeSwitch}</div>
         <div className="topbar-row">
-          {/* Row 2, left (under WOODSHED): ← Library, then the etude name above the file name (the title), stacked. */}
+          {/* Row 2, left (under TONEPATH): ← Library, then the etude name above the file name (the title), stacked. */}
           <div className="topbar-file">
             <button
               type="button"

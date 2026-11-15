@@ -7,9 +7,9 @@ import { isInstrumentId } from './instruments';
 import { DURATIONS, fitToForm } from './melody';
 import { SCHEMA_VERSION, type Bar, type Duration, type MelodyEvent, type Progression, type Slot } from './progression';
 
-export const APP = 'honeycomb';
+export const APP = 'tonepath';
 /** The app's name before the rename: files exported under it still import. */
-export const LEGACY_APP = 'improwiser';
+export const LEGACY_APPS = ['honeycomb', 'improwiser']; // files from before the renames
 
 type Json = Record<string, unknown>;
 const isObj = (x: unknown): x is Json => typeof x === 'object' && x !== null && !Array.isArray(x);
@@ -102,21 +102,21 @@ const safeName = (s: string) => s.replace(/[\\/:*?"<>|]+/g, '-').trim() || 'Unti
 
 export function exportOne(p: Progression): { filename: string; text: string } {
   const env = { app: APP, v: SCHEMA_VERSION, kind: 'progression', progression: fileData(p) };
-  return { filename: `${safeName(p.title)}.honeycomb.json`, text: JSON.stringify(env, null, 2) + '\n' };
+  return { filename: `${safeName(p.title)}.tonepath.json`, text: JSON.stringify(env, null, 2) + '\n' };
 }
 
 /** Export all: newest edit first (the order the caller passes). */
 export function exportAll(ps: Progression[], now = new Date()): { filename: string; text: string } {
   const env = { app: APP, v: SCHEMA_VERSION, kind: 'library', exportedAt: now.toISOString(), progressions: ps.map(fileData) };
-  return { filename: `honeycomb-library-${now.toISOString().slice(0, 10)}.json`, text: JSON.stringify(env, null, 2) + '\n' };
+  return { filename: `tonepath-library-${now.toISOString().slice(0, 10)}.json`, text: JSON.stringify(env, null, 2) + '\n' };
 }
 
 export type ParsedFile =
   | { ok: true; progressions: Progression[]; skipped: number; shortened: number; unknownInstruments: number }
   | { ok: false; message: string };
 
-export const NEWER_VERSION = 'Made by a newer Honeycomb — reload to update';
-export const NOT_OURS = 'not an Honeycomb file';
+export const NEWER_VERSION = 'Made by a newer Tonepath — reload to update';
+export const NOT_OURS = 'not a Tonepath file';
 
 /** Parse + migrate + repair one file's text. Whole-file rejections and per-entry skips per §12.3. */
 export function parseFile(text: string): ParsedFile {
@@ -126,7 +126,7 @@ export function parseFile(text: string): ParsedFile {
   } catch {
     return { ok: false, message: NOT_OURS };
   }
-  if (!isObj(env) || (env.app !== APP && env.app !== LEGACY_APP)) return { ok: false, message: NOT_OURS };
+  if (!isObj(env) || (env.app !== APP && !LEGACY_APPS.includes(env.app as string))) return { ok: false, message: NOT_OURS };
   const v = typeof env.v === 'number' && Number.isInteger(env.v) && env.v >= 1 ? env.v : 1;
   if (v > SCHEMA_VERSION) return { ok: false, message: NEWER_VERSION };
   let entries: unknown[];

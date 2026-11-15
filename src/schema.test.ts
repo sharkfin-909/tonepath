@@ -1,11 +1,11 @@
 // Test table 7 (SPEC §14.7): migrate1to2, every repair in §12.3 (incl. slot-crossing events shortened + rest-padded),
 // newer-version refusal; plus export / import round trips.
 import { describe, expect, it } from 'vitest';
-import demo from '../examples/demo.honeycomb.json';
+import demo from '../examples/demo.tonepath.json';
 import { NEWER_VERSION, NOT_OURS, exportAll, exportOne, importSummary, migrate1to2, parseFile, repairProgression, uniqueTitle } from './schema';
 import { newProgression, type Progression } from './progression';
 
-const env = (progression: unknown, v = 2) => JSON.stringify({ app: 'honeycomb', v, kind: 'progression', progression });
+const env = (progression: unknown, v = 2) => JSON.stringify({ app: 'tonepath', v, kind: 'progression', progression });
 const one = (text: string) => {
   const r = parseFile(text);
   if (!r.ok) throw new Error(r.message);
@@ -97,13 +97,14 @@ describe('test table 7: files', () => {
     expect(parseFile(env({ bars: [] }, 3))).toEqual({ ok: false, message: NEWER_VERSION });
     expect(parseFile('{not json')).toEqual({ ok: false, message: NOT_OURS });
     expect(parseFile(JSON.stringify({ app: 'other', v: 2, kind: 'progression', progression: {} }))).toEqual({ ok: false, message: NOT_OURS });
-    expect(parseFile(JSON.stringify({ app: 'honeycomb', v: 2, kind: 'song' }))).toEqual({ ok: false, message: NOT_OURS });
-    // files exported before the rename still import
+    expect(parseFile(JSON.stringify({ app: 'tonepath', v: 2, kind: 'song' }))).toEqual({ ok: false, message: NOT_OURS });
+    // files exported before the renames (Honeycomb, Improwiser) still import
+    expect(parseFile(JSON.stringify({ app: 'honeycomb', v: 2, kind: 'progression', progression: { bars: [[{ chord: 'C' }]] } }))).toMatchObject({ ok: true });
     expect(parseFile(JSON.stringify({ app: 'improwiser', v: 2, kind: 'progression', progression: { bars: [[{ chord: 'C' }]] } }))).toMatchObject({ ok: true });
   });
 
   it('bundle entries that are not objects or have no bars list are skipped', () => {
-    const r = one(JSON.stringify({ app: 'honeycomb', v: 2, kind: 'library', progressions: [{ bars: [[{ chord: 'C' }]] }, 'x', { title: 'no bars' }] }));
+    const r = one(JSON.stringify({ app: 'tonepath', v: 2, kind: 'library', progressions: [{ bars: [[{ chord: 'C' }]] }, 'x', { title: 'no bars' }] }));
     expect(r.progressions).toHaveLength(1);
     expect(r.skipped).toBe(2);
   });
@@ -112,17 +113,17 @@ describe('test table 7: files', () => {
     const p: Progression = { ...newProgression('bb-tenor-sax'), title: 'Blues', concertClef: 'bass', bars: [[{ chord: 'Dm7', scale: 'aeolian' }], [{ chord: 'G7' }, { chord: 'G7alt' }]], melody: [{ pitch: 62, d: 'q' }, { d: 'q' }] };
     const stored = { ...p, id: 'x', updatedAt: '2026-01-01T00:00:00Z' };
     const f = exportOne(stored);
-    expect(f.filename).toBe('Blues.honeycomb.json');
+    expect(f.filename).toBe('Blues.tonepath.json');
     expect(f.text).not.toContain('updatedAt');
     expect(f.text).not.toContain('"id"');
-    expect(f.text.startsWith('{\n  "app": "honeycomb",\n  "v": 2,')).toBe(true);
+    expect(f.text.startsWith('{\n  "app": "tonepath",\n  "v": 2,')).toBe(true);
     expect(one(f.text).progressions[0]).toEqual(p);
   });
 
   it('Export all → a library bundle, newest first, that imports every entry', () => {
     const ps = [{ ...newProgression(), title: 'A' }, { ...newProgression(), title: 'B' }];
     const f = exportAll(ps, new Date('2026-11-13T10:00:00Z'));
-    expect(f.filename).toBe('honeycomb-library-2026-11-13.json');
+    expect(f.filename).toBe('tonepath-library-2026-11-13.json');
     expect(one(f.text).progressions.map((p) => p.title)).toEqual(['A', 'B']);
   });
 
@@ -140,7 +141,7 @@ describe('test table 7: files', () => {
 
   it('one toast with counts', () => {
     expect(importSummary({ added: 3, skipped: 1, shortened: 2, unknownInstruments: 1, rejected: [{ name: 'x.json', message: NOT_OURS }] })).toBe(
-      'Imported 3 progressions · 2 notes shortened · 1 unknown instrument → Concert · 1 entry skipped · x.json: not an Honeycomb file',
+      'Imported 3 progressions · 2 notes shortened · 1 unknown instrument → Concert · 1 entry skipped · x.json: not a Tonepath file',
     );
   });
 });

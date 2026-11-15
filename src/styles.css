@@ -1823,9 +1823,11 @@ select {
   }
 }
 
-/* The app's name, top left (row 1). */
+/* The app's name, top left (row 1): the wordmark, in Firjar. */
 .brand {
-  font-size: 15px;
+  font-family: 'Firjar', 'Outfit', system-ui, sans-serif;
+  font-size: 21px;
+  line-height: 1;
   font-weight: 700;
   letter-spacing: 0.18em;
   color: #f3eee6;

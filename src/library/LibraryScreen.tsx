@@ -63,7 +63,7 @@ export function LibraryScreen(props: LibraryScreenProps) {
   return (
     <div className="library">
       <header className="library-header">
-        <h1>Honeycomb</h1>
+        <h1>Tonepath</h1>
         <span className="library-tools">
           <button type="button" className="library-tool" onClick={() => fileInput.current?.click()}>
             Import…
@@ -97,7 +97,7 @@ export function LibraryScreen(props: LibraryScreenProps) {
           <button type="button" className="link" onClick={onExportAll}>
             Export all
           </button>
-          {reminder.safari && <span> · Safari can clear site data: add Honeycomb to your home screen (or Dock) to keep it.</span>}
+          {reminder.safari && <span> · Safari can clear site data: add Tonepath to your home screen (or Dock) to keep it.</span>}
           <button type="button" className="dismiss" aria-label="Dismiss backup reminder" onClick={reminder.onDismiss}>
             ×
           </button>

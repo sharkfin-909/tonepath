@@ -1,4 +1,4 @@
-# Honeycomb
+# Tonepath
 
 A static web app for writing **practice etudes over chord changes** and **practising improvisation** on them.
 Type chord symbols into a bar grid; each slot gets a scale and a fragment of one continuous melody, entered on the
@@ -45,5 +45,5 @@ The microphone (Listen / Practice) works on `localhost` and over HTTPS.
   analysis in an AudioWorklet, analysis window by register, echo guard with speakers, Practice feedback).
 - **Other candidate steps**: on phones, cap bars per row at 2 (the chart gets cramped); more demos.
 
-The product name is under review (see the SEO discussion: "Honeycomb" is a crowded search term; a descriptor or an
-invented name like *Hexude* was suggested).
+Formerly *Honeycomb* (and before that *Improwiser*): saved data and exported files from either name still load. "Honeycomb"
+remains the name of the 3-row hex layout (vs Linear).

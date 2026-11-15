@@ -5,7 +5,7 @@ import { newProgression, type Progression } from './progression';
 import { readDevice } from './device';
 import { isReadOnly } from './readOnly';
 
-export const PROGRESSION_PREFIX = 'honeycomb:progression:';
+export const PROGRESSION_PREFIX = 'tonepath:progression:';
 
 export interface StoredProgression extends Progression {
   id: string;
@@ -32,7 +32,7 @@ function tryWrite(storage: Storage, key: string, value: string): boolean {
     storage.setItem(key, value);
   } catch (err) {
     ok = false;
-    console.warn('Honeycomb: could not save', err);
+    console.warn('Tonepath: could not save', err);
   }
   listeners.forEach((fn) => fn(ok));
   return ok;

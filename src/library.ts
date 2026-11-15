@@ -96,24 +96,30 @@ export function importTexts(storage: Storage, files: { name: string; text: strin
  * migrated in memory and written back, then `v` is bumped. Newer → storage is left alone and the tab is read-only.
  * Returns false for newer storage.
  */
-/** Storage keys from before the rename to Honeycomb: moved to `honeycomb:*` once (existing new keys win). */
-const LEGACY_PREFIX = 'improwiser:';
-const PREFIX = 'honeycomb:';
+/**
+ * Storage keys from before the renames (Improwiser → Honeycomb → Tonepath): moved to `tonepath:*` once (existing new
+ * keys win). The newer old name goes first, so where both exist, its key is the one kept.
+ */
+const LEGACY_PREFIXES = ['honeycomb:', 'improwiser:'];
+const PREFIX = 'tonepath:';
 
 export function renameLegacyKeys(storage: Storage): void {
-  const old: string[] = [];
-  for (let i = 0; i < storage.length; i++) {
-    const key = storage.key(i);
-    if (key?.startsWith(LEGACY_PREFIX)) old.push(key);
-  }
-  for (const key of old) {
-    const target = PREFIX + key.slice(LEGACY_PREFIX.length);
-    try {
-      if (storage.getItem(target) === null) storage.setItem(target, storage.getItem(key) ?? '');
-      storage.removeItem(key);
-    } catch {
-      // storage full: the old key stays and the move is retried next launch
+  for (const legacy of LEGACY_PREFIXES) {
+    const old: string[] = [];
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i);
+      if (key?.startsWith(legacy)) old.push(key);
     }
+    for (const key of old) moveKey(storage, key, PREFIX + key.slice(legacy.length));
+  }
+}
+
+function moveKey(storage: Storage, key: string, target: string): void {
+  try {
+    if (storage.getItem(target) === null) storage.setItem(target, storage.getItem(key) ?? '');
+    storage.removeItem(key);
+  } catch {
+    // storage full: the old key stays and the move is retried next launch
   }
 }
 

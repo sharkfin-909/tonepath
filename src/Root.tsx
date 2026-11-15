@@ -2,8 +2,8 @@
 // Launch reopens the last-open progression, seeding the bundled demo on first launch and each extra demo (rhythm
 // changes) once per device (§12.5).
 import { useCallback, useEffect, useState } from 'react';
-import demo from '../examples/demo.honeycomb.json';
-import rhythmChanges from '../examples/rhythm-changes.honeycomb.json';
+import demo from '../examples/demo.tonepath.json';
+import rhythmChanges from '../examples/rhythm-changes.tonepath.json';
 import { App } from './App';
 import {
   createProgression,
@@ -86,7 +86,7 @@ export function Root() {
 
   const banner = isReadOnly() ? (
     <p className="read-only-banner" role="alert">
-      Made by a newer Honeycomb — reload to update. Nothing in this tab will be saved.
+      Made by a newer Tonepath — reload to update. Nothing in this tab will be saved.
     </p>
   ) : (
     saveFailed && (

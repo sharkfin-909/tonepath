@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import demo from '../examples/demo.honeycomb.json';
-import rhythmChanges from '../examples/rhythm-changes.honeycomb.json';
+import demo from '../examples/demo.tonepath.json';
+import rhythmChanges from '../examples/rhythm-changes.tonepath.json';
 import { readDevice, writeDevice } from './device';
 import {
   createProgression,
@@ -113,7 +113,7 @@ describe('import and storage migration', () => {
   it('Export one → import round-trips exactly, with a new id; a title clash gets "(2)"', () => {
     const s = new MemoryStorage();
     const p = saveProgression(s, { ...newProgression('violin'), title: 'Blues', melody: [{ pitch: 67, d: 'h' }], id: 'orig', updatedAt: '' }, at(0));
-    const r = importTexts(s, [{ name: 'Blues.honeycomb.json', text: exportOne(p).text }], ids, at(5));
+    const r = importTexts(s, [{ name: 'Blues.tonepath.json', text: exportOne(p).text }], ids, at(5));
     expect(r.added).toHaveLength(1);
     const { id, updatedAt, ...data } = r.added[0];
     expect(id).not.toBe('orig');
@@ -128,12 +128,12 @@ describe('import and storage migration', () => {
     const r = importTexts(s, [{ name: 'lib.json', text: bundle }, { name: 'bad.json', text: '{' }], ids, at(10));
     expect(r.added.map((p) => p.title)).toEqual(['A', 'B']);
     expect(listProgressions(s).map((p) => p.title)).toEqual(['A', 'B', 'Old']);
-    expect(r.summary).toBe('Imported 2 progressions · bad.json: not an Honeycomb file');
+    expect(r.summary).toBe('Imported 2 progressions · bad.json: not a Tonepath file');
   });
 
   it('a hand-edited slot-crossing note imports shortened and padded, counted in the toast', () => {
     const s = new MemoryStorage();
-    const text = JSON.stringify({ app: 'honeycomb', v: 2, kind: 'progression', progression: { title: 'X', bars: [[{ chord: 'C' }, { chord: 'F' }], [{ chord: 'G' }]], melody: [{ pitch: 60, d: 'q' }, { pitch: 62, d: 'h' }, { pitch: 64, d: 'q' }] } });
+    const text = JSON.stringify({ app: 'tonepath', v: 2, kind: 'progression', progression: { title: 'X', bars: [[{ chord: 'C' }, { chord: 'F' }], [{ chord: 'G' }]], melody: [{ pitch: 60, d: 'q' }, { pitch: 62, d: 'h' }, { pitch: 64, d: 'q' }] } });
     const r = importTexts(s, [{ name: 'x.json', text }], ids, at(0));
     expect(r.added[0].melody).toEqual([{ pitch: 60, d: 'q' }, { pitch: 62, d: 'q' }, { d: 'q' }, { pitch: 64, d: 'q' }]);
     expect(r.summary).toBe('Imported 1 progression · 1 note shortened');
@@ -141,7 +141,7 @@ describe('import and storage migration', () => {
 
   it('newer files are refused with the reload message', () => {
     const s = new MemoryStorage();
-    const r = importTexts(s, [{ name: 'new.json', text: JSON.stringify({ app: 'honeycomb', v: 9, kind: 'progression', progression: { bars: [] } }) }]);
+    const r = importTexts(s, [{ name: 'new.json', text: JSON.stringify({ app: 'tonepath', v: 9, kind: 'progression', progression: { bars: [] } }) }]);
     expect(r.added).toHaveLength(0);
     expect(r.summary).toContain(NEWER_VERSION);
   });
@@ -160,28 +160,33 @@ describe('import and storage migration', () => {
   it('newer storage → read-only: nothing is written', () => {
     const s = new MemoryStorage();
     writeDevice(s, { v: 3 });
-    const before = s.getItem('honeycomb:device');
+    const before = s.getItem('tonepath:device');
     expect(migrateStorage(s)).toBe(false);
     expect(isReadOnly()).toBe(true);
     createProgression(s, ids, at(0));
     writeDevice(s, { muted: true });
     expect(listProgressions(s)).toHaveLength(0);
-    expect(s.getItem('honeycomb:device')).toBe(before);
+    expect(s.getItem('tonepath:device')).toBe(before);
     setReadOnly(false);
   });
 
-  it('old improwiser:* keys move to honeycomb:* (new keys win), then migrate', () => {
+  it('old improwiser:* and honeycomb:* keys move to tonepath:* (newer names win), then migrate', () => {
     const s = new MemoryStorage();
     s.setItem('improwiser:device', JSON.stringify({ v: 2, muted: true }));
     s.setItem('improwiser:progression:a', JSON.stringify({ id: 'a', updatedAt: 'T', title: 'Old', bars: [[{ chord: 'C' }]], melody: [] }));
+    s.setItem('honeycomb:progression:c', JSON.stringify({ id: 'c', updatedAt: 'T', title: 'Hex', bars: [[{ chord: 'F' }]], melody: [] }));
     s.setItem('improwiser:progression:b', '"stale"');
-    s.setItem('honeycomb:progression:b', '"kept"');
+    s.setItem('honeycomb:progression:b', '"older"');
+    s.setItem('tonepath:progression:b', '"kept"');
+    s.setItem('improwiser:progression:d', '"oldest"');
+    s.setItem('honeycomb:progression:d', '"newer"');
     s.setItem('other', 'x');
     expect(migrateStorage(s)).toBe(true);
     expect(readDevice(s).muted).toBe(true);
-    expect(listProgressions(s).map((p) => p.title)).toEqual(['Old']);
-    expect(s.getItem('honeycomb:progression:b')).toBe('"kept"');
+    expect(listProgressions(s).map((p) => p.title).sort()).toEqual(['Hex', 'Old']);
+    expect(s.getItem('tonepath:progression:b')).toBe('"kept"');
+    expect(s.getItem('tonepath:progression:d')).toBe('"newer"'); // honeycomb beats improwiser
     expect(s.getItem('other')).toBe('x');
-    expect([...Array(s.length).keys()].map((i) => s.key(i)).filter((k) => k?.startsWith('improwiser:'))).toEqual([]);
+    expect([...Array(s.length).keys()].map((i) => s.key(i)).filter((k) => k?.startsWith('improwiser:') || k?.startsWith('honeycomb:'))).toEqual([]);
   });
 });
