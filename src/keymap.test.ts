@@ -12,12 +12,12 @@ describe('keymap (SPEC §11)', () => {
     expect(intent(key('3'), w)).toEqual({ type: 'length', d: 'q' });
     expect(intent(key('r'), w)).toEqual({ type: 'toggle-rest' });
     expect(intent(key('ArrowLeft'), w)).toEqual({ type: 'step', dir: -1 });
-    expect(intent(key('ArrowUp', { shiftKey: true }), w)).toEqual({ type: 'nudge', dir: 1, octave: true });
+    expect(intent(key('ArrowUp', { shiftKey: true }), w)).toEqual({ type: 'nudge', dir: 1, octave: false, scale: false }); // ⇧: chromatic
     expect(intent(key('Backspace'), w)).toEqual({ type: 'delete', back: true });
     expect(intent(key('z', { metaKey: true }), w)).toEqual({ type: 'undo' });
     expect(intent(key('z', { metaKey: true, shiftKey: true }), w)).toEqual({ type: 'redo' });
-    expect(intent(key('ArrowDown'), w)).toEqual({ type: 'nudge', dir: -1, octave: false });
-    expect(intent(key('ArrowUp', { altKey: true }), w)).toEqual({ type: 'nudge', dir: 1, octave: false, scale: true });
+    expect(intent(key('ArrowDown'), w)).toEqual({ type: 'nudge', dir: -1, octave: false, scale: true }); // diatonic
+    expect(intent(key('ArrowUp', { altKey: true }), w)).toEqual({ type: 'nudge', dir: 1, octave: true }); // ⌥: an octave
     expect(intent(key('`'), w)).toEqual({ type: 'step-play' });
     expect(intent(key('~', { shiftKey: true }), w)).toEqual({ type: 'step-play' });
     expect(keyIntent(key('`', { repeat: true }), w)).toEqual({ intent: null, handled: true });
@@ -59,12 +59,13 @@ describe('keymap (SPEC §11)', () => {
     expect(intent(key('p'), ctx('play'))).toEqual({ type: 'mode', mode: 'write' });
     expect(intent(key('p'), ctx('write'))).toBeNull();
     expect(intent(key('\\'), ctx('play'))).toEqual({ type: 'stand', on: 'toggle' });
-    expect(intent(key('m'), ctx('write'))).toEqual({ type: 'toggle-mute' });
+    expect(intent(key('M', { shiftKey: true }), ctx('write'))).toEqual({ type: 'toggle-mute' });
+    expect(intent(key('m'), ctx('write'))).toBeNull(); // plain M: nothing
   });
 
   it('Stand: only M, \\ and Space (click); arrows / ⌫ swallowed', () => {
     const s = ctx('stand', { hovered: 60 });
-    expect(intent(key('m'), s)).toEqual({ type: 'toggle-mute' });
+    expect(intent(key('M', { shiftKey: true }), s)).toEqual({ type: 'toggle-mute' });
     expect(intent(key('\\'), s)).toEqual({ type: 'stand', on: 'toggle' });
     expect(keyIntent(key('ArrowLeft'), s)).toEqual({ intent: null, handled: true });
     expect(intent(key('a'), s)).toBeNull();

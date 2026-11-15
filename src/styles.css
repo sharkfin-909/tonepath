@@ -1424,6 +1424,17 @@ textarea {
   border: var(--group-border);
   background: var(--group-bg);
 }
+/* Group text in lowercase (labels, buttons, dropdown values and their options) — except note names, which keep their
+   letter case (the practice panel's targets). */
+.group,
+.group button,
+.group select,
+.group option {
+  text-transform: lowercase;
+}
+.group .practice-target {
+  text-transform: none;
+}
 /* Every group and well flashes when it appears (a mode switch swaps the editing pill for the practice panel; the
    practice panel re-appears each time the form moves on) and when one of its controls is used (App replays it). */
 .group,

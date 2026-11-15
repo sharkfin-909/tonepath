@@ -613,14 +613,14 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
               />
               <TimeSignatureField value={progression.timeSignature} onChange={(text) => dispatch({ type: 'time-signature', text })} />
               <BarsPerRow value={progression.barsPerRow} onChange={(n) => commit(setBarsPerRow(doc.progression, n))} />
-              {/* Nudge (SPEC §6.2): the note at the caret up / down a semitone (↑ / ↓; ⇧ an octave, ⌥ a scale step). */}
+              {/* Nudge (SPEC §6.2): the note at the caret up / down a scale step (↑ / ↓); ⇧ a semitone, ⌥ an octave. */}
               <div className="step-controls">
-                <button type="button" className="rail-button icon-button" title="Nudge the note at the caret down a semitone (↓ · ⇧↓ an octave · ⌥↓ a scale step)" aria-label="Nudge down" onClick={() => dispatch({ type: 'nudge', dir: -1, octave: false })}>
+                <button type="button" className="rail-button icon-button" title="Nudge the note at the caret down a scale step (↓) · ⇧-click / ⇧↓ a semitone · ⌥↓ an octave" aria-label="Nudge down" onClick={(e) => dispatch({ type: 'nudge', dir: -1, octave: false, scale: !e.shiftKey })}>
                   <svg viewBox="0 0 12 12" width="16" height="16" aria-hidden>
                     <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </button>
-                <button type="button" className="rail-button icon-button" title="Nudge the note at the caret up a semitone (↑ · ⇧↑ an octave · ⌥↑ a scale step)" aria-label="Nudge up" onClick={() => dispatch({ type: 'nudge', dir: 1, octave: false })}>
+                <button type="button" className="rail-button icon-button" title="Nudge the note at the caret up a scale step (↑) · ⇧-click / ⇧↑ a semitone · ⌥↑ an octave" aria-label="Nudge up" onClick={(e) => dispatch({ type: 'nudge', dir: 1, octave: false, scale: !e.shiftKey })}>
                   <svg viewBox="0 0 12 12" width="16" height="16" aria-hidden>
                     <path d="M2.5 7.5 6 4l3.5 3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>

@@ -264,7 +264,7 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
       return done();
     }
     case 'nudge': {
-      // Chromatic by default; ⌥ steps through the owning slot's scale (no chord there: semitones anyway).
+      // `scale`: a step of the owning slot's scale (↑ / ↓; no chord there: semitones anyway); else a semitone (⇧).
       const r = nudge(p.melody, slots, caret, intent.dir, intent.octave, (slot) => (intent.scale ? (stepPitchClasses(slots[slot.index].concert) ?? CHROMATIC) : CHROMATIC));
       if (!r.ok) return done();
       edit = { ...p, melody: r.melody };

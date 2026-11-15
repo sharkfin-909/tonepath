@@ -1,4 +1,4 @@
-// Sound buttons in the header's sound pill (SPEC §3.1, §9): mute (speaker, M), ▶ Chord (C), ▶ Bass (B), ▶ Scale (S / ⇧Space).
+// Sound buttons in the header's sound pill (SPEC §3.1, §9): mute (speaker, ⇧M), ▶ Chord (C), ▶ Bass (B), ▶ Scale (S / ⇧Space).
 // (The `rail/` folder holds the header's controls; the name dates from the old left-hand control rail.)
 export interface AudioControlsProps {
   muted: boolean;
@@ -15,7 +15,7 @@ export function AudioControls({ muted, onToggleMute, onChord, onBass, onScale }:
         type="button"
         className={muted ? 'rail-button mute on' : 'rail-button mute'}
         aria-pressed={muted}
-        title={muted ? 'Sound off (M)' : 'Sound on (M)'}
+        title={muted ? 'Sound off (⇧M)' : 'Sound on (⇧M)'}
         onClick={onToggleMute}
       >
         <span aria-hidden>{muted ? '🔇' : '🔊'}</span> {muted ? 'Muted' : 'Sound'}

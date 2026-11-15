@@ -40,7 +40,7 @@ const LENGTHS: Duration[] = ['w', 'h', 'q', 'e', 's'];
 /** Space (no ⇧): a click under the pointer, in every mode. */
 const CLICK: KeyResult = { intent: null, handled: true, click: true };
 
-/** Keys shared by Write and Play: A picks, S / ⇧Space scale, C / B sound, < > browse, M mute. */
+/** Keys shared by Write and Play: A picks, S / ⇧Space scale, C / B sound, < > browse, ⇧M mute. */
 function shared(e: KeyPress, ctx: KeyContext): KeyResult | null {
   const k = e.key.toLowerCase();
   if (e.key === ' ') {
@@ -54,7 +54,7 @@ function shared(e: KeyPress, ctx: KeyContext): KeyResult | null {
   }
   if (e.key === '<' || e.key === ',') return handled({ type: 'browse', dir: -1 });
   if (e.key === '>' || e.key === '.') return handled({ type: 'browse', dir: 1 });
-  if (k === 'm' && !e.shiftKey) return handled({ type: 'toggle-mute' });
+  if (k === 'm' && e.shiftKey) return handled({ type: 'toggle-mute' }); // ⇧M (plain M does nothing)
   return null;
 }
 
@@ -65,8 +65,8 @@ export function keyIntent(e: KeyPress, ctx: KeyContext): KeyResult {
   if (plain && e.key === '\\') return handled({ type: 'stand', on: 'toggle' });
 
   if (ctx.mode === 'stand') {
-    // Read (`stand`): only M, Space = click (and \ above). Nothing is editable.
-    if (plain && (e.key === 'm' || e.key === 'M')) return handled({ type: 'toggle-mute' });
+    // Read (`stand`): only ⇧M, Space = click (and \ above). Nothing is editable.
+    if (plain && e.shiftKey && (e.key === 'm' || e.key === 'M')) return handled({ type: 'toggle-mute' });
     if (plain && e.key === ' ' && !e.shiftKey) return e.repeat ? handled() : CLICK;
     if (plain && (e.key === ' ' || e.key.startsWith('Arrow') || e.key === 'Backspace')) return handled();
     return NONE;
@@ -99,9 +99,9 @@ export function keyIntent(e: KeyPress, ctx: KeyContext): KeyResult {
     if (!e.metaKey && !e.ctrlKey && (e.key === 'Backspace' || e.key === 'Delete')) return handled({ type: 'bar-action', bar, action: 'delete' });
     if (e.key === 'Escape') return handled({ type: 'clear-selection' });
   }
-  // ⌥↑ / ⌥↓: nudge by one step of the slot's scale.
+  // ⌥↑ / ⌥↓: nudge by an octave.
   if (e.altKey && !e.metaKey && !e.ctrlKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
-    return handled({ type: 'nudge', dir: e.key === 'ArrowUp' ? 1 : -1, octave: false, scale: true });
+    return handled({ type: 'nudge', dir: e.key === 'ArrowUp' ? 1 : -1, octave: true });
   }
   if (!plain) return NONE;
   switch (e.key) {
@@ -113,7 +113,8 @@ export function keyIntent(e: KeyPress, ctx: KeyContext): KeyResult {
       return handled({ type: 'step', dir: e.key === 'ArrowLeft' ? -1 : 1 });
     case 'ArrowUp':
     case 'ArrowDown':
-      return handled({ type: 'nudge', dir: e.key === 'ArrowUp' ? 1 : -1, octave: e.shiftKey });
+      // ↑ / ↓: one step of the slot's scale (diatonic); ⇧: a semitone (chromatic).
+      return handled({ type: 'nudge', dir: e.key === 'ArrowUp' ? 1 : -1, octave: false, scale: !e.shiftKey });
     case 'Delete':
     case 'Backspace':
       return handled({ type: 'delete', back: e.key === 'Backspace' });

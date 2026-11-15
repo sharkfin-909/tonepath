@@ -102,7 +102,7 @@ const CARET = '#2f6fdb';
 /** Practice, Follow: a written note already played. */
 const PLAYED = '#2e9d57';
 /** Mark colours (SPEC §7.2). */
-const OUT_OF_SCALE = '#D62728';
+const OUT_OF_SCALE = '#C8650A'; // orange
 const OUT_OF_RANGE = '#B5B5B5';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -131,14 +131,14 @@ export function SlotStave({ width, timeSignature, clef, start, end, events, spel
         });
         const mark = !rest && markOf ? markOf(e) : null;
         if (mark?.range) {
-          // Out of range (or both): the whole note grey, ledger lines included; a red ring is added for "both".
+          // Out of range (or both): the whole note light grey, ledger lines included; "both" shows as out of range (the tooltip names both).
           note.setStyle({ fillStyle: OUT_OF_RANGE, strokeStyle: OUT_OF_RANGE });
           note.setLedgerLineStyle({ fillStyle: OUT_OF_RANGE, strokeStyle: OUT_OF_RANGE });
         } else if (mark?.outOfScale) {
-          // Out of scale: notehead, stem and flag red; accidentals stay black.
-          const red = { fillStyle: OUT_OF_SCALE, strokeStyle: OUT_OF_SCALE };
-          note.setKeyStyle(0, red).setStemStyle(red);
-          note.setFlagStyle(red);
+          // Out of scale: notehead, stem and flag orange; accidentals stay black.
+          const oos = { fillStyle: OUT_OF_SCALE, strokeStyle: OUT_OF_SCALE };
+          note.setKeyStyle(0, oos).setStemStyle(oos);
+          note.setFlagStyle(oos);
         } else if (played?.has(e.i)) note.setStyle({ fillStyle: PLAYED, strokeStyle: PLAYED });
         else if (caret !== undefined && e.start === caret) note.setStyle({ fillStyle: CARET, strokeStyle: CARET });
         timed.push({ t: e.start, note });
@@ -162,7 +162,6 @@ export function SlotStave({ width, timeSignature, clef, start, end, events, spel
         new Formatter().joinVoices([voice]).formatToStave([voice], stave);
         voice.draw(ctx, stave);
         beams.forEach((b) => b.setContext(ctx).draw());
-        const svgRoot = (ctx as unknown as { svg: SVGSVGElement }).svg;
         for (const { note, mark } of clickable) {
           if (!mark) continue;
           const el = note.getSVGElement();
@@ -171,19 +170,6 @@ export function SlotStave({ width, timeSignature, clef, start, end, events, spel
             title.textContent = mark.reason; // hover tooltip
             el.prepend(title);
             el.setAttribute('data-mark', mark.range ? (mark.outOfScale ? 'both' : 'range') : 'scale');
-          }
-          if (mark.outOfScale) {
-            // A thin red ring so the mark doesn't rely on colour alone.
-            const ring = document.createElementNS(SVG_NS, 'circle');
-            ring.setAttribute('class', 'oos-ring');
-            ring.setAttribute('cx', String((note.getNoteHeadBeginX() + note.getNoteHeadEndX()) / 2));
-            ring.setAttribute('cy', String(note.getYs()[0]));
-            ring.setAttribute('r', '9');
-            ring.setAttribute('fill', 'none');
-            ring.setAttribute('stroke', OUT_OF_SCALE);
-            ring.setAttribute('stroke-width', '1.5');
-            ring.setAttribute('pointer-events', 'none');
-            svgRoot.appendChild(ring);
           }
         }
         if (onEventClick) {
