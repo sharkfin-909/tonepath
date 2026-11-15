@@ -25,6 +25,8 @@ export interface PracticeState {
   count: number;
   /** Follow: how many of the slot's written notes have been played. */
   follow: number;
+  /** Follow: pitch class of the last accepted note — a same-pitch repeat needs a re-attack. */
+  lastFollowPc: number | null;
 }
 
 export interface PracticeContext {
@@ -35,7 +37,7 @@ export interface PracticeContext {
   length: Duration;
 }
 
-export const startPractice = (slot: number): PracticeState => ({ slot, count: 0, follow: 0 });
+export const startPractice = (slot: number): PracticeState => ({ slot, count: 0, follow: 0, lastFollowPc: null });
 
 const mod12 = (n: number) => ((n % 12) + 12) % 12;
 const next = (view: InstrumentView, slot: number) => (slot + 1) % view.slots.length;
@@ -116,23 +118,37 @@ export interface PracticeStep {
  * first note. A rule with nothing to aim for (the next slot has no chord; a slot with nothing written to follow)
  * falls back to the note count.
  */
-export function practiceNote(s: PracticeState, heard: number, c: PracticeContext): PracticeStep {
+export function practiceNote(s: PracticeState, heard: number, c: PracticeContext, fromOnset = true): PracticeStep {
   const count = s.count + 1;
   const need = noteCountFor(c.view.slots[s.slot], c.length);
   /** Landed on the next chord: this note is its first. */
-  const advance = (): PracticeStep => ({ state: { slot: next(c.view, s.slot), count: 1, follow: 0 }, advanced: true, landed: true });
+  const advance = (): PracticeStep => ({
+    state: { slot: next(c.view, s.slot), count: 1, follow: 0, lastFollowPc: mod12(heard) },
+    advanced: true,
+    landed: true,
+  });
   /** Finished this slot: the next slot starts empty. */
-  const finish = (patch: Partial<PracticeStep> = {}): PracticeStep => ({ state: { slot: next(c.view, s.slot), count: 0, follow: 0 }, advanced: true, landed: false, ...patch });
+  const finish = (patch: Partial<PracticeStep> = {}): PracticeStep => ({
+    state: { slot: next(c.view, s.slot), count: 0, follow: 0, lastFollowPc: mod12(heard) },
+    advanced: true,
+    landed: false,
+    ...patch,
+  });
   const stay = (patch: Partial<PracticeState> = {}): PracticeStep => ({ state: { ...s, count, ...patch }, advanced: false });
+  /** Ignore this noteStart (e.g. a slurred echo of a pitch we just accepted) — no count bump. */
+  const ignore = (): PracticeStep => ({ state: s, advanced: false });
   const t = practiceTargets(s, c);
 
   if (c.rule === 'follow') {
-    if (t.midi === null) return count >= need ? finish() : stay(); // nothing written here: by count
-    if (heard !== t.midi) return stay(); // a wrong note: wait for the written one
+    if (t.midi === null) return count >= need ? finish() : stay({ lastFollowPc: null }); // nothing written here: by count
+    // Same pitch class in any octave (detector octave slips + players often shift register).
+    if (mod12(heard) !== mod12(t.midi)) return stay(); // a wrong note: wait for the written one
+    // A written repeat of the same pitch needs a re-attack — a held note must not mark the next one too.
+    if (s.lastFollowPc === mod12(heard) && !fromOnset) return ignore();
     const hit = followEventIndex(s, c) ?? undefined;
     const follow = s.follow + 1;
     if (follow >= writtenNotes(c.view, c.melody, s.slot).length) return finish({ hit });
-    return { ...stay({ follow }), hit };
+    return { ...stay({ follow, lastFollowPc: mod12(heard) }), hit };
   }
   if (c.rule === 'count') return count >= need ? finish() : stay();
   if (c.rule === 'count-then-guide' && s.count < need) return stay(); // still filling the slot

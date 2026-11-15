@@ -94,14 +94,74 @@ describe('NoteTracker', () => {
     return frames.map(([m, o], i) => t.push(m, o, i * 16)).filter((x) => x !== null);
   };
   it('an attack starts a note once its pitch is steady; a held note counts once', () => {
-    expect(run([[null, true], [null, false], [67, false], [67, false], [67, false]])).toEqual([67]);
+    expect(
+      run([
+        [null, true],
+        [null, false],
+        [67, false],
+        [67, false],
+        [67, false],
+        [67, false],
+      ]),
+    ).toEqual([{ midi: 67, fromOnset: true }]);
   });
   it('a slur (pitch change, no new attack) is a new note', () => {
-    expect(run([[null, true], [67, false], [67, false], [69, false], [71, false]])).toEqual([67, 69, 71]);
+    expect(
+      run([
+        [null, true],
+        [67, false],
+        [67, false],
+        [67, false],
+        [67, false],
+        [69, false],
+        [71, false],
+      ]),
+    ).toEqual([
+      { midi: 67, fromOnset: true },
+      { midi: 69, fromOnset: false },
+      { midi: 71, fromOnset: false },
+    ]);
+  });
+  it('sharp-then-correct after an attack counts once (settled pitch)', () => {
+    expect(
+      run([
+        [null, true],
+        [68, false],
+        [68, false],
+        [67, false],
+        [67, false],
+        [67, false],
+        [67, false],
+      ]),
+    ).toEqual([{ midi: 67, fromOnset: true }]);
   });
   it('the same note re-attacked counts again; a brief dropout does not', () => {
-    expect(run([[67, true], [67, false], [67, true], [67, false]])).toEqual([67, 67]);
-    expect(run([[67, true], [null, false], [67, false]])).toEqual([67]); // 16 ms gap: same note
+    expect(
+      run([
+        [67, true],
+        [67, false],
+        [67, false],
+        [67, false],
+        [67, true],
+        [67, false],
+        [67, false],
+        [67, false],
+        [67, false],
+      ]),
+    ).toEqual([
+      { midi: 67, fromOnset: true },
+      { midi: 67, fromOnset: true },
+    ]);
+    expect(
+      run([
+        [67, true],
+        [67, false],
+        [67, false],
+        [67, false],
+        [null, false],
+        [67, false],
+      ]),
+    ).toEqual([{ midi: 67, fromOnset: true }]);
   });
 });
 
@@ -113,15 +173,40 @@ describe('level meter', () => {
 });
 
 describe('SteadyHold', () => {
+  const near = (midi: number, cents = 0) => ({ midi, cents });
   it('needs two equal frames to lock; holds through a brief unlock; clears after silence', () => {
     const h = new SteadyHold();
-    expect(h.push({ midi: 69 }, 0)).toBeNull();
-    expect(h.push({ midi: 69 }, 16)).toBe(69);
-    expect(h.push({ midi: 70 }, 32)).toBe(69); // unlock: still holding A4
-    expect(h.push({ midi: 70 }, 48)).toBe(70); // new lock
-    expect(h.push(null, 64)).toBe(70);
-    expect(h.push(null, 64 + HOLD_RELEASE_MS - 1)).toBe(70);
+    expect(h.push(near(69), 0)).toBeNull();
+    expect(h.push(near(69), 16)).toBe(69);
+    expect(h.push(null, 32)).toBe(69); // brief silence: still holding
+    expect(h.push(near(69), 48)).toBe(69);
+    expect(h.push(null, 64)).toBe(69);
+    expect(h.push(null, 64 + HOLD_RELEASE_MS - 1)).toBe(69);
     expect(h.push(null, 64 + HOLD_RELEASE_MS)).toBeNull();
+  });
+
+  it('retargets after two frames of a new MIDI while sliding (legato), without silence or being in tune', () => {
+    const h = new SteadyHold();
+    expect(h.push(near(69), 0)).toBeNull();
+    expect(h.push(near(69), 16)).toBe(69);
+    // Unclear pitch while still sounding: keep A4 (don't treat as silence).
+    expect(h.push(null, 24, 0.05)).toBe(69);
+    // Slide: first glimpse of Bb (still off-centre) keeps A4; second switches.
+    expect(h.push(near(70, 40), 32)).toBe(69);
+    expect(h.push(near(70, 40), 48)).toBe(70);
+  });
+
+  it('ignores off-centre frames for locking, so a sharp attack can correct into recognition', () => {
+    const h = new SteadyHold();
+    // Attack sharp of A4 (reads as Bb / +high cents): must not lock the neighbour.
+    expect(h.push(near(70, 40), 0)).toBeNull();
+    expect(h.push(near(70, 40), 16)).toBeNull();
+    // Correct into A4: two in-tune frames lock.
+    expect(h.push(near(69, 20), 32)).toBeNull();
+    expect(h.push(near(69, 10), 48)).toBe(69);
+    // Bend sharp again while holding: keep A4, don't start silence.
+    expect(h.push(near(69, 40), 64)).toBe(69);
+    expect(h.push(near(69, 5), 80)).toBe(69);
   });
 });
 

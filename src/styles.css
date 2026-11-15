@@ -223,9 +223,9 @@ body,
   pointer-events: auto;
 }
 .hex-acc-lit {
-  fill: none;
+  fill: color-mix(in srgb, var(--hex-trigger) 25%, transparent);
   stroke: var(--hex-trigger);
-  stroke-width: 3;
+  stroke-width: 5;
   pointer-events: none;
 }
 .hex-acc:hover circle:not(.hex-acc-lit) {
@@ -241,7 +241,7 @@ body,
 
 /* Every cell with the hovered / clicked / heard pitch: bright green glow inside its edge. */
 .hex-lit {
-  fill: none;
+  fill: color-mix(in srgb, var(--hex-trigger) 22%, transparent);
   stroke: var(--hex-trigger);
   pointer-events: none;
 }

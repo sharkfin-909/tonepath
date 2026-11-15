@@ -8,6 +8,7 @@ import {
   NoteTracker,
   OnsetDetector,
   SteadyHold,
+  CLARITY_MIN,
   analysisWindow,
   detectPitch,
   hzToNote,
@@ -26,6 +27,8 @@ export interface Heard {
   onset: boolean;
   /** The concert note that starts on this frame — an attack or a slur to a new pitch — or null. */
   noteStart: number | null;
+  /** True when `noteStart` came from an onset (re-attack), not a slur. */
+  noteFromOnset: boolean;
 }
 
 export interface Listening {
@@ -92,12 +95,20 @@ export async function startListening(onFrame: (h: Heard) => void, opts: ListenOp
     const now = performance.now();
     const onset = onsets.push(level, now);
     const p = detectPitch(buf, ctx.sampleRate, { minHz });
-    const reading = p && p.clarity > 0.85 ? hzToNote(p.hz) : null;
-    const midi = hold.push(reading, now);
+    const reading = p && p.clarity >= CLARITY_MIN ? hzToNote(p.hz) : null;
+    const midi = hold.push(reading, now, level);
     const smoothed = ema.push(reading ? toExact(reading.midi, reading.cents) : null, now);
     if (midi === null) ema.reset();
     const cents = midi !== null && smoothed !== null ? Math.round((smoothed - midi) * 100) : 0;
-    onFrame({ midi, cents, level, onset, noteStart: notes.push(midi, onset, now) });
+    const started = notes.push(midi, onset, now);
+    onFrame({
+      midi,
+      cents,
+      level,
+      onset,
+      noteStart: started?.midi ?? null,
+      noteFromOnset: started?.fromOnset ?? false,
+    });
     raf = requestAnimationFrame(tick);
   };
   raf = requestAnimationFrame(tick);

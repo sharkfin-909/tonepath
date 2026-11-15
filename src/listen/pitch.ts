@@ -28,6 +28,12 @@ export interface PitchOptions {
 /** The level a note must pass to count as started (RMS): marked on the Listen meter. */
 export const ONSET_GATE = 0.015;
 
+/**
+ * Minimum YIN clarity to accept a pitch reading (0–1). Practice needs this low enough that real notes lock
+ * readily; the tuner zones are separate. Was 0.85 — too strict for the Practice flow.
+ */
+export const CLARITY_MIN = 0.7;
+
 /** A level (RMS) on the Listen meter's 0–1 scale: −60 dBFS … 0 dBFS, so quiet and loud both read usefully. */
 export function meterPosition(level: number): number {
   if (level <= 0) return 0;
@@ -138,26 +144,55 @@ export function analysisWindow(
 export const HOLD_RELEASE_MS = 150;
 
 /**
- * Two-frame MIDI lock, then hold through brief unlocks (tuner + Practice). Clears only after `releaseMs` of
- * no clear pitch — so the display doesn't flash through "—" and Practice doesn't see false silence.
+ * A reading must be this close to a pitch centre (¢) before it can lock / retarget. Stops a sharp/flat attack
+ * locking the neighbour; the player can correct into tune and still be recognised. Off-centre frames are not
+ * silence — they keep the previous hold without starting the release timer.
+ */
+export const LOCK_CENTS = 35;
+
+/**
+ * Two-frame MIDI lock for the first note; one in-tune frame to retarget on a pitch change (legato). Hold through
+ * brief unlocks / off-centre frames. Clears only after `releaseMs` of no clear pitch.
  */
 export class SteadyHold {
   private lastRaw: number | null = null;
   private held: number | null = null;
   private silentSince = -Infinity;
 
-  constructor(private readonly releaseMs = HOLD_RELEASE_MS) {}
+  constructor(
+    private readonly releaseMs = HOLD_RELEASE_MS,
+    private readonly lockCents = LOCK_CENTS,
+  ) {}
 
-  /** The MIDI to publish this frame (null = nothing held). */
-  push(reading: { midi: number } | null, timeMs: number): number | null {
-    const locked = reading && reading.midi === this.lastRaw ? reading.midi : null;
-    this.lastRaw = reading ? reading.midi : null;
+  /**
+   * The MIDI to publish this frame (null = nothing held).
+   * `level` — when the mic is still sounding but pitch is unclear (legato smear), pass the RMS so we don't
+   * treat it as silence and drop the hold.
+   */
+  push(reading: { midi: number; cents: number } | null, timeMs: number, level = 0): number | null {
     if (!reading) {
+      this.lastRaw = null;
+      // Still playing through a slur: keep the hold (don't start the release timer).
+      if (level >= ONSET_GATE * 0.5) return this.held;
       if (this.silentSince === -Infinity) this.silentSince = timeMs;
       if (timeMs - this.silentSince >= this.releaseMs) this.held = null;
       return this.held;
     }
     this.silentSince = -Infinity;
+    // Legato: new MIDI while holding — confirm on two frames, *without* the cents gate (slides are off-centre).
+    if (this.held !== null && reading.midi !== this.held) {
+      if (reading.midi === this.lastRaw) this.held = reading.midi;
+      this.lastRaw = reading.midi;
+      return this.held;
+    }
+    // Same pitch (or nothing held yet): off-centre frames don't lock a sharp/flat attack onto a neighbour.
+    if (Math.abs(reading.cents) > this.lockCents) {
+      this.lastRaw = null;
+      return this.held;
+    }
+    // First lock: two equal in-tune frames.
+    const locked = reading.midi === this.lastRaw ? reading.midi : null;
+    this.lastRaw = reading.midi;
     if (locked !== null) this.held = locked;
     return this.held;
   }
@@ -242,33 +277,94 @@ export class OnsetDetector {
   }
 }
 
+/** A played-note event: from an attack, or a slur to a new pitch (what Practice counts). */
+export interface NoteStart {
+  midi: number;
+  /** True when this start is tied to an onset (re-attack); false for a slur. */
+  fromOnset: boolean;
+}
+
+/** How long a pitch must hold steady after an attack before it counts (one count per tonguing). */
+export const ATTACK_STABLE_MS = 48;
+
 /**
- * Played notes from the per-frame readings: a note starts on an attack (the next steady pitch after an onset, within
- * `windowMs`), or when the steady pitch changes to another note without one — so slurred lines count too. A held
- * note, or the same note through a brief dropout, doesn't count again.
+ * Played notes from the per-frame readings. After an onset, pitch may wobble (sharp→in-tune); only **one** note is
+ * counted once it has been steady for `ATTACK_STABLE_MS` (or when the attack window ends). Later pitch changes
+ * without a new onset count as slurs. A held note through a brief dropout doesn't count again.
  */
 export class NoteTracker {
   private pendingSince = -Infinity;
   private current: number | null = null;
   private silentSince = -Infinity;
+  private pendingMidi: number | null = null;
+  private stableSince = -Infinity;
+  private attackEmitted = true;
 
-  constructor(private readonly windowMs = 250, private readonly releaseMs = 150) {}
+  constructor(
+    private readonly windowMs = 250,
+    private readonly releaseMs = 150,
+    private readonly stableMs = ATTACK_STABLE_MS,
+  ) {}
 
-  /** The MIDI note that starts on this frame, or null. `midi` = the steady reading (null when unclear / silent). */
-  push(midi: number | null, onset: boolean, timeMs: number): number | null {
-    if (onset) this.pendingSince = timeMs;
+  /** The note that starts on this frame, or null. `midi` = the steady reading (null when unclear / silent). */
+  push(midi: number | null, onset: boolean, timeMs: number): NoteStart | null {
+    if (onset) {
+      this.pendingSince = timeMs;
+      this.attackEmitted = false;
+      this.pendingMidi = null;
+      this.stableSince = -Infinity;
+    }
+
     if (midi === null) {
       if (this.silentSince === -Infinity) this.silentSince = timeMs;
-      if (timeMs - this.silentSince >= this.releaseMs) this.current = null; // a real stop: the same note may start again
+      if (timeMs - this.silentSince >= this.releaseMs) {
+        // Flush an unemitted attack that never settled, then clear.
+        const flush = this.flushAttack(timeMs);
+        this.current = null;
+        return flush;
+      }
       return null;
     }
     this.silentSince = -Infinity;
-    const attacked = timeMs - this.pendingSince <= this.windowMs;
-    if (attacked || midi !== this.current) {
-      this.pendingSince = -Infinity;
-      this.current = midi;
-      return midi;
+
+    const inAttack = !this.attackEmitted && timeMs - this.pendingSince <= this.windowMs;
+    if (inAttack) {
+      if (midi !== this.pendingMidi) {
+        this.pendingMidi = midi;
+        this.stableSince = timeMs;
+      }
+      if (this.pendingMidi !== null && timeMs - this.stableSince >= this.stableMs) {
+        return this.emitAttack(this.pendingMidi);
+      }
+      return null;
     }
+
+    // Attack window ended without a stable emit — count the last pitch we saw.
+    if (!this.attackEmitted && this.pendingMidi !== null) {
+      return this.emitAttack(this.pendingMidi);
+    }
+
+    if (midi !== this.current) {
+      this.current = midi;
+      return { midi, fromOnset: false };
+    }
+    return null;
+  }
+
+  private emitAttack(midi: number): NoteStart {
+    this.attackEmitted = true;
+    this.current = midi;
+    this.pendingMidi = null;
+    return { midi, fromOnset: true };
+  }
+
+  private flushAttack(timeMs: number): NoteStart | null {
+    if (this.attackEmitted || this.pendingMidi === null) return null;
+    if (timeMs - this.pendingSince > this.windowMs || timeMs - this.stableSince >= this.stableMs) {
+      return this.emitAttack(this.pendingMidi);
+    }
+    this.attackEmitted = true;
+    this.pendingMidi = null;
     return null;
   }
 }

@@ -59,9 +59,11 @@ export interface DockedHexProps {
   heard?: number | null;
   /** Practice (SPEC §3.7): what moves the form on — pitch classes (written) or Follow's exact next note. Ringed. */
   targets?: { pcs: Set<number> | null; midi: number | null } | null;
+  /** A note sounded elsewhere (Write: stepped with ` or a melody note selected): its cells light as if clicked. `n` replays. */
+  sounded?: { midi: number; n: number } | null;
 }
 
-export function DockedHex({ dock, onPick, halo, onLabelClick, onHoverPitch, heard = null, targets = null }: DockedHexProps) {
+export function DockedHex({ dock, onPick, halo, onLabelClick, onHoverPitch, heard = null, targets = null, sounded = null }: DockedHexProps) {
   const [ref, { width, height }] = useSize<HTMLDivElement>();
   const { hex, mode, label, labelEditsChord } = dock;
   const layout: HexLayout | null = width > 0 && height > 0 ? layoutHex(hex, width, height, T.borderButtonGap) : null;
@@ -82,6 +84,10 @@ export function DockedHex({ dock, onPick, halo, onLabelClick, onHoverPitch, hear
   const shown = (b: HexBorder) =>
     hover !== null && b.r === hover.r && (hover.kind === 'border' ? b.x === hover.x : !!hoverCell && Math.abs(b.x - hoverCell.x) === 0.5);
   const { midi: hoverMidi, pick: hoverPick } = resolve(hover);
+  // Listen: out-of-scale pitches live on borders — don't also light cells for them.
+  const cellMidis = new Set(hex.cells.map((c) => c.midi));
+  const borderMidis = new Set(hex.borders.flatMap((b) => b.buttons.map((x) => x.midi)));
+  const heardIsBorder = heard !== null && !cellMidis.has(heard) && borderMidis.has(heard);
   // Reported straight from the pointer handler, so a key pressed before the next paint still sees it.
   const setHover = (t: HoverTarget | null) => {
     setHoverState(t);
@@ -96,15 +102,22 @@ export function DockedHex({ dock, onPick, halo, onLabelClick, onHoverPitch, hear
   const [flash, setFlash] = useState<number | null>(null);
   const flashTimer = useRef<number>();
   useEffect(() => () => window.clearTimeout(flashTimer.current), []);
+  const light = (midi: number) => {
+    setFlash(midi);
+    window.clearTimeout(flashTimer.current);
+    flashTimer.current = window.setTimeout(() => setFlash(null), 600);
+  };
+  useEffect(() => {
+    if (sounded) light(sounded.midi);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per sounding
+  }, [sounded?.n]);
   const [pressed, setPressed] = useState<{ at: string; n: number }>({ at: '', n: 0 });
   const pick = !onPick
     ? undefined
     : (midi: number, at: string) => {
         setPressed((p) => ({ at, n: p.n + 1 }));
         onPick(midi);
-        setFlash(midi);
-        window.clearTimeout(flashTimer.current);
-        flashTimer.current = window.setTimeout(() => setFlash(null), 600);
+        light(midi);
       };
   const popOf = (at: string) => (pressed.at === at ? pressed.n : 0);
 
@@ -169,7 +182,7 @@ export function DockedHex({ dock, onPick, halo, onLabelClick, onHoverPitch, hear
                   ry={layout.size.ry}
                   onPick={pick}
                   halo={cell.midi === halo}
-                  lit={cell.midi === hoverMidi || cell.midi === flash || cell.midi === heard}
+                  lit={cell.midi === hoverMidi || cell.midi === flash || (cell.midi === heard && !heardIsBorder)}
                   target={!!targets && (targets.midi !== null ? cell.midi === targets.midi : !!targets.pcs?.has(cell.midi % 12))}
                   onHover={setHover}
                 />
@@ -248,9 +261,15 @@ function NoteDefs({ R }: { R: number }) {
       <filter id="hex-glow-blur" x="-10%" y="-30%" width="120%" height="160%">
         <feGaussianBlur stdDeviation={Math.max(4, R * 0.3)} />
       </filter>
-      {/* Lit cells: a soft white glow inside the cell's edge (blurred stroke, clipped to the cell). */}
-      <filter id="hex-lit-blur" x="-20%" y="-20%" width="140%" height="140%">
-        <feGaussianBlur stdDeviation={Math.max(1.5, R * 0.05)} />
+      {/* Lit cells: a big bright green glow (a wide blurred stroke over a crisp one), spilling past the cell's edge. */}
+      <filter id="hex-lit-blur" x="-60%" y="-60%" width="220%" height="220%">
+        <feGaussianBlur in="SourceGraphic" stdDeviation={Math.max(4, R * 0.16)} result="wide" />
+        <feGaussianBlur in="SourceGraphic" stdDeviation={Math.max(1, R * 0.03)} result="tight" />
+        <feMerge>
+          <feMergeNode in="wide" />
+          <feMergeNode in="wide" />
+          <feMergeNode in="tight" />
+        </feMerge>
       </filter>
       <filter id="hex-note-shadow" x="-50%" y="-50%" width="200%" height="200%">
         <feDropShadow dx="0" dy={Math.max(1, R * 0.06)} stdDeviation={Math.max(1, R * 0.07)} floodColor="#000" floodOpacity="0.45" />
@@ -289,20 +308,13 @@ function Cell({ part, plain, cell, cx, cy, R, ry, onPick, halo, lit, onHover, ta
   const style = { ['--deg' as string]: cell.colour, ['--deg-ink' as string]: cell.ink };
   const opacity = cell.inRange ? 1 : T.outOpacity;
   if (part === 'top') {
-    const clipId = `hex-clip-${cell.r}-${cell.c}`;
     return (
       <g className={`${className} hex-cell-top`} style={style} opacity={opacity}>
         {target && <polygon className="hex-target" points={hexPoints(cx, cy, R * 0.86, ry * 0.86)} />}
         {/* Triad cells: a thin white edge (in the top layer, so no neighbour's fill covers it; off while colours travel). */}
         {cell.triad && !plain && <polygon className="hex-triad-edge" points={hexPoints(cx, cy, R - 0.75, ry - 0.75)} />}
-        {lit && (
-          <>
-            <clipPath id={clipId}>
-              <polygon points={hexPoints(cx, cy, R, ry)} />
-            </clipPath>
-            <polygon className="hex-lit" points={hexPoints(cx, cy, R, ry)} clipPath={`url(#${clipId})`} strokeWidth={R * 0.2} filter="url(#hex-lit-blur)" />
-          </>
-        )}
+        {/* Unclipped, so the glow spills past the cell's edge. */}
+        {lit && <polygon className="hex-lit" points={hexPoints(cx, cy, R * 0.92, ry * 0.92)} strokeWidth={R * 0.3} filter="url(#hex-lit-blur)" />}
         <text x={cx} y={cy - R * 0.6} textAnchor="middle" dominantBaseline="central" fontSize={Math.max(8, R * 0.25)} fontWeight={700} className="hex-name">
           {prettyName(cell.name)}
         </text>
@@ -397,7 +409,7 @@ function BorderButtonView({ cx, cy, R, glyph, label, shown, lit, onClick, onEnte
   return (
     <g className={cls} role="button" aria-label={label} onClick={onClick} onMouseEnter={onEnter} onMouseLeave={onLeave}>
       <g key={pop} className={pop > 0 ? 'hex-pop' : undefined}>
-        {lit && <circle cx={cx} cy={cy} r={r + Math.max(2, r * 0.35)} className="hex-acc-lit" filter="url(#hex-lit-blur)" />}
+        {lit && <circle cx={cx} cy={cy} r={r + Math.max(3, r * 0.6)} className="hex-acc-lit" filter="url(#hex-lit-blur)" />}
         <circle cx={cx} cy={cy} r={r} fill="url(#hex-note-sphere)" filter="url(#hex-note-shadow)" />
         <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central" fontSize={Math.max(10, r * 1.45)} fontWeight={700} className="hex-ball-ink">
           {glyph}

@@ -120,6 +120,8 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
   const [practiceAdvances, setPracticeAdvances] = useState(0);
   /** The app's own sounds the mic may hear while practising (On arrival). */
   const echoRef = useRef<EchoGuard | null>(null);
+  /** Write: the last note sounded by ` (step-play) or a melody-note click, concert pitch; lights the hex (`n` replays). */
+  const [sounded, setSounded] = useState<{ midi: number; n: number } | null>(null);
   const [editRequest, setEditRequest] = useState<{ bar: number; part: number; n: number } | null>(null);
 
   const view = useMemo(() => instrumentView(progression), [progression]);
@@ -182,11 +184,17 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
 
   /** Run an intent through the session: commit its edit, keep its state, perform its effects. */
   const dispatch = (intent: Intent) => {
+    const writing = sessionRef.current.playIndex === null;
     const out = reduce(sessionRef.current, doc.progression, intent);
     if (out.edit) commit(out.edit);
     sessionRef.current = out.state;
     setSession(out.state);
     perform(out.effects);
+    // Write: a stepped (`) or selected melody note lights its hex cells as if played (a click lights its own).
+    if (writing && (intent.type === 'step-play' || intent.type === 'event-click')) {
+      const note = out.effects.find((e): e is Extract<Effect, { type: 'note' }> => e.type === 'note');
+      if (note) setSounded((f) => ({ midi: note.midi, n: (f?.n ?? 0) + 1 }));
+    }
   };
   const dispatchRef = useRef(dispatch);
   dispatchRef.current = dispatch;
@@ -302,14 +310,14 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
   /** A note the mic heard (concert): count it; the right one moves the form on (or ends it, without Loop). */
   const practiceRef = useRef({ practice, practiceCtx, practiceLoop, on: session.practice });
   practiceRef.current = { practice, practiceCtx, practiceLoop, on: session.practice };
-  const onPracticeNote = useCallback((heard: number) => {
+  const onPracticeNote = useCallback((heard: number, fromOnset: boolean) => {
     const { practice: p, practiceCtx: c, practiceLoop: loop, on } = practiceRef.current;
     if (!on || !p) return;
     if (isEcho(echoRef.current, heard, performance.now())) return; // the app's own On arrival sound
     // This note is played in the current slot: a waiting On arrival sound (the slot was reached by finishing the one
     // before) sounds with it.
     dispatchRef.current({ type: 'practice-note' });
-    const step = practiceNote(p, heard, c);
+    const step = practiceNote(p, heard, c, fromOnset);
     if (step.hit !== undefined) {
       const hit = step.hit;
       // A new time through the form (it wrapped to the start) clears the marks.
@@ -587,6 +595,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
             halo={haloPitch === null ? null : view.toWritten(haloPitch)}
             heard={heardConcert === null ? null : view.toWritten(heardConcert)}
             targets={practiceHexTargets}
+            sounded={sounded && { midi: view.toWritten(sounded.midi), n: sounded.n }}
           />
         </section>
       </main>

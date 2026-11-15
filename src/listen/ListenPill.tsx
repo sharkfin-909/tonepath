@@ -15,7 +15,7 @@ export interface ListenPillProps {
   /** A concert note's written name in the active slot, e.g. `Eb4`. */
   nameOf: (concertMidi: number) => string;
   /** A note was played (an attack, or a slur to a new pitch): concert MIDI. Practice counts these (SPEC §3.7). */
-  onNote?: (concertMidi: number) => void;
+  onNote?: (concertMidi: number, fromOnset: boolean) => void;
   /** Practice: listen without a click — on while true, off again when it turns false (if it started it). */
   auto?: boolean;
   /** Where the big tuner goes (above the hex): rendered there while listening, so only it redraws every frame. */
@@ -65,7 +65,7 @@ export function ListenPill({ onHeard, nameOf, onNote, auto = false, tunerSlot = 
       listening.current = await startListening(
         (h) => {
           setFrame({ midi: h.midi, cents: h.cents, level: h.level });
-          if (h.noteStart !== null) noted.current?.(h.noteStart);
+          if (h.noteStart !== null) noted.current?.(h.noteStart, h.noteFromOnset);
           if (h.midi !== lastMidi.current) {
             lastMidi.current = h.midi;
             report.current(h.midi);

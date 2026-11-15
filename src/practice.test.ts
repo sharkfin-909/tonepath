@@ -40,7 +40,7 @@ describe('advance rules', () => {
 
   it('landed vs finished: guide / chord-tone notes land in the next slot; count / Follow finish the old one', () => {
     expect(practiceNote(startPractice(0), 71, ctx('guide'))).toMatchObject({ advanced: true, landed: true });
-    expect(practiceNote({ slot: 0, count: 1, follow: 0 }, 60, ctx('count'))).toMatchObject({ advanced: true, landed: false });
+    expect(practiceNote({ slot: 0, count: 1, follow: 0, lastFollowPc: null }, 60, ctx('count'))).toMatchObject({ advanced: true, landed: false });
   });
 
   it('note count: after the slot’s count (quarters: 2 in a half bar)', () => {
@@ -49,34 +49,50 @@ describe('advance rules', () => {
 
   it('count, then guide tone: fill the slot first, then land on a guide tone', () => {
     expect(play('count-then-guide', [71, 62, 64, 71])).toEqual([0, 0, 0, 1]); // B too early; 2 notes; E no; B lands
-    const s = { slot: 0, count: 2, follow: 0 };
+    const s = { slot: 0, count: 2, follow: 0, lastFollowPc: null };
     expect(practiceTargets(s, ctx('count-then-guide')).pcs).toEqual(new Set([5, 11]));
     expect(practiceTargets({ ...s, count: 1 }, ctx('count-then-guide')).pcs).toBeNull(); // not yet
   });
 
-  it('follow the etude: the written notes in order; wrong notes wait', () => {
+  it('follow the etude: the written notes in order; wrong notes wait; any octave of the pitch counts', () => {
     const p = prog([{ pitch: 62, d: 'q' }, { pitch: 65, d: 'q' }, { pitch: 67, d: 'h' }]); // D F | G
     expect(play('follow', [62, 60, 65, 67], p)).toEqual([0, 0, 1, 2]);
+    expect(play('follow', [74, 65], p)).toEqual([0, 1]); // D5 (= D4 pc) then F
     expect(practiceTargets(startPractice(0), ctx('follow', p)).midi).toBe(62);
     const c = ctx('follow', p);
     expect(followEventIndex(startPractice(0), c)).toBe(0); // the D
-    expect(followEventIndex({ slot: 0, count: 1, follow: 1 }, c)).toBe(1); // then the F
-    expect(followEventIndex({ slot: 1, count: 0, follow: 0 }, c)).toBe(2); // the G, in the next slot
+    expect(followEventIndex({ slot: 0, count: 1, follow: 1, lastFollowPc: null }, c)).toBe(1); // then the F
+    expect(followEventIndex({ slot: 1, count: 0, follow: 0, lastFollowPc: null }, c)).toBe(2); // the G, in the next slot
     // Each correct note reports which written note it was (marked as played); a wrong note doesn't.
     expect(practiceNote(startPractice(0), 62, c).hit).toBe(0);
     expect(practiceNote(startPractice(0), 60, c).hit).toBeUndefined();
-    expect(practiceNote({ slot: 0, count: 1, follow: 1 }, 65, c)).toMatchObject({ hit: 1, advanced: true });
+    expect(practiceNote({ slot: 0, count: 1, follow: 1, lastFollowPc: 2 }, 65, c)).toMatchObject({ hit: 1, advanced: true });
+  });
+
+  it('follow: a held note does not mark the next written repeat; a re-attack does', () => {
+    const p = prog([{ pitch: 62, d: 'q' }, { pitch: 62, d: 'q' }, { pitch: 65, d: 'h' }]); // D D | F
+    const c = ctx('follow', p);
+    const first = practiceNote(startPractice(0), 62, c, true);
+    expect(first).toMatchObject({ hit: 0, advanced: false });
+    expect(first.state.follow).toBe(1);
+    // Same pitch, slurred / no new onset: must not mark the second D.
+    const held = practiceNote(first.state, 62, c, false);
+    expect(held.hit).toBeUndefined();
+    expect(held.advanced).toBe(false);
+    expect(held.state).toEqual(first.state);
+    // Re-attack: marks the repeat.
+    expect(practiceNote(first.state, 62, c, true)).toMatchObject({ hit: 1, advanced: true });
   });
 
   it('wraps from the last slot to the first; a next slot without a chord falls back to the count', () => {
-    let s: PracticeState = { slot: 2, count: 0, follow: 0 }; // Cmaj7 → N.C. next
+    let s: PracticeState = { slot: 2, count: 0, follow: 0, lastFollowPc: null }; // Cmaj7 → N.C. next
     for (const m of [60, 62, 64]) s = practiceNote(s, m, ctx('guide')).state;
     expect(s.slot).toBe(2);
     s = practiceNote(s, 65, ctx('guide')).state; // 4th note: the count of a whole bar in quarters
     expect(s.slot).toBe(3);
-    const end = practiceNote({ slot: 3, count: 0, follow: 0 }, 71, ctx('guide')); // N.C. → Dm7 (wraps)
+    const end = practiceNote({ slot: 3, count: 0, follow: 0, lastFollowPc: null }, 71, ctx('guide')); // N.C. → Dm7 (wraps)
     expect(end.state.slot).toBe(3); // B isn't a guide tone of Dm7 (F, C)
-    expect(practiceNote({ slot: 3, count: 0, follow: 0 }, 65, ctx('guide')).state.slot).toBe(0);
+    expect(practiceNote({ slot: 3, count: 0, follow: 0, lastFollowPc: null }, 65, ctx('guide')).state.slot).toBe(0);
   });
 });
 
