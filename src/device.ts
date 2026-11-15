@@ -9,6 +9,15 @@ export const DEVICE_KEY = 'honeycomb:device';
 export type OnArrival = 'silent' | 'chord' | 'root' | 'bass' | 'bass-chord';
 const ARRIVALS: OnArrival[] = ['silent', 'chord', 'root', 'bass', 'bass-chord'];
 
+/** UI labels for *On arrival* / next chord trigger (SPEC §3.3). */
+export const ON_ARRIVAL_LABELS: Record<OnArrival, string> = {
+  silent: 'Silent',
+  chord: 'Chord',
+  root: 'Root note',
+  bass: 'Bass note',
+  'bass-chord': 'Bass note + chord',
+};
+
 export function onArrivalOf(d: DeviceSettings): OnArrival {
   return ARRIVALS.includes(d.playArrival as OnArrival) ? (d.playArrival as OnArrival) : 'silent';
 }

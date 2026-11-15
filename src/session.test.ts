@@ -67,6 +67,26 @@ describe('Write: entry', () => {
   });
 });
 
+describe('Write: Explore hex panel (write-with)', () => {
+  it('a pick only auditions: nothing written, the caret stays', () => {
+    const r = run([{ type: 'write-with', how: 'explore' }, pick(62)]);
+    expect(r.p.melody).toEqual([]);
+    expect(r.state.caret).toBe(0);
+    expect(show(r.per[1])).toEqual(['note 62']);
+  });
+
+  it('Rest on: a length key inserts nothing', () => {
+    const r = run([{ type: 'write-with', how: 'explore' }, { type: 'toggle-rest' }, { type: 'length', d: 'h' }]);
+    expect(r.p.melody).toEqual([]);
+    expect(r.state.length).toBe('h');
+  });
+
+  it('back to hex (or instrument): picks write again', () => {
+    expect(run([{ type: 'write-with', how: 'explore' }, { type: 'write-with', how: 'hex' }, pick(62)]).p.melody).toEqual([{ pitch: 62, d: 'q' }]);
+    expect(run([{ type: 'write-with', how: 'instrument' }, pick(62)]).p.melody).toEqual([{ pitch: 62, d: 'q' }]);
+  });
+});
+
 describe('Write: On arrival sounds with the first entry of a slot', () => {
   it('first note of a slot: the note plus the slot chord; later notes alone', () => {
     const r = run([pick(62), pick(65), pick(69), pick(72), pick(67)], { onArrival: 'chord' });

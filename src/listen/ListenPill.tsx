@@ -1,4 +1,5 @@
-// 🎤 Listen (SPEC §9.2): an on / off toggle in the hex panel's top left corner. On: the mic is read every frame; a pill
+// 🎤 Listen (SPEC §9.2): no button of its own — on while `auto` (Practice, or Write's *Write with instrument audio*). On:
+// the mic is read every frame; a pill
 // portalled to the row's right end shows the input level control and meter, and — portalled into the row's middle — the tuner shows
 // the note being played (spelled for the active slot, written pitch) and how far off it is. Practice turns it on and off (`auto`) and receives each played note (`onNote`).
 // Only a change of note is reported up (to light the hex), so the chart doesn't re-render 60 times a second.
@@ -16,7 +17,7 @@ export interface ListenPillProps {
   nameOf: (concertMidi: number) => string;
   /** A note was played (an attack, or a slur to a new pitch): concert MIDI. Write inserts; Practice counts (SPEC §3.7). */
   onNote?: (concertMidi: number, fromOnset: boolean) => void;
-  /** Practice: listen without a click — on while true, off again when it turns false (if it started it). */
+  /** Listen while true (Practice, or Write with instrument audio); off again when it turns false. */
   auto?: boolean;
   /** Mic on/off — App uses this in Write to mute note audition while listening. */
   onListening?: (on: boolean) => void;
@@ -87,7 +88,8 @@ export function ListenPill({ onHeard, nameOf, onNote, auto = false, onListening,
     return false;
   };
 
-  // Practice turns listening on (the Practice click is the user's gesture) and off again when it ends.
+  // Practice / Write with instrument audio turn listening on (the click or dropdown change is the user's gesture) and
+  // off again when they end.
   useEffect(() => {
     if (auto && !on && !autoStarted.current) {
       autoStarted.current = true;
@@ -96,7 +98,7 @@ export function ListenPill({ onHeard, nameOf, onNote, auto = false, onListening,
       autoStarted.current = false;
       void toggle(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reacts to Practice starting / ending
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reacts to `auto` turning on / off
   }, [auto]);
 
   // Retune YIN's window when the instrument changes while listening (issues/064).
@@ -109,17 +111,6 @@ export function ListenPill({ onHeard, nameOf, onNote, auto = false, onListening,
   return (
     <>
     {on && tunerSlot && createPortal(<Tuner name={frame.midi === null ? null : nameOf(frame.midi)} cents={frame.cents} />, tunerSlot)}
-    {/* A static on / off toggle like Grid (filled when on), in the hex panel's top left corner. */}
-    <button
-      type="button"
-      role="switch"
-      aria-checked={on}
-      className={on ? 'listen-switch on' : 'listen-switch'}
-      title={on ? 'Stop listening' : 'Listen: detect the notes you play (mic)'}
-      onClick={() => void toggle()}
-    >
-      Listen
-    </button>
     {/* While listening: the input level control and meter, in a pill as tall as the tuner, at the row's right end. */}
     {on && levelsSlot && createPortal(
       <div className="listen-levels">

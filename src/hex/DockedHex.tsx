@@ -51,7 +51,7 @@ export interface DockedHexProps {
   onPick?: (midi: number) => void;
   /** Written pitch of the nudge target: its cell(s) get a dashed halo (SPEC §6.2 item 8). */
   halo?: number | null;
-  /** Clicking an empty / unparseable slot's label focuses its chord field. */
+  /** Clicking an unparseable slot's label focuses its chord field. */
   onLabelClick?: () => void;
   /** The playable written pitch under the pointer (a cell or a border button), or null: what A would pick (Space clicks it). */
   onHoverPitch?: (written: number | null) => void;

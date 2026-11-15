@@ -53,7 +53,7 @@ Pure modules (no React / DOM), each unit-tested with the tables in §14:
 └───────────────────────────────────────────────────────┘
 ```
 
-- **Control header** — a bar across the top, so the hex gets the full width, in the hex panel's dark background (`--dock-bg`) with light text and an inner glow. **Two rows** (a grid): row 1 = the ← Library pill and the title (small, Thin; inline rename) on the left, the **sound pill** (mute · ▶ Chord / Bass / Scale · *On arrival*; Thin, 12px) **centred**; row 2 = the note lengths and Rest (note / rest icons with their keys 1–5 / R; names in tooltips), time signature, bars per row, undo / redo (icons), **Clear ▾** (§6.2 item 10), then, **aligned right**, **Ins:** the instrument picker and clef (§7.3, §10) and the **Play | Practice | Write | Read** mode switch. Play hides that editing group (Practice keeps the note lengths, §3.7); Ins: and the sound pill stay. Narrow screens: §3.6. After any header button click or dropdown choice, **focus returns to the hex grid**, so Space and the other keys never act on the last-clicked control; the inline title / time-signature fields keep focus while editing. No toolbar strip between chart and hex.
+- **Control header** — a bar across the top, so the hex gets the full width, in the hex panel's dark background (`--dock-bg`) with light text and an inner glow. **Two rows** (a grid): row 1 = the ← Library pill and the title (small, Thin; inline rename) on the left, the **sound pill** (mute · ▶ Chord / Bass / Scale · *On arrival*; Thin, 12px) **centred**; row 2 = the note lengths and Rest (note / rest icons with their keys 1–5 / R; names in tooltips), time signature, bars per row, undo / redo (icons), **Clear ▾** (§6.2 item 10), then, **aligned right**, **Ins:** the instrument picker and clef (§7.3, §10) and the **Practice | Write | Read** mode switch. Play hides that editing group (Practice keeps the note lengths, §3.7); Ins: and the sound pill stay. Narrow screens: §3.6. After any header button click or dropdown choice, **focus returns to the hex grid**, so Space and the other keys never act on the last-clicked control; the inline title / time-signature fields keep focus while editing. No toolbar strip between chart and hex.
 - **Chart** — rows of `barsPerRow` bars; each row has a **clef gutter** at its left (§7.3), then the slots at equal, time-proportional width. Bar lines at the end of each bar only; **no line between two chords in a bar** (the chord names mark the change). Bar numbers sit **just above the stave's top line**, at the start of each bar. In Write, each bar number carries a **⋯ bar handle** and a **"+"** follows the last bar (§4.1).
 - **Chart zoom** — automatic: scale so every row fits the chart area (cap ~1.4× on short forms), never below a readable floor (staff line gap ≈ 5px). Every row has the same height (fixed ledger-line headroom, §7.1); chord / scale labels keep their minimum sizes (§7.1) at any zoom. Below the floor the chart stops shrinking and **scrolls vertically**, keeping the caret's row (or, in Play, the current slot) in view. No manual zoom control.
 - **Split** — the chart takes only the height its rows need (padding above; the stave's own ledger-line headroom is the gap below), up to half the space under the header; the **hex takes everything else**, with 24px padding around the grid. No divider, no setting.
@@ -62,9 +62,15 @@ Pure modules (no React / DOM), each unit-tested with the tables in §14:
 
 Hex picks are recorded at the caret (§6). Opening a progression or reloading always starts in Write.
 
+- **Write mode** dropdown, in the **top left corner of the hex panel** (Write only; styled like Grid), sets what entry does:
+  - **Explore hex panel** — hex picks (click, Space, `A`) and the mic only **audition**: nothing is written, and Rest + a length inserts nothing. The caret, nudges, deleting and stepwise playback work as usual.
+  - **Write with hex panel** (default) — hex picks are written at the caret.
+  - **Write with instrument audio** — turns **Listen** on (§9.2): each note you play (an attack) is written at the caret; hex picks still write too. Choosing another option turns Listen off.
+- Not saved: every open or reload starts at *Write with hex panel*.
+
 ### 3.3 Play mode — [Play mode](issues/035-play-mode.md)
 
-- Switch: **Play** in the mode switch (Play | Practice | Write | Read), or `P` to toggle Write ⇄ Play (ignored while a text field has focus).
+- **Not in the UI**: the mode switch has no Play option and `P` never enters it. Play remains only as the machinery Practice (§3.7) runs on; the rest of this section describes that behaviour.
 - Same layout, but the **stave is cleared**: the written melody is hidden (bars, clef and chords stay) so you play over empty staves; it shows again in Write. Hex clicks **audition only** (never recorded). The caret is hidden; the **current slot** gets a solid full-width highlight in a colour distinct from Write's active-slot tint. The note lengths, Rest, time signature, bars per row, undo / redo and Clear are **hidden** (not disabled); the sound pill and Ins: stay. **Chord and scale entry stay**: clicking a chord name (or an empty slot's `+`) edits it exactly as in Write (autosuggest, Tab / Enter to move on), and makes that slot current; the scale name under a chord opens its scale menu as in Write.
 - **← / →** move to the previous / next **slot** (a split bar = two stops), **wrapping** at both ends. Clicking a slot selects it. ↑ / ↓ do nothing. Chart scrolls to keep the current slot in view.
 - **On arrival** dropdown: **Silent** (default) · **Chord** (= ▶ Chord) · **Root note** (chord's bass — the slash bass if any — in concert octave 3, plain sine; `N.C.` silent) · **Bass note** (the same note an octave lower, concert octave 2) · **Bass note + chord** (both together). *On arrival* applies in **Write** too: writing the **first entry of a slot** (a note or rest at its start, incl. the wrap back to bar 1) sounds that slot's chord or root together with it. Moving the caret, < > and finishing a slot are silent. The dropdown shows in both modes. C / B always play ▶ Chord / ▶ Bass; S / ⇧Space ▶ Scale; Space clicks whatever is under the pointer (§11), and A over a hex cell auditions it. In **Play** the sound waits for the **first note played** in the slot after arriving (hex click / Space / A), sounding together with it; arriving itself (←/→, < >, slot click, entering Play) is silent. A device setting.
@@ -75,14 +81,14 @@ Hex picks are recorded at the caret (§6). Opening a progression or reloading al
 
 ### 3.4 Read mode (formerly Stand)
 
-- Entered from the mode switch (**Read**) or `\`; the read-only view's header shows the same **Play | Practice | Write | Read** switch, so any other mode returns to editing.
+- Entered from the mode switch (**Read**) or `\`; the read-only view's header shows the same **Practice | Write | Read** switch, so any other mode returns to editing.
 - Hides the control header and the hex; shows a thin header: title, instrument and the mode switch (no sound controls: nothing plays in Read).
 - Read-only chart: no caret, no chord editing, no bar handles or "+". **Fit page**: every bar on one screen, auto-zoomed (no floor; 32 bars at 4/row fit on 1024×768). `\` returns to the mode it came from (Write or Play); the mode switch goes to any mode.
 
 
 ### 3.7 Practice mode
 
-- **Practice** — the second option of the mode switch (**Play | Practice | Write | Read**): Play driven by your instrument. Entering it turns on **Listen** (§9.2) automatically (the browser asks for the mic once); leaving it turns it off. The chart, hex and arrival behave as in Play; the **note-length buttons stay** in the header, since the selected length sets each slot's note count.
+- **Practice** — the first option of the mode switch (**Practice | Write | Read**): Play driven by your instrument. Entering it turns on **Listen** (§9.2) automatically (the browser asks for the mic once); leaving it turns it off. The chart, hex and arrival behave as in Play; the **note-length buttons stay** in the header, since the selected length sets each slot's note count.
 - Every note you play is counted in the current slot: an **attack**, or a **slur** to a new pitch (no new attack); a held note counts once.
 - **Move on when** (a device setting; all are options):
   - **Guide tone** — you play the 3rd (a sus chord's 4th) or the 7th / 6th of the **next** chord.
@@ -93,7 +99,7 @@ Hex picks are recorded at the caret (§6). Opening a progression or reloading al
   - The note that moves the form on lands in the new slot and counts as its first note. A rule with nothing to aim for (the next slot has no chord; nothing written to follow) falls back to the note count.
 - **On arrival** in Practice sounds with the **new slot's first note**: with **Guide tone** and **Chord tone** (and Count, then guide tone) that is the note that moved the form on — you landed on the next chord — so it sounds at once; with **Note count** and **Follow the etude** the form moves on when you *finish* a slot, so the sound waits and plays with the next note you play. Moving to a slot by hand also waits for its first note. Entering Practice sounds the starting slot once, as a cue to start. The mic hears it too, so an **echo guard** ignores everything for 250 ms after it starts, and while it rings (chord ~3.2 s, root / bass note ~1.1 s) ignores heard notes matching its pitches (or an octave off). Headphones avoid the question altogether.
 - **Targets** — the notes that move the form on are ringed on the hex (a dashed glowing ring in each cell holding them; Follow: the exact next note), and named in the practice panel.
-- **Practice panel** (above the hex, beside the tuner): the rule, this slot's count (`3 / 4` for count rules, else `3 notes`), `→ B · F` (the targets), and **Loop** (default on; off = practice stops — back to Play — at the end of the form). It flashes each time the form moves on.
+- **Practice panel** (above the hex, beside the tuner): the rule (a dropdown labelled *Next chord on:*), this slot's count (`3 / 4` for count rules, else `3 notes`), `→ B · F` (the targets), and **Loop** (default on; off = practice stops — back to Write — at the end of the form). It flashes each time the form moves on.
 - Moving between slots by hand (←/→, < >, clicking a slot) restarts the count on the new slot.
 
 ### 3.6 Responsive layout
@@ -271,12 +277,12 @@ Reference implementation: the throwaway [VexFlow spike prototype](prototypes/vex
 | Active slot | Hex shows | Entry | Dock label | ▶ Chord / ▶ Scale / *On arrival* |
 |---|---|---|---|---|
 | `N.C.` | **C major** (in the instrument's written pitch: white-key names, whatever the neighbouring slots), with **no degree data**: every cell neutral taupe, no degree numbers, no triad tones; **fully playable** (the border buttons reach the other pitches) | **any note**, not checked (no out-of-scale marks; ↑ / ↓ nudge by semitone) | "N.C.: notes not checked" | silent |
-| Empty | as `N.C.` | as `N.C.` | "No chord yet: notes not checked" | silent |
+| Empty | as `N.C.` | as `N.C.` | none | silent |
 | Unparseable | as `N.C.` | as `N.C.` | "Chord not recognised: notes not checked" | silent |
 | Valid chord, **no scale fits** | steps through the **chord's own tones** (each cell = next chord tone up; same slant, 3 rows, Fit range, pitch anchor); triad cells coloured by spelled degree | normal | "No scale fits: chord tones only" | ▶ Chord normal; ▶ Scale plays the chord tones ascending over one octave; *On arrival* normal |
 
 - Glossary names: the first three rows are the **unchecked hex**, the last the **chord-tones hex**.
-- Clicking an empty / unparseable label focuses that slot's chord field. Notes in such a slot are kept and never marked out of scale; they are checked again once the slot has a chord.
+- Clicking an unparseable slot's label focuses its chord field. Notes in such a slot are kept and never marked out of scale; they are checked again once the slot has a chord.
 - Play mode follows the same table (every row playable).
 
 ### 8.5 Linear
@@ -302,7 +308,7 @@ Reference implementation: the throwaway [VexFlow spike prototype](prototypes/vex
 
 ### 9.2 Listen (prototype) — toward an improvisation practice mode
 
-- **Listen** toggle (on / off, sized and styled like Grid: filled when on), in the **top left corner of the hex panel**. On: the browser asks for the microphone once; the mic is read every animation frame (no library): an AnalyserNode frame (2048 samples, ~43 ms) → **YIN pitch detection** (monophonic: voice, horns, strings, single-line guitar / bass; ~55 Hz – 1.6 kHz) and **onset detection** (level well above its recent average, still rising, past a noise gate; 90 ms lockout — a re-attack of the same note counts, a held note doesn't). A note is reported once it reads the same on two frames running (no flicker through the attack).
+- **Listen** has no button of its own: it is on in **Practice** and in Write's **Write with instrument audio** (§3.2). On: the browser asks for the microphone once; the mic is read every animation frame (no library): an AnalyserNode frame (2048 samples, ~43 ms) → **YIN pitch detection** (monophonic: voice, horns, strings, single-line guitar / bass; ~55 Hz – 1.6 kHz) and **onset detection** (level well above its recent average, still rising, past a noise gate; 90 ms lockout — a re-attack of the same note counts, a held note doesn't). A note is reported once it reads the same on two frames running (no flicker through the attack).
 - While listening, a pill **as tall as the tuner**, at the right end of the row, holds the input level control (a small slider) and the level meter; the tuner shows the **heard note** (written pitch, spelled for the active slot) and its cents off; the heard note's cells **light on the hex** like a hovered cell.
 - **Tuner** (while listening): a tuner in the middle of the **row above the hex** (the hex makes room) — the note name and octave, a needle on a **±50 ¢** scale with a ±5 ¢ band, and the cents off; green within ±5 ¢, amber within ±15 ¢, red beyond, a dash when nothing clear is heard. In Practice the practice panel sits beside it, on the same row.
 - The mic is opened with echo cancellation on (keeps the app's own sounds out) and noise suppression / auto gain off (they colour an instrument).
@@ -350,7 +356,7 @@ Reference implementation: the throwaway [VexFlow spike prototype](prototypes/vex
 | `C` / `B` | ▶ Chord / ▶ Bass | ▶ Chord / ▶ Bass | — |
 | `<` / `>` (or `,` / `.`) | previous / next slot, wrapping (caret to its start) | previous / next slot, wrapping | — |
 | `M` | mute | mute | mute |
-| `P` | → Play | → Write | — |
+| `P` | — | Practice → Write | — |
 | `\` | → Read | → Read | back |
 | ⌘Z / ⇧⌘Z | undo / redo | — | — |
 | Enter / Tab / ⇧Tab | (in a chord field) commit and move to next / previous slot | | |

@@ -82,7 +82,7 @@ describe('OnsetDetector', () => {
   it('quiet bumps under the gate are ignored; two attacks inside the lockout count once', () => {
     const o = new OnsetDetector();
     expect([0, 0.01, 0, 0.012].map((l, i) => o.push(l, i * 16)).some(Boolean)).toBe(false);
-    const p = new OnsetDetector({ lockoutMs: 90 });
+    const p = new OnsetDetector({ lockoutMs: 120 });
     const r = [0, 0.2, 0.01, 0.3].map((l, i) => p.push(l, i * 16));
     expect(r.filter(Boolean)).toHaveLength(1);
   });
@@ -109,6 +109,12 @@ describe('NoteTracker', () => {
     expect(
       run([
         [null, true],
+        [67, false],
+        [67, false],
+        [67, false],
+        [67, false],
+        [67, false],
+        [67, false],
         [67, false],
         [67, false],
         [67, false],
@@ -142,7 +148,20 @@ describe('NoteTracker', () => {
         [67, false],
         [67, false],
         [67, false],
+        [67, false],
+        [null, false],
+        [null, false],
+        [null, false],
+        [null, false],
+        [null, false],
+        [null, false],
+        [null, false],
+        [null, false],
+        [null, false],
+        [null, false],
+        [null, false],
         [67, true],
+        [67, false],
         [67, false],
         [67, false],
         [67, false],
@@ -163,12 +182,28 @@ describe('NoteTracker', () => {
       ]),
     ).toEqual([{ midi: 67, fromOnset: true }]);
   });
+  it('ignores a spurious onset on a held note (no second attack)', () => {
+    const t = new NoteTracker();
+    const push = (m: number | null, o: boolean, ms: number) => t.push(m, o, ms);
+    const out: ReturnType<NoteTracker['push']>[] = [];
+  const track = (m: number | null, o: boolean, ms: number) => {
+      const r = push(m, o, ms);
+      if (r) out.push(r);
+      return r;
+    };
+    track(67, true, 0);
+    for (let ms = 16; ms <= 80; ms += 16) track(67, false, ms);
+    expect(out).toEqual([{ midi: 67, fromOnset: true }]);
+    track(67, true, 100); // level bump while holding
+    for (let ms = 116; ms <= 200; ms += 16) track(67, false, ms);
+    expect(out).toEqual([{ midi: 67, fromOnset: true }]);
+  });
 });
 
 describe('level meter', () => {
   it('dB scale: −60 dBFS → 0, 0 dBFS → 1; the onset gate sits about 40% along', () => {
     expect([meterPosition(0), meterPosition(0.001), meterPosition(1), meterPosition(2)]).toEqual([0, 0, 1, 1]);
-    expect(meterPosition(ONSET_GATE)).toBeCloseTo(0.39, 2);
+    expect(meterPosition(ONSET_GATE)).toBeCloseTo(0.41, 2);
   });
 });
 

@@ -31,6 +31,10 @@ export interface Selection {
   to: number;
 }
 
+/** Write's entry source (SPEC §3.2): explore the hex (audition only, nothing written), write with hex picks, or write
+ * with the instrument (the mic; hex picks still write). */
+export type WriteWith = 'explore' | 'hex' | 'instrument';
+
 export interface SessionState {
   /** A time position in the form (SPEC §6.2); clamped to the form end when read (`caretOf`). */
   caret: number;
@@ -54,6 +58,8 @@ export interface SessionState {
   refusal: { d: Duration; message: string; n: number } | null;
   /** A short notice (bar-edit refusals, "Copied bar 2"). */
   notice: { text: string; n: number } | null;
+  /** Write's entry source; not saved (a reload starts at `hex`). */
+  writeWith: WriteWith;
   /** Device settings (SPEC §9, §12.5). */
   muted: boolean;
   onArrival: OnArrival;
@@ -61,7 +67,7 @@ export interface SessionState {
 
 export type Intent =
   /** Hex cell (or its ♯ / ♭) clicked or picked with Space / A — written pitch. Write: insert; Play: audition. */
-  | { type: 'pick'; written: number }
+  | { type: 'pick'; written: number; /** Mic insert in Write: skip speaker while Listen is on. */ silent?: boolean }
   | { type: 'length'; d: Duration }
   | { type: 'toggle-rest' }
   | { type: 'delete'; back: boolean }
@@ -84,6 +90,8 @@ export type Intent =
   | { type: 'stand'; on: boolean | 'toggle' }
   | { type: 'sound'; what: 'chord' | 'bass' | 'scale' }
   | { type: 'toggle-mute' }
+  /** Write's entry source dropdown. */
+  | { type: 'write-with'; how: WriteWith }
   | { type: 'set-arrival'; how: OnArrival }
   | { type: 'bar-select'; bar: number; extend: boolean }
   | { type: 'bar-action'; bar: number; action: BarAction }
@@ -101,7 +109,8 @@ export type Intent =
   | { type: 'notice-done' };
 
 export type Effect =
-  | { type: 'note'; midi: number }
+  /** `pick`: mic insert audition only — silenced in Write while Listen is on. */
+  | { type: 'note'; midi: number; pick?: boolean }
   | { type: 'chord' | 'root' | 'bass' | 'scale'; harmony: SlotHarmony }
   | { type: 'device'; patch: { muted?: boolean; playArrival?: OnArrival } }
   | { type: 'history'; dir: 'undo' | 'redo' };
@@ -127,6 +136,7 @@ export function initialSession(p: Progression, device: { muted?: boolean; onArri
     halo: null,
     refusal: null,
     notice: null,
+    writeWith: 'hex',
     muted: device.muted === true,
     onArrival: device.onArrival,
   };
@@ -207,9 +217,11 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
   switch (intent.type) {
     case 'pick': {
       const midi = view.toConcert(intent.written);
-      effects.push({ type: 'note', midi }); // audition, even when the insert is refused
+      effects.push({ type: 'note', midi, pick: !playing && intent.silent === true });
+      // audition, even when the insert is refused (hex pick always sounds; mic uses `silent`)
       if (playing) playedIn(active.index); // Play: audition only, never recorded
-      else {
+      else if (s.writeWith !== 'explore') {
+        // Explore: audition only, nothing written
         set({ rest: false });
         insert(s.length, midi);
       }
@@ -230,7 +242,7 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
     }
     case 'length':
       set({ length: intent.d });
-      if (s.rest && !playing) insert(intent.d, null); // Rest on (Write): a length also inserts a rest (silent)
+      if (s.rest && !playing && s.writeWith !== 'explore') insert(intent.d, null); // Rest on (Write): a length also inserts a rest (silent)
       return done();
     case 'toggle-rest':
       set({ rest: !s.rest });
@@ -320,6 +332,9 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
       return done();
     case 'sound':
       effects.push({ type: intent.what === 'bass' ? 'root' : intent.what, harmony: active.concert });
+      return done();
+    case 'write-with':
+      set({ writeWith: intent.how, halo: null });
       return done();
     case 'toggle-mute':
       set({ muted: !s.muted });

@@ -20,13 +20,16 @@ export function PracticePanel({ rule, onRule, loop, onLoop, count, need, targetN
   const hint = ADVANCE_RULES.find((r) => r.id === rule)?.hint;
   return (
     <div className="practice-panel" key={advanced} data-flash={advanced > 0 || undefined}>
-      <select className="practice-rule" value={rule} title={hint} aria-label="Move on when" onChange={(e) => onRule(e.target.value as AdvanceRule)}>
-        {ADVANCE_RULES.map((r) => (
-          <option key={r.id} value={r.id}>
-            {r.label}
-          </option>
-        ))}
-      </select>
+      <label className="practice-rule-field">
+        <span className="practice-rule-label">Next chord on:</span>
+        <select className="practice-rule" value={rule} title={hint} onChange={(e) => onRule(e.target.value as AdvanceRule)}>
+          {ADVANCE_RULES.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.label}
+            </option>
+          ))}
+        </select>
+      </label>
       <span className="practice-count" title="Notes played in this slot">
         {need === null ? `${count} ${count === 1 ? 'note' : 'notes'}` : `${Math.min(count, need)} / ${need}`}
       </span>

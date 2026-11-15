@@ -11,12 +11,12 @@ import { setBarsPerRow, setConcertClef, setInstrument, setScaleOverride, setTitl
 import { BarsPerRow, ClearMenu, TimeSignatureField, TitleField } from './rail/RailSettings';
 import { InstrumentPicker } from './rail/InstrumentPicker';
 import { playBass, playChord, playNote, playRoot, playScale, setMuted, unlockAudio } from './audio';
-import { onArrivalOf, readDevice, writeDevice, type OnArrival } from './device';
+import { onArrivalOf, ON_ARRIVAL_LABELS, readDevice, writeDevice, type OnArrival } from './device';
 import { AudioControls } from './rail/AudioControls';
 import { DockedHex } from './hex/DockedHex';
 import type { StoredProgression } from './storage';
 import { openDocument, type ProgressionDocument } from './document';
-import { initialSession, reduce, type Effect, type Intent, type SessionState } from './session';
+import { initialSession, reduce, type Effect, type Intent, type SessionState, type WriteWith } from './session';
 import { enterChord } from './chordEntry';
 import { HONEYCOMB, linearOctaves, type HexShape } from './hex';
 import { keyIntent } from './keymap';
@@ -93,7 +93,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
     ro.observe(el);
     return () => ro.disconnect();
   }, [session.stand]);
-  /** Clicking an empty / unparseable dock label opens that slot's chord field. */
+  /** Clicking an unparseable slot's dock label opens its chord field. */
   // Linear (SPEC §8.5): the dock as one row, switched by octave. The layout is a device setting; the octave isn't
   // saved (it starts mid-range and is kept within the instrument's range).
   const [linearSetting, setLinear] = useState(() => readDevice(localStorage).hexShape === 'linear');
@@ -108,6 +108,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
     });
   /** Listen (SPEC §9.2): the concert note the mic hears, or null. */
   const [heardConcert, setHeardConcert] = useState<number | null>(null);
+  const [listening, setListening] = useState(false);
   const [tunerSlot, setTunerSlot] = useState<HTMLDivElement | null>(null);
   const [levelsSlot, setLevelsSlot] = useState<HTMLDivElement | null>(null);
   // Practice (SPEC §3.7): which slot is being practised and how many notes were played in it; the rule and loop are
@@ -123,6 +124,8 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
   const echoRef = useRef<EchoGuard | null>(null);
   /** Write + Listen: skip note audition so the speaker does not re-trigger the mic. */
   const listeningRef = useRef(false);
+  /** Last mic write (for dedupe while Listen is on in Write). */
+  const lastMicWriteRef = useRef<{ written: number; at: number } | null>(null);
   /** Write: the last note sounded by ` (step-play) or a melody-note click, concert pitch; lights the hex (`n` replays). */
   const [sounded, setSounded] = useState<{ midi: number; n: number } | null>(null);
   const [editRequest, setEditRequest] = useState<{ bar: number; part: number; n: number } | null>(null);
@@ -157,7 +160,8 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
         case 'note': {
           const s = sessionRef.current;
           const writing = s.playIndex === null && !s.practice && !s.stand;
-          if (!(writing && listeningRef.current)) playNote(e.midi);
+          const mutePick = writing && listeningRef.current && e.pick === true;
+          if (!mutePick) playNote(e.midi);
           break;
         }
         case 'chord':
@@ -319,7 +323,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
     practiceLoop,
     practiceOn: session.practice,
     view,
-    writeOn: !playing && !session.practice && !session.stand,
+    writeOn: !playing && !session.practice && !session.stand && session.writeWith === 'instrument',
   });
   micNoteRef.current = {
     practice,
@@ -327,15 +331,26 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
     practiceLoop,
     practiceOn: session.practice,
     view,
-    writeOn: !playing && !session.practice && !session.stand,
+    writeOn: !playing && !session.practice && !session.stand && session.writeWith === 'instrument',
   };
   const onMicNote = useCallback((heard: number, fromOnset: boolean) => {
     const { practice: p, practiceCtx: c, practiceLoop: loop, practiceOn, view: v, writeOn } = micNoteRef.current;
     if (isEcho(echoRef.current, heard, performance.now())) return; // the app's own On arrival sound
     if (writeOn && !practiceOn) {
-      // One note per tonguing — wobble / legato retarget while holding is a slur, not a new note.
-      if (!fromOnset) return;
-      dispatchRef.current({ type: 'pick', written: v.toWritten(heard) });
+      const written = v.toWritten(heard);
+      const now = performance.now();
+      const last = lastMicWriteRef.current;
+      if (last) {
+        const dt = now - last.at;
+        const diff = Math.abs(written - last.written);
+        if (written === last.written && dt < 220) return;
+        if (!fromOnset) {
+          if (diff <= 2 && dt < 130) return;
+          if (diff < 2 && dt < 150) return;
+        }
+      }
+      lastMicWriteRef.current = { written, at: now };
+      dispatchRef.current({ type: 'pick', written, silent: true });
       return;
     }
     if (!practiceOn || !p) return;
@@ -349,7 +364,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
       setPlayed((prev) => (step.advanced && step.state.slot < p.slot ? new Set() : new Set(prev).add(hit)));
     }
     if (step.advanced && step.state.slot === 0 && !loop) {
-      dispatchRef.current({ type: 'mode', mode: 'play' }); // the end of the form, no loop: practice stops
+      dispatchRef.current({ type: 'mode', mode: 'write' }); // the end of the form, no loop: practice stops (back to Write)
       return;
     }
     setPractice(step.state);
@@ -376,7 +391,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
   const mode: 'play' | 'practice' | 'write' | 'read' = session.stand ? 'read' : session.practice ? 'practice' : playing ? 'play' : 'write';
   const modeSwitch = (
     <div className="mode-switch" role="radiogroup" aria-label="Mode">
-      {(['play', 'practice', 'write', 'read'] as const).map((m) => (
+      {(['practice', 'write', 'read'] as const).map((m) => (
         <button
           key={m}
           type="button"
@@ -384,7 +399,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
           aria-checked={mode === m}
           className={mode === m ? 'mode-option on' : 'mode-option'}
           title={
-            m === 'play' ? 'Play: audition only (P)' : m === 'practice' ? 'Practice: play your instrument; the right notes move the form on (mic)' : m === 'write' ? 'Write: hex picks or Listen (mic) at the caret (P)' : 'Read: read-only page view (\\)'
+            m === 'practice' ? 'Practice: play your instrument; the right notes move the form on (mic)' : m === 'write' ? 'Write: hex picks or Listen (mic) at the caret' : 'Read: read-only page view (\\)'
           }
           onClick={() => {
             if (m === 'read') return dispatch({ type: 'stand', on: true });
@@ -392,7 +407,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
             dispatch({ type: 'mode', mode: m });
           }}
         >
-          {m === 'play' ? 'Play' : m === 'practice' ? 'Practice' : m === 'write' ? 'Write' : 'Read'}
+          {m === 'practice' ? 'Practice' : m === 'write' ? 'Write' : 'Read'}
         </button>
       ))}
     </div>
@@ -457,7 +472,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
             <TitleField title={progression.title} editing={renameOnOpen} onRename={(t) => commit(setTitle(doc.progression, t))} />
           </h1>
         </div>
-        {/* Row 1, centred: sound and On arrival, in a pill. */}
+        {/* Row 1, centred: sound and next-chord trigger (*On arrival*), in a pill; hidden while Listen is on. */}
         <div className="sound-section topbar-center">
           <AudioControls
             muted={muted}
@@ -466,16 +481,25 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
             onBass={() => dispatch({ type: 'sound', what: 'bass' })}
             onScale={() => dispatch({ type: 'sound', what: 'scale' })}
           />
-          <label className="rail-setting on-arrival">
-            <span className="rail-label">On arrival</span>
-            <select className="rail-select" value={session.onArrival} onChange={(e) => dispatch({ type: 'set-arrival', how: e.target.value as OnArrival })}>
-              <option value="silent">Silent</option>
-              <option value="chord">Chord</option>
-              <option value="root">Root note</option>
-              <option value="bass">Bass note</option>
-              <option value="bass-chord">Bass note + chord</option>
-            </select>
-          </label>
+          <p className="rail-setting on-arrival" role={listening ? 'status' : undefined}>
+            <span className="rail-label">Next chord trigger</span>
+            {listening ? (
+              <span className="on-arrival-readout">{ON_ARRIVAL_LABELS[session.onArrival]}</span>
+            ) : (
+              <select
+                className="rail-select"
+                aria-label="Next chord trigger"
+                value={session.onArrival}
+                onChange={(e) => dispatch({ type: 'set-arrival', how: e.target.value as OnArrival })}
+              >
+                {(Object.keys(ON_ARRIVAL_LABELS) as OnArrival[]).map((v) => (
+                  <option key={v} value={v}>
+                    {ON_ARRIVAL_LABELS[v]}
+                  </option>
+                ))}
+              </select>
+            )}
+          </p>
         </div>
         <div className="topbar-row">
           {/* Practice keeps the note lengths: the selected one sets each slot's note count (SPEC §3.7). */}
@@ -571,15 +595,36 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
             Grid
           </button>
           )}
-          {/* Listen (SPEC §9.2): top left corner; its tuner and levels portal into the row above the hex. */}
+          {/* Write (SPEC §3.2): what entry does — explore the hex (audition only), write with hex picks, or write with
+              the instrument (turns Listen on). Top left corner of the hex panel. */}
+          {!playing && (
+            <select
+              className="write-with"
+              value={session.writeWith}
+              aria-label="Write mode"
+              title="Write mode: what entering a note does"
+              onChange={(e) => {
+                dispatch({ type: 'write-with', how: e.target.value as WriteWith });
+                focusHex();
+              }}
+            >
+              <option value="explore">Explore hex panel</option>
+              <option value="hex">Write with hex panel</option>
+              <option value="instrument">Write with instrument audio</option>
+            </select>
+          )}
+          {/* Listen (SPEC §9.2): on in Practice and in Write with instrument audio; its tuner and levels portal into the
+              row above the hex. */}
           <ListenPill
             onHeard={setHeardConcert}
             nameOf={(m) => view.name(m, active)}
             onNote={onMicNote}
             onListening={(on) => {
               listeningRef.current = on;
+              setListening(on);
+              if (!on) lastMicWriteRef.current = null;
             }}
-            auto={session.practice}
+            auto={session.practice || (!playing && !session.stand && session.writeWith === 'instrument')}
             tunerSlot={tunerSlot}
             levelsSlot={levelsSlot}
             concertLowMidi={view.inst.range ? view.toConcert(view.inst.range.lo) : null}

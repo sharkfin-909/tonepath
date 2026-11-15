@@ -228,7 +228,7 @@ describe('test table 6: §8.4 slots without a scale', () => {
   });
 
   it('empty and unparseable slots: their labels, which edit the chord', () => {
-    expect(dockHex(hs('Dm7', ''), 1)).toMatchObject({ mode: 'unchecked', label: 'No chord yet: notes not checked', labelEditsChord: true });
+    expect(dockHex(hs('Dm7', ''), 1)).toMatchObject({ mode: 'unchecked', label: null });
     expect(dockHex(hs('Dm7', 'Hm7'), 1)).toMatchObject({ label: 'Chord not recognised: notes not checked', labelEditsChord: true });
   });
 

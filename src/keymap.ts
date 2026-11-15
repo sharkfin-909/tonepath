@@ -72,7 +72,8 @@ export function keyIntent(e: KeyPress, ctx: KeyContext): KeyResult {
     return NONE;
   }
 
-  if (plain && !e.shiftKey && (e.key === 'p' || e.key === 'P')) return handled({ type: 'mode', mode: 'toggle' });
+  // P leaves Practice for Write (there is no Play mode in the UI: P never enters it).
+  if (plain && !e.shiftKey && (e.key === 'p' || e.key === 'P') && ctx.mode === 'play') return handled({ type: 'mode', mode: 'write' });
 
   if (ctx.mode === 'play') {
     // Play: ← / → step slots (wrapping); the shared keys; everything else does nothing.

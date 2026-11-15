@@ -253,7 +253,7 @@ export interface DockHex {
   mode: DockMode;
   /** Dock label (SPEC §8.4); null for an ordinary scale hex. */
   label: string | null;
-  /** Clicking the label focuses the active slot's chord field (empty / unparseable slots). */
+  /** Clicking the label focuses the active slot's chord field (unparseable slots). */
   labelEditsChord: boolean;
   /** The slot's key (its scale's notes) — null without a scale; and its root pitch class (the travel plan). */
   key: Key | null;
@@ -277,8 +277,8 @@ export function dockHex(harmonies: SlotHarmony[], active: number, range: PitchRa
       ? { hex: slotHex(h, range, shape)!, mode: 'scale', label: null, labelEditsChord: false, key: keyOf(h), root }
       : { hex: slotHex(h, range, shape)!, mode: 'chord-tones', label: 'No scale fits: chord tones only', labelEditsChord: false, key: null, root };
   }
-  const label =
-    h.reason === 'nc' ? 'N.C.: notes not checked' : h.reason === 'empty' ? 'No chord yet: notes not checked' : 'Chord not recognised: notes not checked';
+  // An empty slot has no label (its empty chord field already says so).
+  const label = h.reason === 'nc' ? 'N.C.: notes not checked' : h.reason === 'empty' ? null : 'Chord not recognised: notes not checked';
   // C major's layout and note names only: no chord here, so no degrees, degree colours or triad tones.
   const c = slotHex(C_MAJOR, range, shape)!;
   const cells = c.cells.map((x) => ({ ...x, degree: null, role: 'scale' as const, triad: false, guide: false, colour: NEUTRAL, ink: HEX_THEME.noteInk }));

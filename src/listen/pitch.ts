@@ -26,7 +26,7 @@ export interface PitchOptions {
 }
 
 /** The level a note must pass to count as started (RMS): marked on the Listen meter. */
-export const ONSET_GATE = 0.015;
+export const ONSET_GATE = 0.017;
 
 /**
  * Minimum YIN clarity to accept a pitch reading (0–1). Practice needs this low enough that real notes lock
@@ -257,7 +257,7 @@ export class OnsetDetector {
   private readonly gate: number;
   private readonly lockoutMs: number;
 
-  constructor({ ratio = 1.8, gate = ONSET_GATE, lockoutMs = 90 }: OnsetOptions = {}) {
+  constructor({ ratio = 1.8, gate = ONSET_GATE, lockoutMs = 120 }: OnsetOptions = {}) {
     this.ratio = ratio;
     this.gate = gate;
     this.lockoutMs = lockoutMs;
@@ -287,6 +287,15 @@ export interface NoteStart {
 /** How long a pitch must hold steady after an attack before it counts (one count per tonguing). */
 export const ATTACK_STABLE_MS = 48;
 
+/** Don't emit the attack until at least this long after the onset (lets sharp transients pass). */
+export const MIN_ATTACK_EMIT_MS = 64;
+
+/** After an attack, a ±2-semitone slur inside this window is only a retune, not a new note. */
+export const POST_ATTACK_SLUR_GUARD_MS = 180;
+
+/** Ignore a new onset while the same note is still held (level bumps on a sustain). */
+export const ONSET_REFRACTORY_MS = 220;
+
 /**
  * Played notes from the per-frame readings. After an onset, pitch may wobble (sharp→in-tune); only **one** note is
  * counted once it has been steady for `ATTACK_STABLE_MS` (or when the attack window ends). Later pitch changes
@@ -299,6 +308,7 @@ export class NoteTracker {
   private pendingMidi: number | null = null;
   private stableSince = -Infinity;
   private attackEmitted = true;
+  private attackSettledAt = -Infinity;
 
   constructor(
     private readonly windowMs = 250,
@@ -308,6 +318,14 @@ export class NoteTracker {
 
   /** The note that starts on this frame, or null. `midi` = the steady reading (null when unclear / silent). */
   push(midi: number | null, onset: boolean, timeMs: number): NoteStart | null {
+    if (
+      onset &&
+      this.current !== null &&
+      timeMs - this.attackSettledAt < ONSET_REFRACTORY_MS &&
+      (midi === null || midi === this.current)
+    ) {
+      onset = false;
+    }
     if (onset) {
       this.pendingSince = timeMs;
       this.attackEmitted = false;
@@ -333,35 +351,50 @@ export class NoteTracker {
         this.pendingMidi = midi;
         this.stableSince = timeMs;
       }
-      if (this.pendingMidi !== null && timeMs - this.stableSince >= this.stableMs) {
-        return this.emitAttack(this.pendingMidi);
+      if (
+        this.pendingMidi !== null &&
+        timeMs - this.stableSince >= this.stableMs &&
+        timeMs - this.pendingSince >= MIN_ATTACK_EMIT_MS
+      ) {
+        return this.emitAttack(this.pendingMidi, timeMs);
       }
       return null;
     }
 
     // Attack window ended without a stable emit — count the last pitch we saw.
     if (!this.attackEmitted && this.pendingMidi !== null) {
-      return this.emitAttack(this.pendingMidi);
+      return this.emitAttack(this.pendingMidi, timeMs);
     }
 
     if (midi !== this.current) {
+      const dt = timeMs - this.attackSettledAt;
+      const d = this.current === null ? 99 : Math.abs(midi - this.current);
+      if (dt < POST_ATTACK_SLUR_GUARD_MS && d <= 1) {
+        this.current = midi;
+        return null;
+      }
+      if (dt < 90 && d === 2) {
+        this.current = midi;
+        return null;
+      }
       this.current = midi;
       return { midi, fromOnset: false };
     }
     return null;
   }
 
-  private emitAttack(midi: number): NoteStart {
+  private emitAttack(midi: number, timeMs: number): NoteStart {
     this.attackEmitted = true;
     this.current = midi;
     this.pendingMidi = null;
+    this.attackSettledAt = timeMs;
     return { midi, fromOnset: true };
   }
 
   private flushAttack(timeMs: number): NoteStart | null {
     if (this.attackEmitted || this.pendingMidi === null) return null;
     if (timeMs - this.pendingSince > this.windowMs || timeMs - this.stableSince >= this.stableMs) {
-      return this.emitAttack(this.pendingMidi);
+      return this.emitAttack(this.pendingMidi, timeMs);
     }
     this.attackEmitted = true;
     this.pendingMidi = null;

@@ -55,8 +55,9 @@ describe('keymap (SPEC §11)', () => {
     expect(intent(key('z', { metaKey: true }), p)).toBeNull();
   });
 
-  it('P toggles Write / Play; \\ toggles Stand; M mutes', () => {
-    expect(intent(key('p'), ctx('write'))).toEqual({ type: 'mode', mode: 'toggle' });
+  it('P leaves Practice for Write (never enters Play); \\ toggles Stand; M mutes', () => {
+    expect(intent(key('p'), ctx('play'))).toEqual({ type: 'mode', mode: 'write' });
+    expect(intent(key('p'), ctx('write'))).toBeNull();
     expect(intent(key('\\'), ctx('play'))).toEqual({ type: 'stand', on: 'toggle' });
     expect(intent(key('m'), ctx('write'))).toEqual({ type: 'toggle-mute' });
   });
