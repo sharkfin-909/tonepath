@@ -258,18 +258,27 @@ function NoteDefs({ R }: { R: number }) {
         <stop offset="0" style={{ stopColor: 'var(--ball-highlight)' }} />
         <stop offset="1" style={{ stopColor: 'var(--ball-edge)' }} />
       </radialGradient>
+      {/* Lit border buttons: the highlight turns the lit cells' bright green. */}
+      <radialGradient id="hex-note-sphere-lit" cx="0.5" cy="0.5" r="0.5" fx="0.24" fy="0.16">
+        <stop offset="0" style={{ stopColor: 'var(--hex-trigger)' }} />
+        <stop offset="1" style={{ stopColor: 'var(--ball-edge)' }} />
+      </radialGradient>
       <filter id="hex-glow-blur" x="-10%" y="-30%" width="120%" height="160%">
         <feGaussianBlur stdDeviation={Math.max(4, R * 0.3)} />
       </filter>
       {/* Lit cells: a big bright green glow (a wide blurred stroke over a crisp one), spilling past the cell's edge. */}
       <filter id="hex-lit-blur" x="-60%" y="-60%" width="220%" height="220%">
-        <feGaussianBlur in="SourceGraphic" stdDeviation={Math.max(4, R * 0.16)} result="wide" />
+        <feGaussianBlur in="SourceGraphic" stdDeviation={Math.max(2, R * 0.08)} result="wide" />
         <feGaussianBlur in="SourceGraphic" stdDeviation={Math.max(1, R * 0.03)} result="tight" />
         <feMerge>
           <feMergeNode in="wide" />
           <feMergeNode in="wide" />
           <feMergeNode in="tight" />
         </feMerge>
+      </filter>
+      {/* Lit neutral cells: their degree colour as a soft glow inside the cell's edge. */}
+      <filter id="hex-pass-blur" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur stdDeviation={Math.max(2, R * 0.1)} />
       </filter>
       <filter id="hex-note-shadow" x="-50%" y="-50%" width="200%" height="200%">
         <feDropShadow dx="0" dy={Math.max(1, R * 0.06)} stdDeviation={Math.max(1, R * 0.07)} floodColor="#000" floodOpacity="0.45" />
@@ -308,13 +317,23 @@ function Cell({ part, plain, cell, cx, cy, R, ry, onPick, halo, lit, onHover, ta
   const style = { ['--deg' as string]: cell.colour, ['--deg-ink' as string]: cell.ink };
   const opacity = cell.inRange ? 1 : T.outOpacity;
   if (part === 'top') {
+    const clipId = `hex-clip-${cell.r}-${cell.c}`;
     return (
       <g className={`${className} hex-cell-top`} style={style} opacity={opacity}>
         {target && <polygon className="hex-target" points={hexPoints(cx, cy, R * 0.86, ry * 0.86)} />}
-        {/* Triad cells: a thin white edge (in the top layer, so no neighbour's fill covers it; off while colours travel). */}
-        {cell.triad && !plain && <polygon className="hex-triad-edge" points={hexPoints(cx, cy, R - 0.75, ry - 0.75)} />}
+        {/* A lit neutral cell keeps its neutral fill: its degree colour glows in from the edge (clipped to the cell). */}
+        {lit && !coloured && (
+          <>
+            <clipPath id={clipId}>
+              <polygon points={hexPoints(cx, cy, R, ry)} />
+            </clipPath>
+            <g clipPath={`url(#${clipId})`}>
+              <polygon className="hex-pass-glow" points={hexPoints(cx, cy, R, ry)} strokeWidth={R * 0.45} filter="url(#hex-pass-blur)" />
+            </g>
+          </>
+        )}
         {/* Unclipped, so the glow spills past the cell's edge. */}
-        {lit && <polygon className="hex-lit" points={hexPoints(cx, cy, R * 0.92, ry * 0.92)} strokeWidth={R * 0.3} filter="url(#hex-lit-blur)" />}
+        {lit && <polygon className="hex-lit" points={hexPoints(cx, cy, R * 0.92, ry * 0.92)} strokeWidth={R * 0.15} filter="url(#hex-lit-blur)" />}
         <text x={cx} y={cy - R * 0.6} textAnchor="middle" dominantBaseline="central" fontSize={Math.max(8, R * 0.25)} fontWeight={700} className="hex-name">
           {prettyName(cell.name)}
         </text>
@@ -363,18 +382,34 @@ interface BallProps {
   pop: number;
 }
 
+/** Degrees whose colour is dark: their ball is the colour, with a white highlight (the rest: colour highlight, dark rim). */
+const INVERTED_DEGREES = new Set([2, 4, 6, 7]);
+
 /** A cell's ball and degree number, in the layer above every cell (it travels with that layer; clicks pass through). */
 function Ball({ cell, cx, cy, R, halo, pop }: BallProps) {
   const r = R * (cell.triad ? T.triadNote : T.otherNote);
   // Sharps sit to the right, flats to the left of the cell centre (over the cell's socket).
   const slide = R * cell.accidental * T.accidentalShift; // a transform, so the slide can be transitioned (CSS: .hex-ball)
   const dfs = Math.max(8, r * (cell.triad ? 0.85 : 0.95)); // degree number on the ball
+  const sphereId = `hex-sphere-${cell.r}-${cell.c}`;
+  // Dark degree colours turn inside out: the colour is the sphere, with a white highlight.
+  const inverted = cell.degree !== null && INVERTED_DEGREES.has(cell.degree);
   return (
     <g opacity={cell.inRange ? 1 : T.outOpacity}>
       <g className="hex-ball" style={{ transform: `translateX(${slide.toFixed(2)}px)` }}>
         {/* Re-keyed on every click of this ball, so the pop (CSS: .hex-pop) plays again. */}
         <g key={pop} className={pop > 0 ? 'hex-pop' : undefined}>
-          <circle cx={cx} cy={cy} r={r} fill="url(#hex-note-sphere)" filter={cell.inRange ? 'url(#hex-note-shadow)' : undefined} />
+          {/* The highlight is the cell's degree colour, lit or not (the unchecked hex has none: the plain sphere);
+              dark degree colours are inverted (white highlight, the colour as the sphere). */}
+          {cell.degree !== null && (
+            <defs>
+              <radialGradient id={sphereId} cx="0.5" cy="0.5" r="0.5" fx="0.24" fy="0.16">
+                <stop offset="0" style={{ stopColor: inverted ? '#FFFFFF' : cell.colour }} />
+                <stop offset="1" style={{ stopColor: inverted ? cell.colour : 'var(--ball-edge)' }} />
+              </radialGradient>
+            </defs>
+          )}
+          <circle cx={cx} cy={cy} r={r} fill={cell.degree !== null ? `url(#${sphereId})` : 'url(#hex-note-sphere)'} filter={cell.inRange ? 'url(#hex-note-shadow)' : undefined} />
           <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central" fontSize={dfs} fontWeight={cell.triad ? 700 : 600} className="hex-ball-ink">
             {cell.degree ?? ''}
           </text>
@@ -410,7 +445,7 @@ function BorderButtonView({ cx, cy, R, glyph, label, shown, lit, onClick, onEnte
     <g className={cls} role="button" aria-label={label} onClick={onClick} onMouseEnter={onEnter} onMouseLeave={onLeave}>
       <g key={pop} className={pop > 0 ? 'hex-pop' : undefined}>
         {lit && <circle cx={cx} cy={cy} r={r + Math.max(3, r * 0.6)} className="hex-acc-lit" filter="url(#hex-lit-blur)" />}
-        <circle cx={cx} cy={cy} r={r} fill="url(#hex-note-sphere)" filter="url(#hex-note-shadow)" />
+        <circle cx={cx} cy={cy} r={r} fill={lit ? 'url(#hex-note-sphere-lit)' : 'url(#hex-note-sphere)'} filter="url(#hex-note-shadow)" />
         <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central" fontSize={Math.max(10, r * 1.45)} fontWeight={700} className="hex-ball-ink">
           {glyph}
         </text>

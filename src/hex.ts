@@ -310,9 +310,9 @@ export const HEX_THEME = {
   /** Sharp balls sit this far (× cell radius) right of the default spot, flat balls this far left. */
   accidentalShift: 0.26,
   /** Chromatic-entry buttons on the borders between cells: radius × cell radius. */
-  accidentalButton: 0.18,
+  accidentalButton: 0.22,
   /** Two buttons on one border sit this far (× vertical cell radius) above and below its middle. */
-  borderButtonGap: 0.24,
+  borderButtonGap: 0.28,
   /** Balls travelling to their new cells on a slot change (ms). */
   travelMs: 450,
   /** Out-of-range cells: the whole cell faded. */

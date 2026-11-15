@@ -7,7 +7,6 @@
   /* Hex theme tokens (DockedHex reads these; SPEC §8.2). */
   --cell-neutral: #bfafa2; /* non-triad cells at rest, and every cell of the unchecked hex */
   --cell-outline: #a39385;
-  --triad-edge: #ffffff; /* thin border round triad cells */
   --ball-highlight: #ffe6d0; /* note spheres: highlight (top left) → rim */
   --ball-edge: #44372f;
   --ball-ink: #ffffff; /* degree numbers and ♯ / ♭ / ♮ on the spheres */
@@ -192,12 +191,11 @@ body,
 .hex-cell.muted .hex-name {
   fill: #5e5a53;
 }
-.hex-cell.muted.lit .hex-bg {
-  fill: var(--deg);
-  stroke: none;
-}
-.hex-cell.muted.lit .hex-name {
-  fill: var(--deg-ink);
+/* A lit neutral cell (not a chord / guide tone) stays neutral; its degree colour glows inside the edge (DockedHex: .hex-pass-glow). */
+.hex-pass-glow {
+  fill: none;
+  stroke: var(--deg);
+  pointer-events: none;
 }
 /* The ball's default spot: a dark socket, seen when a sharp / flat ball sits above / below it. */
 .hex-socket {
@@ -241,7 +239,7 @@ body,
 
 /* Every cell with the hovered / clicked / heard pitch: bright green glow inside its edge. */
 .hex-lit {
-  fill: color-mix(in srgb, var(--hex-trigger) 22%, transparent);
+  fill: none;
   stroke: var(--hex-trigger);
   pointer-events: none;
 }
@@ -1276,14 +1274,6 @@ button.dock-label {
 }
 .hex-glow polygon {
   fill: var(--grid-glow);
-}
-
-/* Triad cells: a thin white border (SPEC §8.2). */
-.hex-triad-edge {
-  fill: none;
-  stroke: var(--triad-edge);
-  stroke-width: 1.5;
-  pointer-events: none;
 }
 
 /* Linear (SPEC §8.5): the octave switch, a pill under the row. */
