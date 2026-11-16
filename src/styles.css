@@ -965,6 +965,41 @@ button.dock-label {
   color: #b3261e;
 }
 
+/* × after a chord (SPEC §4.2): clears it. Faint until the slot is hovered or current, like the trash can. */
+.chord-clear {
+  align-self: center;
+  display: grid;
+  place-items: center;
+  flex: none;
+  /* Sized with the chord label (its zoom-proof size), so it stays clickable on a zoomed-out chart. */
+  font-size: var(--chord-px, 14px);
+  width: 1em;
+  height: 1em;
+  margin-left: 0.1em;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.slot:hover .chord-clear,
+.slot.active .chord-clear,
+.chord-clear:focus-visible {
+  opacity: 0.8;
+}
+.chord-clear svg {
+  width: 0.62em;
+  height: 0.62em;
+}
+.chord-clear:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.08);
+  color: #b3261e;
+}
+
 /* Short refusal notices (bar edits). */
 .notice {
   position: absolute;

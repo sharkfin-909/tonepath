@@ -168,6 +168,7 @@ The mode every progression opens in: the tuner and the hex, for warming up, long
 ### 4.2 Chord entry
 
 - Click a slot's chord label and type. Enter / Tab → next slot, Shift+Tab → previous. While a text field has focus, global shortcuts are ignored.
+- **Clear a chord**: a small **×** after the chord label (faint until the slot is hovered or current, like the bar's trash can; sized with the label so it stays clickable at any zoom) empties the slot — its chord and any scale override — in one undoable step; notes stay (they are then unchecked). Wherever chords are editable: Write etude, and Improvise while the transport is stopped.
 - Whitespace outside parentheses separates symbols: one symbol edits the current slot; two split a one-slot bar (refused if a note crosses the middle, §4.1) or overwrite both slots of a split bar from the first; three or more are not committed (inline message "a bar holds at most two chords"). No spaces inside a symbol.
 - Stored and shown **exactly as typed**; parsed on load. Unparseable → shown red. Empty slots allowed. `N.C.` / `NC` / `n.c.` = intentional silence (normal text; no scale on the hex).
 - **Root letters are capitalised as typed**: the first letter of each symbol and the letter after a `/` become A–G (`d` → `D`, `g7/b` → `G7/B`); a `b` straight after a root stays a flat (`bbm7` → `Bbm7`); qualities stay as typed. The caret doesn't move.

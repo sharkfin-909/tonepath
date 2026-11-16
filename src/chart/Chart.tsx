@@ -34,6 +34,8 @@ export interface ChartProps {
   onChordCommit: (bar: number, part: number, text: string) => ChordCommit;
   /** Set (or with null, clear) a slot's scale override. */
   onScaleChange: (bar: number, part: number, scale: ScaleId | null) => void;
+  /** The × after a chord: clear the slot's chord (one undo step). Where chords are editable. */
+  onChordClear?: (bar: number, part: number) => void;
   /** Open a slot's chord field from outside (the dock label); `n` changes on every request. */
   editRequest?: { bar: number; part: number; n: number } | null;
   /** Bar selection (a run), for the bar handles and ⌘C / ⌘V / ⌘D / ⌫ (SPEC §4.1). */
@@ -87,7 +89,7 @@ function useParentSize<T extends HTMLElement>() {
   return [ref, size] as const;
 }
 
-export function Chart({ progression, view, caret, onSlotClick, onEventClick, onTimeClick, onChordCommit, onScaleChange, editRequest, selection, onBarSelect, onBarAction, onAppendBar, canPaste, mode = 'write', current = null, running = false, maxHeight }: ChartProps) {
+export function Chart({ progression, view, caret, onSlotClick, onEventClick, onTimeClick, onChordCommit, onScaleChange, onChordClear, editRequest, selection, onBarSelect, onBarAction, onAppendBar, canPaste, mode = 'write', current = null, running = false, maxHeight }: ChartProps) {
   const writing = mode === 'write';
   const read = mode === 'read';
   /** Read etude while running: nothing on the chart answers a click. */
@@ -210,6 +212,7 @@ export function Chart({ progression, view, caret, onSlotClick, onEventClick, onT
                   : undefined
               }
               onCommit={(text, move) => commit(slot, text, move)}
+              onClear={editsForm && onChordClear && slot.data.chord !== '' ? () => onChordClear(slot.bar, slot.part) : undefined}
               onScaleChange={editsForm ? (scale) => onScaleChange(slot.bar, slot.part, scale) : undefined} // Write etude and Improvise
             />
           ))}
@@ -254,11 +257,13 @@ interface SlotViewProps {
   error: string | null;
   onEdit?: () => void;
   onCommit: (text: string, move: -1 | 1 | null) => boolean;
+  /** The × after the chord: clear it. */
+  onClear?: () => void;
   usedChords: string[];
   onScaleChange?: (scale: ScaleId | null) => void;
 }
 
-function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing, hideMelody, onEventClick, onTimeClick, span, layout, header, barTools, inSelection, onShiftSelect, onDeleteBar, onAppend, showTimeSignature, editing, error, usedChords, onEdit, onCommit, onScaleChange }: SlotViewProps) {
+function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing, hideMelody, onEventClick, onTimeClick, span, layout, header, barTools, inSelection, onShiftSelect, onDeleteBar, onAppend, showTimeSignature, editing, error, usedChords, onEdit, onCommit, onClear, onScaleChange }: SlotViewProps) {
   // Everything shown runs against the written chord; the stored melody stays concert (SPEC §5.3, §10).
   const { chord, harmony } = slot;
   const spell = (midi: number) => view.name(midi, slot);
@@ -306,7 +311,7 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
         {editing ? (
           <ChordField initial={chord} error={error} onCommit={onCommit} used={usedChords} inKey={view.keyChords(slot.index).map((k) => k.symbol)} />
         ) : (
-          <ChordLabel chord={chord} harmony={harmony} bar={slot.bar} part={slot.part} onEdit={onEdit} />
+          <ChordLabel chord={chord} harmony={harmony} bar={slot.bar} part={slot.part} onEdit={onEdit} onClear={onClear} />
         )}
         <ScaleLabel harmony={harmony} bar={slot.bar} onPick={onScaleChange} />
       </div>
@@ -370,9 +375,10 @@ interface ChordLabelProps {
   bar: number;
   part: number;
   onEdit?: () => void;
+  onClear?: () => void;
 }
 
-function ChordLabel({ chord, harmony, bar, part, onEdit }: ChordLabelProps) {
+function ChordLabel({ chord, harmony, bar, part, onEdit, onClear }: ChordLabelProps) {
   const overridden = harmony.kind === 'chord' && harmony.overridden;
   const kind = parseChord(chord).kind;
   const tipId = `chord-tip-${bar}-${part}`;
@@ -390,6 +396,14 @@ function ChordLabel({ chord, harmony, bar, part, onEdit }: ChordLabelProps) {
         {chord || '+'}
       </button>
       {overridden && <span className="override-dot" aria-hidden title="Scale override" />}
+      {onClear && (
+        // Clear the chord (SPEC §4.2): faint until the slot is hovered or current, like the bar's trash can.
+        <button type="button" className="chord-clear" aria-label={`Clear chord ${chord}, bar ${bar + 1}`} onClick={onClear}>
+          <svg viewBox="0 0 12 12" width="9" height="9" aria-hidden>
+            <path d="M3 3l6 6M9 3 3 9" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
+        </button>
+      )}
       <span role="tooltip" id={tipId} className="chord-tip">
         {tooltip(chord, harmony)}
       </span>

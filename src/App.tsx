@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { LengthLatch } from './rail/LengthLatch';
 import { Chart } from './chart/Chart';
-import { setBarsPerRow, setConcertClef, setEtudeName, setInstrument, setScaleOverride, setTitle, type Progression } from './progression';
+import { setBarsPerRow, setChord, setConcertClef, setEtudeName, setInstrument, setScaleOverride, setTitle, type Progression } from './progression';
 import { BarsPerRow, ClearMenu, EtudeNameField, TimeSignatureField, TitleField } from './rail/RailSettings';
 import { InstrumentPicker } from './rail/InstrumentPicker';
 import { playBass, playChord, playNote, playRoot, playScale, setMuted, unlockAudio } from './audio';
@@ -597,6 +597,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
               onTimeClick={(t) => dispatch({ type: 'time-click', t })}
               onChordCommit={onChordCommit}
               onScaleChange={onScaleChange}
+              onChordClear={(bar, part) => commit(setChord(doc.progression, bar, part, ''))}
               editRequest={editRequest}
               selection={session.selection}
               onBarSelect={(bar, extend) => dispatch({ type: 'bar-select', bar, extend })}
