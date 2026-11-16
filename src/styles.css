@@ -1167,6 +1167,53 @@ button.dock-label {
   font-weight: 400;
 }
 
+/* Improvise's lead sheet (SPEC §3.3): the slot's scale in place of the stave — chord tones filled in their degree
+   colour, the guide tone ringed, other scale tones outlined. */
+.lead-tones {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  padding-inline: 6px;
+  overflow: hidden;
+}
+.lead-tones-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+.lead-tone {
+  min-width: 1.9em;
+  padding: 0 6px;
+  border-radius: 14px;
+  border: 2px solid var(--deg);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 25px;
+  text-align: center;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--deg) 10%, transparent);
+}
+.lead-tone.triad,
+.lead-tone.guide,
+.lead-tone.chord {
+  background: var(--deg);
+  color: var(--deg-ink);
+}
+.lead-tone.guide {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--deg);
+}
+.lead-tone.chord {
+  opacity: 0.8;
+}
+.lead-tone.scale {
+  font-weight: 500;
+}
+/* The bar line spans the tones' band as it spans the stave. */
+.bar-line.lead {
+  opacity: 0.35;
+}
+
 /* Read etude (SPEC §3.4): no hex — the chart takes the whole main area, every bar fitted to it (no zoom floor). */
 .main.read {
   grid-template-rows: minmax(0, 1fr);

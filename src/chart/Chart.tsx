@@ -11,6 +11,7 @@ import type { InstrumentView, ViewSlot } from '../view';
 import { ChordField } from './ChordField';
 import { ScaleLabel } from './ScaleLabel';
 import { BarHandle, type BarAction } from './BarHandle';
+import { LeadTones } from './LeadTones';
 
 import { CHORD_PX, MIN_CHORD_PX, MIN_SCALE_PX, ROW_GAP_PX, SCALE_PX, chartHeight, fitZoom, headerPx, labelPx } from '../zoom';
 
@@ -159,7 +160,8 @@ export function Chart({ progression, view, caret, onSlotClick, onEventClick, onT
           style={{ gridTemplateColumns: `${GUTTER_WIDTH}px repeat(${barsPerRow * 2}, minmax(0, 1fr))` }}
         >
           <div className="clef-gutter" style={{ paddingTop: header }}>
-            <ClefGutter width={GUTTER_WIDTH} clef={clef} />
+            {/* Improvise's lead sheet has no stave, so no clef (SPEC §3.3). */}
+            {mode !== 'improvise' && <ClefGutter width={GUTTER_WIDTH} clef={clef} />}
           </div>
           {row.map((slot) => (
             <SlotView
@@ -228,7 +230,7 @@ interface SlotViewProps {
   caret?: number;
   /** Improvise / Read etude: the active slot gets the solid "current slot" highlight. */
   playing: boolean;
-  /** Improvise: an empty stave to play over (the lead sheet). */
+  /** Improvise: the lead sheet — the slot's chord and scale tones in place of the stave. */
   hideMelody: boolean;
   onEventClick?: (e: TimedEvent) => void;
   onTimeClick?: (t: number) => void;
@@ -255,8 +257,6 @@ interface SlotViewProps {
   usedChords: string[];
   onScaleChange?: (scale: ScaleId | null) => void;
 }
-
-const NO_EVENTS: TimedEvent[] = [];
 
 function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing, hideMelody, onEventClick, onTimeClick, span, layout, header, barTools, inSelection, onShiftSelect, onDeleteBar, onAppend, showTimeSignature, editing, error, usedChords, onEdit, onCommit, onScaleChange }: SlotViewProps) {
   // Everything shown runs against the written chord; the stored melody stays concert (SPEC §5.3, §10).
@@ -311,14 +311,17 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
         <ScaleLabel harmony={harmony} bar={slot.bar} onPick={onScaleChange} />
       </div>
       <div ref={ref} className="slot-body">
+        {hideMelody ? (
+          // Improvise (SPEC §3.3): the slot's scale, chord tones marked, where the stave would be.
+          <LeadTones harmony={harmony} />
+        ) : (
         <SlotStave
           width={width}
           timeSignature={meter && `${meter.beats}/${meter.unit}`}
           clef={clef}
           start={slot.start}
           end={slot.end}
-          // Improvise: an empty stave to play over (SPEC §3.3).
-          events={hideMelody ? NO_EVENTS : eventsForSlot(melody, slot)}
+          events={eventsForSlot(melody, slot)}
           spell={spell}
           caret={caret}
           onEventClick={onEventClick}
@@ -326,6 +329,7 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
           meter={layout}
           markOf={markOf}
         />
+        )}
       </div>
       {onDeleteBar && (
         <button
@@ -348,7 +352,7 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
         </button>
       )}
       {/* A bar line at the end of each bar; nothing between two chords in a bar (a chord change, not a bar). */}
-      {slot.barEnd && <div className="bar-line" style={{ top: header + staffTop, height: staffBottom - staffTop }} />}
+      {slot.barEnd && <div className={hideMelody ? 'bar-line lead' : 'bar-line'} style={{ top: header + staffTop, height: staffBottom - staffTop }} />}
     </div>
   );
 }

@@ -36,6 +36,7 @@ Pure modules (no React / DOM), each unit-tested with the tables in §14:
 | `schema` | Envelope, validation / repair, migrations `migrateNtoN+1`. |
 | `audio` | `playNote`, `playChord`, `playScale`, `playRoot`, `playBass`; mute; the generated-impulse reverb (§9). The UI never touches Web Audio. |
 | `listen/pitch` | YIN pitch detection, onset detection and the note tracker over raw samples (§9.2). |
+| `leadSheet` | Improvise's lead sheet: a slot's scale spelled from its root, each note's degree and role (triad, guide, chord, scale) (§3.3). |
 | `transport` | The transport besides its timing: the looped bars as a slot range, the slot after a slot within them, the form the metronome runs, the upcoming chord's targets (§3.7). |
 | `metronome` / `metronomeRun` | Tempo and click sounds; the run on a clock — clicks ahead on the beat, chords announced on time, wrap or end (§3.7). |
 | `micIntake` | The echo guard: a heard note start is the player's, or the app's own sound (§3.3, §9.2). |
@@ -93,7 +94,7 @@ Hex picks are recorded at the caret (§6). The mic is off (no writing by playing
 
 Playing over the form, from a **lead sheet**: Listen on, the tuner bar, the transport (§3.7). The form moves on **only with the transport** (time); there are no note-driven advance rules. *Formerly* Practice, built on the old Play mode's behaviour (Play is not offered).
 
-- **Lead sheet**: the **stave is cleared** — the written melody is hidden (bars, clef and chords stay) so you play over empty staves. The caret is hidden; the **current slot** gets a solid full-width highlight in a colour distinct from Write etude's active-slot tint.
+- **Lead sheet**: no stave — in its place each slot shows its **scale, spelled from the root**, one chip per note in the hex's **degree colour**: chord tones (triad and extensions) filled, the **guide tone** ringed, other scale tones outlined (a chord no scale fits: its chord tones only; no chord: nothing). The written melody and the clef are hidden; bar lines and chords stay; rows keep the stave's height (`leadSheet.ts`). The caret is hidden; the **current slot** gets a solid full-width highlight in a colour distinct from Write etude's active-slot tint.
 - **Editing the lead sheet** (transport stopped): **chord and scale entry** exactly as in Write etude (clicking a chord name or an empty slot's `+` edits it — autosuggest, Tab / Enter to move on — and makes that slot current; the scale name opens its scale menu); the **form group** in the header — time signature, bars per row, undo / redo; the **"+"** after the last bar and each bar's **trash can**. No ⋯ bar menu, no note lengths, Rest, nudge, step or Clear (those are Write etude's). While the transport **runs**, the form group, "+" and trash cans are hidden and chord / scale entry is off, so the form never changes under the playhead.
 - **Bar numbers** pick the **looped bars** (§3.7).
 - **Transport stopped**: **← / →** (and `<` / `>`) move to the previous / next **slot** (a split bar = two stops), **wrapping**; clicking a slot makes it current. ↑ / ↓ do nothing. The hex shows the **current slot's scale**, remoulding on arrival exactly as in Write etude (pitch anchor kept, travel, the no-scale rules of §8.4), and **lights the notes played** (mic or hex) like a hovered cell. Hex picks (click, Space, `A`) audition only.
