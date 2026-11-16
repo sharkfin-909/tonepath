@@ -307,14 +307,12 @@ button.dock-label {
 }
 
 /* The current slot in Improvise and Read etude (SPEC §3.3, §3.4): a solid highlight, distinct from Write etude's tint. */
-.slot.active.playing,
-.slot.key-mate.playing {
+.slot.active.playing {
   background: rgba(255, 190, 40, 0.32);
 }
 
-/* Active slot (drives the docked hex): a light tint across the slot — and the same on every slot sharing its key. */
-.slot.active,
-.slot.key-mate {
+/* Active slot (drives the docked hex): a light tint across the slot. Its key mates light only their key pills. */
+.slot.active {
   background: rgba(47, 111, 219, 0.08);
 }
 

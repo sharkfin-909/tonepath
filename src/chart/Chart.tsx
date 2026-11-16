@@ -243,7 +243,7 @@ interface SlotViewProps {
   playing: boolean;
   /** The key pill's text (the parent scale's name), or null (no scale). */
   keyLabel: string | null;
-  /** Shares the current slot's key: highlighted like it. */
+  /** Shares the current slot's key: its key pill lights like the current slot's (the slot itself isn't tinted). */
   keyMate: boolean;
   /** Improvise: the lead sheet — the slot's chord and scale tones in place of the stave. */
   hideMelody: boolean;
@@ -320,7 +320,7 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
         </button>
       )}
       {keyLabel && (
-        // The key pill (SPEC §3.1): the key this slot's scale belongs to; lit on the current slot and its key mates.
+        // The key pill (SPEC §3.1): the key this slot's scale belongs to; lit on the current slot and its key mates (only the pill).
         <span className={['key-pill', onAppend && 'beside-append'].filter(Boolean).join(' ')} title={`Key: ${prettyName(keyLabel)}`}>
           {prettyName(keyLabel)}
         </span>
