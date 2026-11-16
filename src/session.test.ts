@@ -76,6 +76,13 @@ describe('Write etude: entry', () => {
 });
 
 describe('opening, and the mode decides', () => {
+  it('opening another progression keeps the mode (Improvise: the slot\'s sound waits for a note)', () => {
+    expect(initialSession(prog(), { onArrival: 'chord' }, null, { mode: 'write', clip: null })).toMatchObject({ mode: 'write', arrival: null });
+    expect(initialSession(prog(), { onArrival: 'chord' }, null, { mode: 'improvise', clip: null })).toMatchObject({ mode: 'improvise', arrival: 0, running: false });
+    const clip = { bars: [[{ chord: 'Am7' }]], slices: [[]], barTicks: W };
+    expect(initialSession(prog(), { onArrival: 'chord' }, null, { mode: 'write', clip }).clip).toBe(clip); // copy here, paste there
+  });
+
   it('every open starts in Tune, on the caret\'s slot (the melody\'s end)', () => {
     const p = withFlat(prog(), { melody: [{ pitch: 62, d: 'w' as const }, { pitch: 67, d: 'q' as const }] });
     expect(initialSession(p, { onArrival: 'silent' })).toMatchObject({ mode: 'tune', slot: 1, running: false });

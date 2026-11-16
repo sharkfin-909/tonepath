@@ -10,7 +10,7 @@ import { openDocument, type ProgressionDocument } from './document';
 import { NEW_INTAKE, appSounded, isPlayed, type MicIntake } from './micIntake';
 import { modeProfile } from './modeProfile';
 import type { ChordCommit, Progression } from './progression';
-import { initialSession, reduce, type Effect, type Intent, type SessionState } from './session';
+import { initialSession, reduce, type Carried, type Effect, type Intent, type SessionState } from './session';
 import type { StoredProgression } from './storage';
 import { instrumentView, type InstrumentView } from './view';
 
@@ -30,6 +30,8 @@ export interface ChartSessionOptions {
   onDeleted: () => void;
   /** The session's `transport-restart` effect. */
   onTransportRestart: () => void;
+  /** The mode and clipboard to open with (none on launch; the previous progression's when switching). */
+  carried?: Carried;
 }
 
 export interface ChartSession {
@@ -63,7 +65,7 @@ export function useChartSession(o: ChartSessionOptions): ChartSession {
   const [session, setSession] = useState<SessionState>(() => {
     const device = readDevice(localStorage);
     // The etude last open in this progression (SPEC §3.0); missing → the first.
-    return initialSession(doc.progression, { muted: device.muted, onArrival: onArrivalOf(device) }, doc.progression.openEtudeId);
+    return initialSession(doc.progression, { muted: device.muted, onArrival: onArrivalOf(device) }, doc.progression.openEtudeId, o.carried);
   });
   const view = useMemo(() => instrumentView(progression, session.etude), [progression, session.etude]);
   const sessionRef = useRef(session);

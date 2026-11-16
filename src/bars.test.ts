@@ -175,3 +175,16 @@ describe("a slot's trash (Improvise)", () => {
     expect(deleteSlot(split(), 1, 0, 0)).toEqual({ ok: false, message: 'the bar has only one chord' });
   });
 });
+
+describe('the clipboard between progressions', () => {
+  it('pastes chords and notes into bars of the same length; into another time signature, chords only', () => {
+    const clip = copyBars(prog(), 0, 0); // Dm7 (aeolian) + its whole note, a 4/4 bar
+    const same = ok(pasteBars({ ...prog(), etudes: [{ ...prog().etudes[0], melody: [] }] }, 1, clip, 0)).progression;
+    expect(same.bars[1]).toEqual([{ chord: 'Dm7', scale: 'aeolian' }]);
+    expect(show(same.etudes[0].melody)).toBe('rw 62w');
+    const waltz = { ...prog(), timeSignature: '3/4', etudes: [{ ...prog().etudes[0], melody: [] }] };
+    const other = ok(pasteBars(waltz, 1, clip, 0)).progression;
+    expect(other.bars[1]).toEqual([{ chord: 'Dm7', scale: 'aeolian' }]);
+    expect(other.etudes[0].melody).toEqual([]); // a 4/4 bar's notes don't fit a 3/4 bar
+  });
+});

@@ -552,10 +552,10 @@ function ChordLabel({ chord, harmony, bar, part, onEdit, onClear }: ChordLabelPr
         className={cls}
         onClick={onEdit}
         disabled={!onEdit}
-        aria-label={chord ? `Chord ${chord}, bar ${bar + 1}` : `Add chord, bar ${bar + 1}`}
+        aria-label={chord ? `Chord ${chord}, bar ${bar + 1}` : onEdit ? `Add chord, bar ${bar + 1}` : `No chord, bar ${bar + 1}`}
         aria-describedby={tipId}
       >
-        {chord || '+'}
+        {chord || (onEdit ? '+' : '')}
       </button>
       {overridden && <span className="override-dot" aria-hidden title="Scale override" />}
       {onClear && (

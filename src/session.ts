@@ -190,20 +190,29 @@ export interface Outcome {
   entry?: ChordCommit;
 }
 
-export function initialSession(p: Progression, device: { muted?: boolean; onArrival: OnArrival }, etude?: string | null): SessionState {
+/** What a session carries to the next progression opened (SPEC §3.0, §4.1): the mode and the bar clipboard. */
+export type Carried = Pick<SessionState, 'mode' | 'clip'>;
+
+/**
+ * A session for a progression just opened: on its etude (missing → the first), the caret at the melody's end; in
+ * Tune with an empty clipboard on launch and reload — switching progressions carries the mode and the clipboard.
+ */
+export function initialSession(p: Progression, device: { muted?: boolean; onArrival: OnArrival }, etude?: string | null, carried?: Carried): SessionState {
+  const mode = carried?.mode ?? 'tune';
   const open = etudeOf(p, etude).id;
   const caret = melodyEnd(etudeOf(p, open).melody); // opens at the melody's end; not saved
+  const slot = instrumentView(p, open).slotAt(caret).index;
   return {
-    mode: 'tune', // every open and reload starts in Tune (SPEC §3.0)
+    mode,
     etude: open,
     caret,
     length: 'q',
     rest: false,
-    slot: instrumentView(p, open).slotAt(caret).index,
+    slot,
     running: false,
-    arrival: null,
+    arrival: mode === 'improvise' ? slot : null, // as when entering Improvise: the slot's sound waits for a note
     selection: null,
-    clip: null,
+    clip: carried?.clip ?? null,
     halo: null,
     refusal: null,
     notice: null,

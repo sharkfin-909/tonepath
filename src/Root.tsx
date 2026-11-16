@@ -1,7 +1,7 @@
-// The app's two screens (SPEC §3): the library and the chart screen for one progression.
+// The chart screen for one progression, with the library as a modal over it (SPEC §3, §3.5).
 // Launch reopens the last-open progression, seeding the bundled demo on first launch and each extra demo (rhythm
 // changes) once per device (§12.5).
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import demo from '../examples/demo.tonepath.json';
 import rhythmChanges from '../examples/rhythm-changes.tonepath.json';
 import { App } from './App';
@@ -24,8 +24,10 @@ import { backupAge, isSafari, shouldRemind } from './backup';
 import { readDevice, writeDevice } from './device';
 import { exportAll, exportOne } from './schema';
 import { isReadOnly } from './readOnly';
+import type { Carried } from './session';
 
-type Screen = { kind: 'library' } | { kind: 'chart'; progression: StoredProgression; rename: boolean };
+/** The open progression (null: none, e.g. an empty library) — `n` re-mounts the chart when it changes underneath. */
+type Chart = { progression: StoredProgression; rename: boolean; n: number } | null;
 
 /** Save a text file through the browser's download. */
 function download(filename: string, text: string) {
@@ -37,16 +39,24 @@ function download(filename: string, text: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function initialScreen(): Screen {
+function initialChart(): Chart {
   migrateStorage(localStorage); // SPEC §12.4: older storage is migrated; newer makes the tab read-only
   const l = launch(localStorage, demo, undefined, undefined, [{ key: 'rhythm-changes', file: rhythmChanges }]);
-  if (l.kind === 'empty') return { kind: 'library' };
+  if (l.kind === 'empty') return null;
   rememberOpen(localStorage, l.progression.id);
-  return { kind: 'chart', progression: l.progression, rename: false };
+  return { progression: l.progression, rename: false, n: 0 };
 }
 
 export function Root() {
-  const [screen, setScreen] = useState<Screen>(initialScreen);
+  const [chart, setChart] = useState<Chart>(initialChart);
+  /** The library modal: open over the chart — always, when no progression is open. */
+  const [libraryOpen, setLibraryOpen] = useState(() => chart === null);
+  const showLibrary = libraryOpen || chart === null;
+  /** The chart's mode and bar clipboard: opening another progression keeps them (a reload starts afresh, SPEC §3.0). */
+  const carried = useRef<Carried | undefined>(undefined);
+  const onCarry = useCallback((c: Carried) => {
+    carried.current = c;
+  }, []);
   const [list, setList] = useState<StoredProgression[]>(() => listProgressions(localStorage));
   const [deleted, setDeleted] = useState<{ id: string; raw: string; title: string; n: number } | null>(null);
   const [unreadable, setUnreadable] = useState(() => countUnreadable(localStorage));
@@ -61,13 +71,13 @@ export function Root() {
 
   // The library list refreshes on any change from another tab.
   useEffect(() => {
-    if (screen.kind !== 'library') return;
+    if (!showLibrary) return;
     const onStorage = (e: StorageEvent) => {
       if (e.storageArea === localStorage) refresh();
     };
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
-  }, [screen.kind]);
+  }, [showLibrary]);
 
   // Backup reminder (SPEC §3.5), re-read whenever the list changes.
   const [device, setDevice] = useState(() => readDevice(localStorage));
@@ -105,29 +115,29 @@ export function Root() {
   const open = (p: StoredProgression, rename = false) => {
     rememberOpen(localStorage, p.id);
     setDeleted(null);
-    setScreen({ kind: 'chart', progression: readProgression(localStorage, p.id) ?? p, rename });
+    setChart((c) => ({ progression: readProgression(localStorage, p.id) ?? p, rename, n: (c?.n ?? 0) + 1 }));
+    setLibraryOpen(false);
   };
   const toLibrary = () => {
     refresh();
-    setScreen({ kind: 'library' });
+    setLibraryOpen(true);
+  };
+  /** The open progression changed in storage from the library (renamed): the chart reloads it. */
+  const reloadIfOpen = (id: string) => {
+    if (chart?.progression.id !== id) return;
+    const p = readProgression(localStorage, id);
+    if (p) setChart((c) => c && { progression: p, rename: false, n: c.n + 1 });
   };
   const onToastDone = useCallback(() => setDeleted(null), []);
 
-  if (screen.kind === 'chart') {
-    // Keyed by id: a fresh chart screen (and empty undo history) for every progression opened.
-    return (
-      <>
-        {banner}
-        <Tooltips />
-        <App key={screen.progression.id} initial={screen.progression} renameOnOpen={screen.rename} onLibrary={toLibrary} />
-      </>
-    );
-  }
   return (
     <>
     {banner}
     <Tooltips />
-    <LibraryScreen
+    {/* Keyed by id (and reloads): a fresh chart screen (and empty undo history) for every progression opened. */}
+    {chart && <App key={`${chart.progression.id}:${chart.n}`} initial={chart.progression} renameOnOpen={chart.rename} onLibrary={toLibrary} carried={carried.current} onCarry={onCarry} />}
+    {showLibrary && <LibraryScreen
+      onClose={chart ? () => setLibraryOpen(false) : undefined}
       progressions={list}
       onExportOne={(p) => {
         const f = exportOne(p);
@@ -153,10 +163,12 @@ export function Root() {
       onRename={(p, title) => {
         renameProgression(localStorage, p, title);
         refresh();
+        reloadIfOpen(p.id);
       }}
       onDelete={(p) => {
         const raw = deleteProgression(localStorage, p.id);
         refresh();
+        if (chart?.progression.id === p.id) setChart(null); // the open one: nothing behind the library now
         if (raw) setDeleted((old) => ({ id: p.id, raw, title: p.title, n: (old?.n ?? 0) + 1 }));
       }}
       deleted={deleted && { title: deleted.title, n: deleted.n }}
@@ -167,7 +179,7 @@ export function Root() {
         refresh();
       }}
       onToastDone={onToastDone}
-    />
+    />}
     </>
   );
 }

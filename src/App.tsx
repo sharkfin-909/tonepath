@@ -29,7 +29,9 @@ import { chartArea } from './zoom';
 import { useChartSession } from './useChartSession';
 import { useTransport } from './useTransport';
 import { etudeOf } from './progression';
+import type { Carried } from './session';
 import { EtudePicker } from './rail/EtudePicker';
+import { HamburgerMenu } from './rail/HamburgerMenu';
 
 /** A CSS media query as React state (SPEC §3.6 responsive layout). */
 function useMediaQuery(query: string): boolean {
@@ -49,18 +51,23 @@ const inTextField = (el: unknown) => el instanceof Element && !!el.closest('inpu
 export interface AppProps {
   /** The progression to edit. Key the component by its id so undo history is per progression (SPEC §6.3). */
   initial: StoredProgression;
-  /** ← Library. */
+  /** The ☰ menu's Library: the library modal (SPEC §3.5). */
   onLibrary: () => void;
   /** A New progression opens with its title in edit (SPEC §3.5). */
   renameOnOpen?: boolean;
+  /** The mode and bar clipboard to open with (none on launch); switching progressions keeps them (SPEC §3.0, §4.1). */
+  carried?: Carried;
+  /** The mode or clipboard changed (the caller carries them to the next progression opened). */
+  onCarry?: (carried: Carried) => void;
 }
 
 /** The chart screen (layout C, SPEC §3.1) for one progression. */
-export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
-  const chart = useChartSession({ initial, onDeleted: onLibrary, onTransportRestart: () => transport.restart() });
+export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry }: AppProps) {
+  const chart = useChartSession({ initial, onDeleted: onLibrary, onTransportRestart: () => transport.restart(), carried });
   const { doc, progression, view, session, dispatch } = chart;
   const { mode, running } = session;
   const profile = modeProfile(mode, running);
+  useEffect(() => onCarry?.({ mode, clip: session.clip }), [mode, session.clip, onCarry]);
   /** The open etude: its melody (Write etude, Read etude) and its instrument (every mode). */
   const etude = etudeOf(progression, session.etude);
 
@@ -267,17 +274,13 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
           </div>
         </div>
         {/* Row 1, right: the mode panel (Mode:), in a pill. */}
+        {/* Row 1, right: the mode panel. */}
         <div className="mode-corner">{modeSwitch}</div>
+        {/* The ☰ menu: a column of its own at the right end, as tall as both rows. */}
+        <HamburgerMenu items={[{ label: 'Library', onChoose: onLibrary }]} />
         <div className="topbar-row">
-          {/* Row 2, left (under TONEPATH): ← Library, then the title. */}
+          {/* Row 2, left (under TONEPATH): the title and the etude picker (the library is in the ☰ menu). */}
           <div className="topbar-file">
-            <button
-              type="button"
-              className="rail-link"
-              onClick={onLibrary} // every edit is already saved
-            >
-              ← Library
-            </button>
             {/* The title is the progression's name; each etude has its own (the picker). */}
             <div className="title-stack">
               <h1 className="rail-heading">

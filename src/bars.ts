@@ -19,6 +19,9 @@ export type BarEdit = { ok: true; progression: Progression; caret: number } | { 
 export interface BarClip {
   bars: Bar[];
   slices: MelodyEvent[][];
+  /** The bar length the slices were cut at (ticks). The clipboard outlives the progression (SPEC §4.1): pasted into
+   *  one whose bars are another length, only the chords are pasted. */
+  barTicks: number;
 }
 
 const meterOf = (p: Progression): Meter => layoutMeter(p.timeSignature);
@@ -112,7 +115,7 @@ export function deleteBars(p: Progression, from: number, to: number, caret: numb
 /** Copy bars [from, to]: chords, overrides, and the etude's melody slices. */
 export function copyBars(p: Progression, from: number, to: number, etude?: string | null): BarClip {
   const slices = toSlices(etudeOf(p, etude).melody, p.bars.length, barTicks(meterOf(p)));
-  return { bars: copyBarsOnly(p.bars.slice(from, to + 1)), slices: slices.slice(from, to + 1).map((s) => [...s]) };
+  return { bars: copyBarsOnly(p.bars.slice(from, to + 1)), slices: slices.slice(from, to + 1).map((s) => [...s]), barTicks: barTicks(meterOf(p)) };
 }
 
 /** Duplicate bars [from, to]: a copy straight after the run, every etude's music with it; later music moves on. */
@@ -128,8 +131,10 @@ export function pasteBars(p: Progression, at: number, clip: BarClip, caret: numb
   const n = clip.bars.length;
   if (at + n > p.bars.length) return { ok: false, message: 'not enough bars to paste into' };
   const inPaste = (i: number) => i >= at && i < at + n;
+  // Notes only between bars of the same length (a clip from a progression in another time signature: chords only).
+  const fits = clip.barTicks === barTicks(meterOf(p));
   const bars = p.bars.map((b, i) => (inPaste(i) ? clip.bars[i - at].map((s) => ({ ...s })) : b));
-  const sl = slicesOf(p).map((s, k) => s.map((x, i) => (!inPaste(i) ? x : isEtude(p, k, etude) ? [...clip.slices[i - at]] : [])));
+  const sl = slicesOf(p).map((s, k) => s.map((x, i) => (!inPaste(i) ? x : fits && isEtude(p, k, etude) ? [...clip.slices[i - at]] : [])));
   return { ok: true, progression: rebuild(p, bars, sl), caret };
 }
 

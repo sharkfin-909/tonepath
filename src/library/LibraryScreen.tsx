@@ -1,4 +1,4 @@
-// Library screen (SPEC §3.5): rows newest edit first (title, instrument, bar count, last edited); click opens.
+// Library (SPEC §3.5), a modal over the chart screen: rows newest edit first (title, instrument, bar count, last edited); click opens.
 // New · Duplicate · Rename · Delete (immediate, ~10 s Undo toast that restores exactly) · Export one · Export all ·
 // Import (several files at once; one toast with counts; new rows highlighted) · the backup reminder · a line for
 // unreadable keys.
@@ -27,6 +27,8 @@ export interface LibraryScreenProps {
   unreadable: number;
   /** The backup reminder, when due (SPEC §3.5). */
   reminder: { age: string; safari: boolean; onDismiss: () => void } | null;
+  /** Back to the open progression (×, Esc, the backdrop); absent when none is open. */
+  onClose?: () => void;
 }
 
 /** "just now", "5 min ago", "3 h ago", "yesterday", "4 days ago", else the date. */
@@ -45,8 +47,14 @@ export function lastEdited(iso: string, now = new Date()): string {
 }
 
 export function LibraryScreen(props: LibraryScreenProps) {
-  const { progressions, onOpen, onNew, deleted, onUndoDelete, onToastDone, onExportAll, onImport, imported, onImportDone, unreadable, reminder } = props;
+  const { progressions, onOpen, onNew, deleted, onUndoDelete, onToastDone, onExportAll, onImport, imported, onImportDone, unreadable, reminder, onClose } = props;
   const fileInput = useRef<HTMLInputElement>(null);
+  const dialog = useRef<HTMLDivElement>(null);
+
+  // The dialog takes focus, so keys go to it (never to the chart behind).
+  useEffect(() => {
+    dialog.current?.focus({ preventScroll: true });
+  }, []);
 
   useEffect(() => {
     if (!imported?.summary) return;
@@ -61,9 +69,29 @@ export function LibraryScreen(props: LibraryScreenProps) {
   }, [deleted, onToastDone]);
 
   return (
-    <div className="library">
+    <div
+      className="library-overlay"
+      onPointerDown={(e) => {
+        if (e.target === e.currentTarget) onClose?.(); // the backdrop
+      }}
+    >
+    <div
+      ref={dialog}
+      className="library"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Library"
+      tabIndex={-1}
+      onKeyDown={(e) => {
+        e.stopPropagation(); // the chart's keys stay out of the library
+        if (e.key === 'Escape' && onClose && !(e.target instanceof HTMLInputElement)) {
+          e.preventDefault();
+          onClose();
+        }
+      }}
+    >
       <header className="library-header">
-        <h1>Tonepath</h1>
+        <h1>Library</h1>
         <span className="library-tools">
           <button type="button" className="library-tool" onClick={() => fileInput.current?.click()}>
             Import…
@@ -89,6 +117,13 @@ export function LibraryScreen(props: LibraryScreenProps) {
               e.currentTarget.value = ''; // the same file can be imported again
             }}
           />
+          {onClose && (
+            <button type="button" className="library-close" title="Close (Esc)" aria-label="Close the library" onClick={onClose}>
+              <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden>
+                <path d="M3 3l6 6M9 3 3 9" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
+            </button>
+          )}
         </span>
       </header>
       {reminder && (
@@ -135,6 +170,7 @@ export function LibraryScreen(props: LibraryScreenProps) {
           </button>
         </div>
       )}
+    </div>
     </div>
   );
 }
