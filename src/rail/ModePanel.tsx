@@ -5,7 +5,7 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { MODES, MODE_LABELS, type Mode } from '../session';
 
-/** What each mode is for, and what it uses (SPEC §3.0). */
+/** What each mode is for, and what it uses or lets you edit (SPEC §3.0): the tags beside its name. */
 export const MODE_INFO: Record<Mode, { blurb: string; uses: string[] }> = {
   tuner: {
     blurb: 'Warm up and tune. The hex lights every note you play; no chart, no chords. Every open starts here.',
@@ -13,11 +13,11 @@ export const MODE_INFO: Record<Mode, { blurb: string; uses: string[] }> = {
   },
   improvise: {
     blurb: 'Play over the changes. A lead sheet with empty staves; the transport keeps time and the hex rings the next chord. Stop it to step chords by hand or edit them.',
-    uses: ['mic', 'transport'],
+    uses: ['mic', 'transport', 'edit tonality'],
   },
   write: {
     blurb: 'Write your line. Pick notes on the hex at the caret; set lengths and rests, edit bars, step through what you wrote.',
-    uses: [],
+    uses: ['edit'],
   },
   read: {
     blurb: 'Play the etude. Every bar on one page, a click and a moving playhead; nothing to edit — made for a music stand.',
