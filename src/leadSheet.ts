@@ -29,3 +29,19 @@ export function leadTones(h: SlotHarmony): LeadTone[] | null {
       [...new Map(h.intervals.map((iv) => [pcOf(h.root, iv), spellInterval(h.root, iv)])).values()];
   return names.map((name) => ({ name, degree: spelledDegree(h.root, name), role: roleOf(((pcOfName(name) % 12) + 12) % 12) }));
 }
+
+/**
+ * The lead sheet's little hex (SPEC §3.3): the tones in rows from the bottom — pairs, the top row taking the rest —
+ * so a 7-note scale stacks as [1 2] [3 4] [5 6 7], each row half a cell left of the one below (up-left = a third, as on
+ * the docked hex). Bottom row first.
+ */
+export function leadRows<T>(tones: T[]): T[][] {
+  const rows: T[][] = [];
+  let i = 0;
+  while (tones.length - i > 3 && rows.length < 2) {
+    rows.push(tones.slice(i, i + 2));
+    i += 2;
+  }
+  if (i < tones.length) rows.push(tones.slice(i));
+  return rows;
+}

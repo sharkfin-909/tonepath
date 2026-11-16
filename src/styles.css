@@ -417,13 +417,13 @@ button.dock-label {
 }
 
 /* Bar lines span the staff only (no line between two chords in a bar). */
-/* A bar line at the end of each bar: the slot's full height (chord labels to the stave's headroom), 3px. */
+/* A bar line at the end of each bar: the slot's full height (chord labels to the stave's headroom), 2.5px. */
 .bar-line {
   position: absolute;
   top: 0;
   bottom: 0;
   right: 0;
-  width: 3px;
+  width: 2.5px;
   background: var(--line);
   pointer-events: none;
 }
@@ -945,7 +945,7 @@ button.dock-label {
 }
 /* Room for the repeat signs: the lead sheet's tones start after [: and end before :]. */
 .slot.loop-start .lead-tones {
-  padding-left: 32px;
+  padding-left: 46px;
 }
 .slot.loop-end .lead-tones {
   padding-right: 32px;
@@ -1355,42 +1355,32 @@ button.dock-label {
   box-sizing: border-box;
   display: flex;
   align-items: center;
-  padding-inline: 6px;
+  /* Clear of the bar number (top left, where the hex's top row leans). */
+  padding-inline: 26px 6px;
   overflow: hidden;
 }
-.lead-tones-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  align-items: center;
+.lead-hex {
+  display: block;
+  overflow: visible;
 }
-.lead-tone {
-  min-width: 1.9em;
-  padding: 0 6px;
-  border-radius: 14px;
-  border: 2px solid var(--deg);
-  font-size: 17px;
-  font-weight: 600;
-  line-height: 25px;
-  text-align: center;
-  color: var(--ink);
-  background: color-mix(in srgb, var(--deg) 10%, transparent);
+/* Cells as the docked hex: neutral taupe, coloured on triad tones and the guide tone (set inline). */
+.lead-cell polygon {
+  fill: var(--cell-neutral);
+  stroke: #fff;
+  stroke-width: 1.2;
 }
-.lead-tone.triad,
-.lead-tone.guide,
-.lead-tone.chord {
-  background: var(--deg);
-  color: var(--deg-ink);
+.lead-cell.guide polygon {
+  stroke: var(--ink);
+  stroke-width: 1.6;
 }
-.lead-tone.guide {
-  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--deg);
+.lead-cell text {
+  fill: var(--ink);
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
 }
-.lead-tone.chord {
-  opacity: 0.8;
-}
-.lead-tone.scale {
-  font-weight: 500;
-}
+
 /* The bar line spans the tones' band as it spans the stave. */
 /* Read etude (SPEC §3.4): no hex — the chart takes the whole main area, every bar fitted to it (no zoom floor). */
 .main.read {

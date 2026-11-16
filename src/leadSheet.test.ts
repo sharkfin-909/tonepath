@@ -1,7 +1,7 @@
 // Improvise's lead sheet (SPEC §3.3): the slot's scale, spelled, with each note's degree and role in the chord.
 import { describe, expect, it } from 'vitest';
 import { slotHarmony } from './harmony';
-import { leadTones } from './leadSheet';
+import { leadRows, leadTones } from './leadSheet';
 
 const show = (chord: string, scale?: Parameters<typeof slotHarmony>[0]['scale']) =>
   leadTones(slotHarmony({ chord, scale }))?.map((t) => `${t.name}${t.degree}:${t.role[0]}`).join(' ');
@@ -23,5 +23,18 @@ describe('lead tones', () => {
   it('no chord: nothing', () => {
     expect(leadTones(slotHarmony({ chord: 'N.C.' }))).toBeNull();
     expect(leadTones(slotHarmony({ chord: '' }))).toBeNull();
+  });
+});
+
+describe('lead hex rows', () => {
+  const rows = (n: number) => leadRows(Array.from({ length: n }, (_, i) => i + 1));
+  it('7 notes: [1 2] [3 4] [5 6 7], bottom first', () => {
+    expect(rows(7)).toEqual([[1, 2], [3, 4], [5, 6, 7]]);
+  });
+  it('other sizes: pairs from the bottom, the top row takes the rest', () => {
+    expect(rows(6)).toEqual([[1, 2], [3, 4], [5, 6]]); // whole-tone
+    expect(rows(8)).toEqual([[1, 2], [3, 4], [5, 6, 7, 8]]); // diminished
+    expect(rows(4)).toEqual([[1, 2], [3, 4]]); // a 7th chord's tones
+    expect(rows(3)).toEqual([[1, 2, 3]]);
   });
 });
