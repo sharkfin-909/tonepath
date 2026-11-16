@@ -1,14 +1,14 @@
 // Chord entry (SPEC §4.2) as one step: written text → concert progression, the key's mode for a key chord.
 import { describe, expect, it } from 'vitest';
+import { withFlat } from './test-progression';
 import { enterChord } from './chordEntry';
 import { newProgression, type Progression } from './progression';
 import { instrumentView } from './view';
 
-const prog = (instrument: string, ...chords: string[]): Progression => ({
-  ...newProgression(instrument),
+const prog = (instrument: string, ...chords: string[]): Progression => (withFlat(newProgression(instrument), {
   bars: chords.map((chord) => [{ chord }]),
   melody: [],
-});
+}));
 const enter = (p: Progression, bar: number, text: string) => {
   const r = enterChord(p, instrumentView(p), bar, 0, text);
   if (!r.ok) throw new Error(r.message);

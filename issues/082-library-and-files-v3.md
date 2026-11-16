@@ -17,7 +17,7 @@ assignee:
   B♭ trumpet* (distinct instruments, in etude order). Duplicate copies every etude (fresh etude ids). New: one
   empty *Etude 1* on the device's last-picked instrument.
 - **Files** (§12.3): *Export one* / *Export all* write `v: 3` with every etude (name, instrument, clef, melody;
-  ids left out like the progression's). **Import** runs v1 / v2 / v3 through the migration chain and repair
+  ids left out like the progression's — done in 078). **Import** runs v1 / v2 / v3 through the migration chain and repair
   ([078](078-schema-v3-etudes.md)), giving each etude a fresh id; the toast counts as today (notes shortened,
   unknown instruments → Concert, across all etudes).
 - **Demos** (§12.5): the bundled demo files stay v2 (they migrate on import) or are re-exported as v3 — either way

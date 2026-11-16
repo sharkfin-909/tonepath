@@ -9,7 +9,7 @@ import { dockHex, type DockHex, type HexShape, type PitchRange } from './hex';
 import { clefOf, hexRange, instrumentOf, toConcert, toWritten, writtenChord, type Clef, type Instrument } from './instruments';
 import { noteMark, type NoteMark } from './marks';
 import { formEnd } from './melody';
-import type { Progression, Slot } from './progression';
+import { etudeOf, type Progression, type Slot } from './progression';
 import { noteName, slotSpelling, type SlotSpelling } from './spelling';
 
 export interface ViewSlot extends FormSlot {
@@ -59,8 +59,10 @@ export interface InstrumentView {
 const NO_CHORD = slotHarmony({ chord: '' });
 const NO_CHORD_SPELLING = slotSpelling(NO_CHORD);
 
-export function instrumentView(p: Progression): InstrumentView {
-  const inst = instrumentOf(p.instrument);
+/** The progression seen through one etude's instrument (missing id → the first etude's). */
+export function instrumentView(p: Progression, etude?: string | null): InstrumentView {
+  const e = etudeOf(p, etude);
+  const inst = instrumentOf(e.instrument);
   const meter = layoutMeter(p.timeSignature);
   const range = hexRange(inst);
   const slots: ViewSlot[] = slotsOf(p.bars, meter).map((s) => {
@@ -72,7 +74,7 @@ export function instrumentView(p: Progression): InstrumentView {
   const end = formEnd(slots);
   return {
     inst,
-    clef: clefOf(inst, p.concertClef),
+    clef: clefOf(inst, e.concertClef),
     meter,
     range,
     slots,

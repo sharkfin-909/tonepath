@@ -1,5 +1,6 @@
 // The progression document (SPEC §6.3, §12.1): commits, undo / redo with the caret, saving, other tabs.
 import { describe, expect, it } from 'vitest';
+import { melodyOf } from './test-progression';
 import { openDocument } from './document';
 import { newProgression, setTitle } from './progression';
 import { PROGRESSION_PREFIX, type StoredProgression } from './storage';
@@ -54,11 +55,11 @@ describe('progression document', () => {
     expect(doc.external(key, null)).toBe('deleted');
   });
 
-  it('flush writes as is (updatedAt kept); a pre-melody save opens with an empty melody', () => {
+  it('flush writes as is (updatedAt kept); a save without etudes opens with one empty etude', () => {
     const s = new MemoryStorage();
-    const { melody: _m, ...old } = start();
+    const { etudes: _e, ...old } = start();
     const doc = openDocument(s, old as StoredProgression);
-    expect(doc.progression.melody).toEqual([]);
+    expect(melodyOf(doc.progression)).toEqual([]);
     doc.flush();
     expect(stored(s).updatedAt).toBe(T0);
   });

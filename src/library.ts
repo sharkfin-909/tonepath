@@ -2,6 +2,7 @@
 // duplicate, rename, delete + exact restore. One key per progression; no index key.
 
 import { readDevice, writeDevice } from './device';
+import { instrumentOf } from './instruments';
 import { SCHEMA_VERSION, newProgression, setTitle, type Progression } from './progression';
 import { importSummary, migrate, parseFile, uniqueTitle } from './schema';
 import { PROGRESSION_PREFIX, listProgressions, saveProgression, type StoredProgression } from './storage';
@@ -186,4 +187,10 @@ export function launch(storage: Storage, demo: unknown, makeId: MakeId = uuid, n
 /** Remember the open progression for the next launch. */
 export function rememberOpen(storage: Storage, id: string): void {
   writeDevice(storage, { lastOpenId: id });
+}
+
+/** A library row's etudes (SPEC §3.5): their count and their instruments, distinct, in etude order. */
+export function etudeSummary(p: Pick<Progression, 'etudes'>): string {
+  const names = [...new Set(p.etudes.map((e) => instrumentOf(e.instrument).name))];
+  return `${p.etudes.length} etude${p.etudes.length === 1 ? '' : 's'} · ${names.join(', ')}`;
 }

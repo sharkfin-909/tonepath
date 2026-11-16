@@ -1,14 +1,14 @@
 // The Instrument view (SPEC §5.3, §10): written chords, harmony, names and marks per slot, computed once.
 import { describe, expect, it } from 'vitest';
+import { withFlat } from './test-progression';
 import { newProgression, type Progression } from './progression';
 import { instrumentView } from './view';
 
-const prog = (instrument: string, ...chords: string[]): Progression => ({
-  ...newProgression(),
+const prog = (instrument: string, ...chords: string[]): Progression => (withFlat(newProgression(), {
   instrument,
   bars: chords.map((chord) => [{ chord }]),
   melody: [],
-});
+}));
 
 describe('instrument view', () => {
   it('Concert: chords as stored, written = concert', () => {

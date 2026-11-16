@@ -28,6 +28,7 @@ import { hexLighting } from './hexLighting';
 import { chartArea } from './zoom';
 import { useChartSession } from './useChartSession';
 import { useTransport } from './useTransport';
+import { etudeOf } from './progression';
 
 /** A CSS media query as React state (SPEC §3.6 responsive layout). */
 function useMediaQuery(query: string): boolean {
@@ -59,6 +60,8 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
   const { doc, progression, view, session, dispatch } = chart;
   const { mode, running } = session;
   const profile = modeProfile(mode, running);
+  /** The open etude: its melody (Write etude, Read etude) and its instrument (every mode). */
+  const etude = etudeOf(progression, session.etude);
 
   /** The written pitch A would pick (the hovered hex cell or ♯ / ♭ button). */
   const hovered = useRef<number | null>(null);
@@ -179,7 +182,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
   const onRefusalShown = useCallback(() => dispatch({ type: 'refusal-shown' }), [dispatch]);
 
   const { halo, muted } = session;
-  const haloPitch = halo && halo.caret === caretAt && halo.melody === progression.melody ? halo.pitch : null;
+  const haloPitch = halo && halo.caret === caretAt && halo.melody === etude.melody ? halo.pitch : null;
   const lighting = hexLighting({
     profile,
     view,
@@ -377,8 +380,8 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
                 {/* Undo / redo: at the end, just before Clear. */}
                 {undoRedo}
                 <ClearMenu
-                  canClearNotes={progression.melody.length > 0}
-                  canClearAll={progression.melody.length > 0 || progression.bars.some((b) => b.some((s) => s.chord !== '' || s.scale !== undefined))}
+                  canClearNotes={etude.melody.length > 0}
+                  canClearAll={etude.melody.length > 0 || progression.bars.some((b) => b.some((s) => s.chord !== '' || s.scale !== undefined))}
                   onClearNotes={() => dispatch({ type: 'clear-notes' })}
                   onClearAll={() => dispatch({ type: 'clear-all' })}
                 />
@@ -390,7 +393,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
           <span className="ins-group group">
             <InstrumentPicker
               instrument={view.inst.id}
-              concertClef={progression.concertClef === 'bass' ? 'bass' : 'treble'}
+              concertClef={etude.concertClef === 'bass' ? 'bass' : 'treble'}
               onInstrument={(id) => dispatch({ type: 'instrument', id })}
               onConcertClef={(clef) => dispatch({ type: 'clef', clef })}
             />
@@ -418,6 +421,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
             <div className="chart-pane-empty" aria-hidden>
               <Chart
                 progression={progression}
+                melody={etude.melody}
                 view={view}
                 caret={caretAt}
                 onSlotClick={() => {}}
@@ -438,6 +442,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
           ) : (
             <Chart
               progression={progression}
+              melody={etude.melody}
               view={view}
               caret={caretAt}
               onSlotClick={(slot) => dispatch({ type: 'slot-click', index: slot.index })}

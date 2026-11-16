@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { melodyOf, withFlat } from './test-progression';
 import {
   clearEverything,
   clearMelody,
@@ -9,9 +10,13 @@ import {
   setConcertClef,
   setInstrument,
   setTimeSignature,
-  setEtudeName,
   setTitle,
   type Progression,
+  etudeOf,
+  freshEtudeId,
+  newEtude,
+  setMelody,
+  withEtude,
 } from './progression';
 
 const chords = (p: Progression) => p.bars.map((b) => b.map((s) => s.chord).join(' | '));
@@ -60,15 +65,14 @@ describe('commitChordText', () => {
 });
 
 describe('rail settings', () => {
-  const withMelody = (): Progression => ({
-    ...newProgression(),
+  const withMelody = (): Progression => (withFlat(newProgression(), {
     bars: [[{ chord: 'Dm7', scale: 'aeolian' }], [{ chord: 'G7' }], [{ chord: 'Cmaj7' }], [{ chord: '' }]],
     melody: [
       { pitch: 62, d: 'h' },
       { pitch: 65, d: 'h' },
       { pitch: 67, d: 'q' },
     ],
-  });
+  }));
 
   it('title: trimmed, blank → Untitled, unchanged → same object', () => {
     const p = newProgression();
@@ -77,20 +81,28 @@ describe('rail settings', () => {
     expect(setTitle(p, 'Untitled')).toBe(p);
   });
 
-  it('etude name: trimmed; blank removes it; unchanged → same object', () => {
-    const p = newProgression();
-    const named = setEtudeName(p, '  Guide-tone lines ');
-    expect(named.etudeName).toBe('Guide-tone lines');
-    expect('etudeName' in setEtudeName(named, '   ')).toBe(false);
-    expect(setEtudeName(p, '  ')).toBe(p);
-    expect(setEtudeName(named, 'Guide-tone lines')).toBe(named);
+  it('a new progression has one empty etude, Etude 1', () => {
+    expect(newProgression().etudes).toEqual([{ id: 'e1', name: 'Etude 1', instrument: 'concert', melody: [] }]);
+  });
+
+  it('etude helpers: the etude by id (missing → the first); replacing one leaves the others', () => {
+    const two = { ...newProgression(), etudes: [newEtude('concert', 'A', 'e1'), newEtude('bb-trumpet', 'B', 'e2')] };
+    expect(etudeOf(two, 'e2').name).toBe('B');
+    expect(etudeOf(two, 'nope').name).toBe('A');
+    expect(etudeOf(two).name).toBe('A');
+    const next = setMelody(two, 'e2', [{ d: 'q' }]);
+    expect(next.etudes.map((e) => e.melody.length)).toEqual([0, 1]);
+    expect(next.etudes[0]).toBe(two.etudes[0]);
+    expect(withEtude(two, 'e1', (e) => e)).toBe(two);
+    expect(freshEtudeId(two.etudes)).toBe('e3');
+    expect(freshEtudeId([{ id: 'e2' }])).toBe('e1');
   });
 
   it('time signature 3/4 stores as typed and re-fits the melody to the shorter bars', () => {
     const p = setTimeSignature(withMelody(), ' 3/4');
     expect(p.timeSignature).toBe(' 3/4');
     // D h | F h crosses beat 3 → F q + rest q, G keeps its time (beat 5 = bar 2 beat 2)
-    expect(p.melody).toEqual([{ pitch: 62, d: 'h' }, { pitch: 65, d: 'q' }, { d: 'q' }, { pitch: 67, d: 'q' }]);
+    expect(melodyOf(p)).toEqual([{ pitch: 62, d: 'h' }, { pitch: 65, d: 'q' }, { d: 'q' }, { pitch: 67, d: 'q' }]);
     expect(chords(p)).toEqual(['Dm7', 'G7', 'Cmaj7', '']);
     expect(p.bars[0][0].scale).toBe('aeolian');
   });
@@ -98,14 +110,14 @@ describe('rail settings', () => {
   it('time signature 6/8 re-fits too', () => {
     const p = setTimeSignature(withMelody(), '6/8');
     // bars of 6 eighths: D h fits (4e), F h crosses at 6e → F q, rest q (into bar 2), G keeps its time
-    expect(p.melody).toEqual([{ pitch: 62, d: 'h' }, { pitch: 65, d: 'q' }, { d: 'q' }, { pitch: 67, d: 'q' }]);
+    expect(melodyOf(p)).toEqual([{ pitch: 62, d: 'h' }, { pitch: 65, d: 'q' }, { d: 'q' }, { pitch: 67, d: 'q' }]);
   });
 
   it('an unparseable time signature is stored as typed and lays out as 4/4 (melody untouched)', () => {
     const p0 = withMelody();
     const p = setTimeSignature(p0, 'waltz');
     expect(p.timeSignature).toBe('waltz');
-    expect(p.melody).toBe(p0.melody);
+    expect(melodyOf(p)).toBe(melodyOf(p0));
     expect(setTimeSignature(p, 'waltz')).toBe(p);
   });
 
@@ -120,7 +132,7 @@ describe('rail settings', () => {
   it('test table 4: Clear notes empties the melody, leaves chords, scales and title', () => {
     const p0 = { ...withMelody(), title: 'ii–V–I' };
     const p = clearMelody(p0);
-    expect(p.melody).toEqual([]);
+    expect(melodyOf(p)).toEqual([]);
     expect(p.bars).toBe(p0.bars);
     expect(p.title).toBe('ii–V–I');
     expect(clearMelody(p)).toBe(p);
@@ -130,7 +142,7 @@ describe('rail settings', () => {
     const p0 = { ...withMelody(), title: 'ii–V–I', bars: [[{ chord: 'Dm7', scale: 'aeolian' as const }], [{ chord: 'G7' }, { chord: 'C' }]] };
     const p = clearEverything(p0);
     expect(p.bars).toEqual([[{ chord: '' }], [{ chord: '' }, { chord: '' }]]);
-    expect([p.melody, p.title, p.timeSignature]).toEqual([[], 'ii–V–I', p0.timeSignature]);
+    expect([melodyOf(p), p.title, p.timeSignature]).toEqual([[], 'ii–V–I', p0.timeSignature]);
     expect(clearEverything(p)).toBe(p); // nothing left to clear
   });
 });
@@ -138,36 +150,36 @@ describe('rail settings', () => {
 describe('instrument settings', () => {
   it('switches to known instruments only', () => {
     const p = newProgression();
-    expect(setInstrument(p, 'bb-tenor-sax').instrument).toBe('bb-tenor-sax');
-    expect(setInstrument(p, 'kazoo')).toBe(p);
-    expect(setInstrument(p, 'concert')).toBe(p);
+    expect(etudeOf(setInstrument(p, 'e1', 'bb-tenor-sax')).instrument).toBe('bb-tenor-sax');
+    expect(setInstrument(p, 'e1', 'kazoo')).toBe(p);
+    expect(setInstrument(p, 'e1', 'concert')).toBe(p);
   });
 
   it('new progressions take a (valid) default instrument', () => {
-    expect(newProgression('trombone').instrument).toBe('trombone');
-    expect(newProgression('kazoo').instrument).toBe('concert');
+    expect(etudeOf(newProgression('trombone')).instrument).toBe('trombone');
+    expect(etudeOf(newProgression('kazoo')).instrument).toBe('concert');
   });
 
   it('concert clef: bass is saved, treble removes the field', () => {
-    const p = setConcertClef(newProgression(), 'bass');
-    expect(p.concertClef).toBe('bass');
-    const t = setConcertClef(p, 'treble');
-    expect('concertClef' in t).toBe(false);
-    expect(setConcertClef(t, 'treble')).toBe(t);
+    const p = setConcertClef(newProgression(), 'e1', 'bass');
+    expect(etudeOf(p).concertClef).toBe('bass');
+    const t = setConcertClef(p, 'e1', 'treble');
+    expect('concertClef' in etudeOf(t)).toBe(false);
+    expect(setConcertClef(t, 'e1', 'treble')).toBe(t);
   });
 });
 
 describe('two chords into a one-slot bar (SPEC §4.2 → §4.1 split)', () => {
   it('refused when a note crosses the middle', () => {
-    const p = { ...newProgression(), melody: [{ pitch: 60, d: 'w' as const }] };
+    const p = withFlat(newProgression(), { melody: [{ pitch: 60, d: 'w' as const }] });
     expect(commitChordText(p, 0, 0, 'Dm7 G7')).toEqual({ ok: false, message: 'a note crosses the middle of the bar' });
   });
 
   it('splits when nothing crosses; a crossing rest is re-split', () => {
-    const p = { ...newProgression(), melody: [{ d: 'w' as const }, { pitch: 60, d: 'q' as const }] };
+    const p = withFlat(newProgression(), { melody: [{ d: 'w' as const }, { pitch: 60, d: 'q' as const }] });
     const r = commitChordText(p, 0, 0, 'Dm7 G7');
     expect(r.ok && chords(r.progression)).toEqual(['Dm7 | G7', '', '', '']);
-    expect(r.ok && r.progression.melody).toEqual([{ d: 'h' }, { d: 'h' }, { pitch: 60, d: 'q' }]);
+    expect(r.ok && melodyOf(r.progression)).toEqual([{ d: 'h' }, { d: 'h' }, { pitch: 60, d: 'q' }]);
   });
 });
 

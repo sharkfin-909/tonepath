@@ -1,5 +1,6 @@
 // The editing session (SPEC §3.0–3.8, §6.2, §9): each mode's rules, entry, browsing, the transport and *On arrival*, as pure steps.
 import { describe, expect, it } from 'vitest';
+import { melodyOf, withFlat } from './test-progression';
 import { TICKS } from './melody';
 import { newProgression, type Progression } from './progression';
 import { activeIndex, initialSession, reduce, type Effect, type Intent, type Outcome, type SessionState } from './session';
@@ -9,11 +10,10 @@ const q = TICKS.q;
 const W = 4 * q;
 
 /** Dm7 | G7 | Cmaj7 | A7, concert, empty melody. */
-const prog = (): Progression => ({
-  ...newProgression(),
+const prog = (): Progression => (withFlat(newProgression(), {
   bars: [[{ chord: 'Dm7' }], [{ chord: 'G7' }], [{ chord: 'Cmaj7' }], [{ chord: 'A7' }]],
   melody: [],
-});
+}));
 
 /** The effects the screen performs besides sounds and device writes: tested on their own (`signals`). */
 const SIGNALS: Effect['type'][] = ['light', 'transport-restart'];
@@ -48,21 +48,21 @@ const pick = (written: number): Intent => ({ type: 'pick', written });
 describe('Write etude: entry', () => {
   it('a pick inserts with the latched length, plays the note, and moves the caret', () => {
     const r = run([pick(62)]);
-    expect(r.p.melody).toEqual([{ pitch: 62, d: 'q' }]);
+    expect(melodyOf(r.p)).toEqual([{ pitch: 62, d: 'q' }]);
     expect(r.state.caret).toBe(q);
     expect(show(r.effects)).toEqual(['note 62']);
   });
 
   it('a refused insert plays the note, records nothing, and flashes the length', () => {
-    const r = run([{ type: 'length', d: 'w' }, pick(62)], { p: { ...prog(), melody: [{ pitch: 60, d: 'q' }] } });
-    expect(r.p.melody).toHaveLength(1);
+    const r = run([{ type: 'length', d: 'w' }, pick(62)], { p: withFlat(prog(), { melody: [{ pitch: 60, d: 'q' }] }) });
+    expect(melodyOf(r.p)).toHaveLength(1);
     expect(r.state.refusal).toMatchObject({ d: 'w', message: "Doesn't fit in this slot" });
     expect(show(r.per[1])).toEqual(['note 62']);
   });
 
   it('Rest on: a length key inserts a rest; a pick turns Rest off', () => {
     const r = run([{ type: 'toggle-rest' }, { type: 'length', d: 'h' }, pick(62)]);
-    expect(r.p.melody).toEqual([{ d: 'h' }, { pitch: 62, d: 'h' }]);
+    expect(melodyOf(r.p)).toEqual([{ d: 'h' }, { pitch: 62, d: 'h' }]);
     expect(r.state.rest).toBe(false);
   });
 
@@ -71,27 +71,27 @@ describe('Write etude: entry', () => {
     expect(r.state.caret).toBe(0);
     expect(activeIndex(r.state, r.p)).toBe(0);
     const again = reduce(r.state, r.p, pick(72));
-    expect(again.edit!.melody[0]).toEqual({ pitch: 72, d: 'q' }); // overwrites from the start
+    expect(melodyOf(again.edit!)[0]).toEqual({ pitch: 72, d: 'q' }); // overwrites from the start
   });
 });
 
 describe('opening, and the mode decides', () => {
   it('every open starts in Tune, on the caret\'s slot (the melody\'s end)', () => {
-    const p = { ...prog(), melody: [{ pitch: 62, d: 'w' as const }, { pitch: 67, d: 'q' as const }] };
+    const p = withFlat(prog(), { melody: [{ pitch: 62, d: 'w' as const }, { pitch: 67, d: 'q' as const }] });
     expect(initialSession(p, { onArrival: 'silent' })).toMatchObject({ mode: 'tune', slot: 1, running: false });
   });
 
   it('only Write etude writes: a pick elsewhere auditions and records nothing', () => {
     for (const mode of ['tune', 'improvise'] as const) {
       const r = run([{ type: 'mode', mode }, pick(62)]);
-      expect(r.p.melody).toEqual([]);
+      expect(melodyOf(r.p)).toEqual([]);
       expect(show(r.per[1])).toContain('note 62');
     }
     expect(run([{ type: 'mode', mode: 'read' }, pick(62)]).per[1]).toEqual([]); // no hex in Read etude
   });
 
   it('only Write etude edits the melody: delete, nudge, Rest + length and Clear do nothing elsewhere', () => {
-    const p = { ...prog(), melody: [{ pitch: 60, d: 'q' as const }] };
+    const p = withFlat(prog(), { melody: [{ pitch: 60, d: 'q' as const }] });
     const edits = [{ type: 'delete', back: true }, { type: 'nudge', dir: 1, octave: false }, { type: 'clear-notes' }, { type: 'clear-all' }, { type: 'step-play' }] as Intent[];
     for (const mode of ['tune', 'improvise', 'read'] as const) {
       for (const i of edits) expect(run([{ type: 'mode', mode }, i], { p, state: { caret: q } }).p).toBe(p);
@@ -224,13 +224,13 @@ describe('the transport (Improvise, Read etude)', () => {
 
 describe('Read etude', () => {
   const read = (more: Intent[], p = prog()) => run([{ type: 'mode', mode: 'read' }, ...more], { p, onArrival: 'chord', state: { caret: 0 } });
-  const two = { ...prog(), melody: [{ pitch: 62, d: 'w' as const }, { pitch: 67, d: 'w' as const }] };
+  const two = withFlat(prog(), { melody: [{ pitch: 62, d: 'w' as const }, { pitch: 67, d: 'w' as const }] });
 
   it('stopped: clicking a slot moves the playhead there, silently; a note auditions and moves it to its slot', () => {
     const r = read([{ type: 'slot-click', index: 2 }]);
     expect(r.state.slot).toBe(2);
     expect(r.effects).toEqual([]);
-    const n = read([{ type: 'event-click', event: { ev: two.melody[1], i: 1, start: W, end: 2 * W } }], two);
+    const n = read([{ type: 'event-click', event: { ev: melodyOf(two)[1], i: 1, start: W, end: 2 * W } }], two);
     expect(n.state.slot).toBe(1);
     expect(show(n.per[1])).toEqual(['note 67']);
   });
@@ -242,14 +242,14 @@ describe('Read etude', () => {
   });
 
   it('running: chart clicks do nothing — slots, notes, bar numbers', () => {
-    const r = read([{ type: 'transport', run: true }, { type: 'slot-click', index: 2 }, { type: 'event-click', event: { ev: two.melody[1], i: 1, start: W, end: 2 * W } }, { type: 'bar-select', bar: 1, extend: false }], two);
+    const r = read([{ type: 'transport', run: true }, { type: 'slot-click', index: 2 }, { type: 'event-click', event: { ev: melodyOf(two)[1], i: 1, start: W, end: 2 * W } }, { type: 'bar-select', bar: 1, extend: false }], two);
     expect(r.state).toMatchObject({ slot: 0, selection: null });
     expect(r.effects).toEqual([]);
   });
 });
 
 describe('Write etude: stepwise playback (` / ~)', () => {
-  const melody = { ...prog(), melody: [{ pitch: 62, d: 'h' as const }, { d: 'h' as const }, { pitch: 67, d: 'w' as const }] };
+  const melody = withFlat(prog(), { melody: [{ pitch: 62, d: 'h' as const }, { d: 'h' as const }, { pitch: 67, d: 'w' as const }] });
   const step: Intent = { type: 'step-play' };
 
   it('each press plays the event at the caret and moves past it; rests pass silently; slot starts bring On arrival', () => {
@@ -305,27 +305,27 @@ describe('slots without a chord', () => {
   it('notes are written and played (N.C., empty); nudge steps by semitone', () => {
     const p = { ...prog(), bars: [[{ chord: 'N.C.' }], [{ chord: '' }]] };
     const r = run([pick(61), pick(66)], { p });
-    expect(r.p.melody).toEqual([{ pitch: 61, d: 'q' }, { pitch: 66, d: 'q' }]);
+    expect(melodyOf(r.p)).toEqual([{ pitch: 61, d: 'q' }, { pitch: 66, d: 'q' }]);
     expect(show(r.effects)).toEqual(['note 61', 'note 66']);
     const n = run([{ type: 'nudge', dir: 1, octave: false }], { p: r.p, state: { caret: r.state.caret } });
-    expect(n.p.melody[1]).toEqual({ pitch: 67, d: 'q' });
+    expect(melodyOf(n.p)[1]).toEqual({ pitch: 67, d: 'q' });
   });
 });
 
 describe('editing commands', () => {
   it('delete, nudge (plays, halo) and clear all', () => {
-    const p = { ...prog(), melody: [{ pitch: 62, d: 'q' as const }, { pitch: 65, d: 'q' as const }] };
+    const p = withFlat(prog(), { melody: [{ pitch: 62, d: 'q' as const }, { pitch: 65, d: 'q' as const }] });
     const n = run([{ type: 'nudge', dir: 1, octave: false }], { p });
-    expect(n.p.melody[1]).toEqual({ pitch: 66, d: 'q' }); // ↑: a semitone
+    expect(melodyOf(n.p)[1]).toEqual({ pitch: 66, d: 'q' }); // ↑: a semitone
     expect(show(n.effects)).toEqual(['note 66']);
     expect(n.state.halo?.pitch).toBe(66);
     const step = run([{ type: 'nudge', dir: 1, octave: false, scale: true }], { p });
-    expect(step.p.melody[1]).toEqual({ pitch: 67, d: 'q' }); // ⌥↑: the next D Dorian step (F → G)
-    expect(run([{ type: 'delete', back: true }], { p }).p.melody).toHaveLength(1);
+    expect(melodyOf(step.p)[1]).toEqual({ pitch: 67, d: 'q' }); // ⌥↑: the next D Dorian step (F → G)
+    expect(melodyOf(run([{ type: 'delete', back: true }], { p }).p)).toHaveLength(1);
     const c = run([{ type: 'clear-notes' }], { p });
-    expect([c.p.melody, c.state.caret, c.p.bars]).toEqual([[], 0, p.bars]); // notes only
+    expect([melodyOf(c.p), c.state.caret, c.p.bars]).toEqual([[], 0, p.bars]); // notes only
     const all = run([{ type: 'clear-all' }], { p: { ...p, bars: [[{ chord: 'Dm7', scale: 'aeolian' }], [{ chord: 'G7' }, { chord: 'G7alt' }]] } });
-    expect([all.p.melody, all.p.bars]).toEqual([[], [[{ chord: '' }], [{ chord: '' }, { chord: '' }]]]); // bars and splits stay
+    expect([melodyOf(all.p), all.p.bars]).toEqual([[], [[{ chord: '' }], [{ chord: '' }, { chord: '' }]]]); // bars and splits stay
   });
 
   it('bar actions: copy says so, delete refuses the last bar with a notice', () => {
@@ -390,15 +390,15 @@ describe('deselecting', () => {
 });
 
 describe('the screen\'s signals', () => {
-  const melody = { ...prog(), melody: [{ pitch: 62, d: 'h' as const }, { d: 'h' as const }, { pitch: 67, d: 'w' as const }] };
+  const melody = withFlat(prog(), { melody: [{ pitch: 62, d: 'h' as const }, { d: 'h' as const }, { pitch: 67, d: 'w' as const }] });
 
   it('Write etude: a stepped or clicked melody note lights the hex (a rest does not)', () => {
-    const r = run([{ type: 'step-play' }, { type: 'step-play' }, { type: 'event-click', event: { ev: melody.melody[2], i: 2, start: W, end: 2 * W } }], { p: melody });
+    const r = run([{ type: 'step-play' }, { type: 'step-play' }, { type: 'event-click', event: { ev: melodyOf(melody)[2], i: 2, start: W, end: 2 * W } }], { p: melody });
     expect(r.signals).toEqual([[{ type: 'light', midi: 62 }], [], [{ type: 'light', midi: 67 }]]);
   });
 
   it('Read etude: a clicked note auditions but lights nothing', () => {
-    const r = run([{ type: 'event-click', event: { ev: melody.melody[0], i: 0, start: 0, end: W / 2 } }], { p: melody, state: { mode: 'read' } });
+    const r = run([{ type: 'event-click', event: { ev: melodyOf(melody)[0], i: 0, start: 0, end: W / 2 } }], { p: melody, state: { mode: 'read' } });
     expect(show(r.per[0])).toEqual(['note 62']);
     expect(r.signals[0]).toEqual([]);
   });
@@ -453,7 +453,7 @@ describe('edits outside the melody go through the mode too', () => {
       ],
       { state: { mode: 'read', running: true } },
     );
-    expect(r.p).toMatchObject({ title: 'Blues', concertClef: 'bass', instrument: 'bb-trumpet' });
+    expect(r.p).toMatchObject({ title: 'Blues', etudes: [{ concertClef: 'bass', instrument: 'bb-trumpet' }] });
     expect(r.per[2]).toEqual([{ type: 'device', patch: { lastInstrument: 'bb-trumpet' } }]);
   });
 });

@@ -5,7 +5,7 @@ import type { FormSlot, Meter } from '../form';
 import { eventsForSlot, type TimedEvent } from '../melody';
 import { parseChord, interpretation } from '../chords';
 import { scaleLabel, type ScaleId, type SlotHarmony } from '../harmony';
-import type { ChordCommit, Progression } from '../progression';
+import type { ChordCommit, MelodyEvent, Progression } from '../progression';
 import { ClefGutter, SlotStave, staveMetrics } from '../notation/Stave';
 import type { InstrumentView, ViewSlot } from '../view';
 import { ChordField } from './ChordField';
@@ -20,6 +20,8 @@ import { BAR_LINE_PX, GUTTER_PX, ROW_AFTER_PX, SLOT_GAP_PX, SLOT_PAD_TOP_PX, cha
 
 export interface ChartProps {
   progression: Progression;
+  /** The open etude's melody (Write etude, Read etude). */
+  melody: MelodyEvent[];
   /** The progression in the instrument's written pitch (slots, chords, names, marks). */
   view: InstrumentView;
   /** Caret time (form ticks); its slot is the active slot (tinted; drives the docked hex). */
@@ -93,6 +95,7 @@ function useParentSize<T extends HTMLElement>() {
 
 export function Chart({
   progression,
+  melody,
   view,
   caret,
   onSlotClick,
@@ -201,7 +204,7 @@ export function Chart({
               active={slot.index === activeSlot}
               onActivate={inert ? () => {} : () => onSlotClick(slot)}
               clef={clef}
-              melody={progression.melody}
+              melody={melody}
               caret={writing && slot.index === activeSlot ? caret : undefined}
               playing={!writing}
               // Read etude (§3.4): only chord + scale above the stave — no key pills.
@@ -277,7 +280,7 @@ interface SlotViewProps {
   active: boolean;
   onActivate: () => void;
   clef: Clef;
-  melody: Progression['melody'];
+  melody: MelodyEvent[];
   caret?: number;
   /** Improvise / Read etude: the active slot gets the solid "current slot" highlight. */
   playing: boolean;

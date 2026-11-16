@@ -2,9 +2,9 @@
 id: 78
 title: "Schema v3: a progression's etudes"
 labels: [ready-for-agent]
-status: open
+status: closed
 blocked_by: []
-assignee:
+assignee: claude
 ---
 
 ## Parent
@@ -33,13 +33,21 @@ unchanged on one etude until [080](080-session-open-etude.md).
 
 ## Acceptance criteria
 
-- [ ] Both bundled demos (`examples/*.tonepath.json`, v2) migrate to one etude each, notes and instrument intact
-- [ ] A v2 file with `etudeName` names its etude after it; without, *Etude 1*
-- [ ] Repair table: missing / empty `etudes`, a bad entry, duplicate ids, blank names, an unknown instrument, a
+- [x] Both bundled demos (`examples/*.tonepath.json`, v2) migrate to one etude each, notes and instrument intact
+- [x] A v2 file with `etudeName` names its etude after it; without, *Etude 1*
+- [x] Repair table: missing / empty `etudes`, a bad entry, duplicate ids, blank names, an unknown instrument, a
       melody crossing a slot — each repaired and counted as in §12.3
-- [ ] v1 files still import (v1 → v2 → v3)
-- [ ] The app opens and edits as before (one etude)
+- [x] v1 files still import (v1 → v2 → v3)
+- [x] The app opens and edits as before (one etude)
 
 ## Blocked by
 
 None.
+
+## Resolution
+
+Built: `Etude` / `Progression` (v3) in `progression.ts` with `etudeOf`, `withEtude`, `setMelody`, `freshEtudeId`;
+`migrate2to3` and etude repair in `schema.ts`; storage migrates on launch (checked on real v2 storage: both demos
+became one etude, notes intact). Etude ids are short and deterministic (`e1`, `e2`, …: unique within their
+progression), not UUIDs — migration stays pure and tests stable. Files leave etude ids out (as the progression's);
+import gives fresh ones. The session already carries `etude` (the first) so 080 only has to choose and switch it.

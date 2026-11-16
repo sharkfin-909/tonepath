@@ -29,10 +29,12 @@ import { modeProfile } from './modeProfile';
 import {
   clearEverything,
   clearMelody,
+  etudeOf,
   setBarsPerRow,
   setChord,
   setConcertClef,
   setInstrument,
+  setMelody,
   setScaleOverride,
   setTimeSignature,
   setTitle,
@@ -58,6 +60,8 @@ export const MODE_LABELS: Record<Mode, string> = { tune: 'Tune', improvise: 'Imp
 export interface SessionState {
   /** The mode (SPEC §3.0). Every open starts in Tune. */
   mode: Mode;
+  /** The open etude's id: the melody Write etude and Read etude work on, and the instrument every mode follows. */
+  etude: string;
   /** A time position in the form (SPEC §6.2); clamped to the form end when read (`caretOf`). Write etude's. */
   caret: number;
   /** Length latch and Rest latch (SPEC §6.2 item 6). */
@@ -170,14 +174,16 @@ export interface Outcome {
   entry?: ChordCommit;
 }
 
-export function initialSession(p: Progression, device: { muted?: boolean; onArrival: OnArrival }): SessionState {
-  const caret = melodyEnd(p.melody); // opens at the melody's end; not saved
+export function initialSession(p: Progression, device: { muted?: boolean; onArrival: OnArrival }, etude?: string | null): SessionState {
+  const open = etudeOf(p, etude).id;
+  const caret = melodyEnd(etudeOf(p, open).melody); // opens at the melody's end; not saved
   return {
     mode: 'tune', // every open and reload starts in Tune (SPEC §3.0)
+    etude: open,
     caret,
     length: 'q',
     rest: false,
-    slot: instrumentView(p).slotAt(caret).index,
+    slot: instrumentView(p, open).slotAt(caret).index,
     running: false,
     arrival: null,
     selection: null,
@@ -192,12 +198,12 @@ export function initialSession(p: Progression, device: { muted?: boolean; onArri
 
 /** The caret clamped to the form (the form can shrink under it). */
 export function caretOf(s: SessionState, p: Progression): number {
-  return Math.min(s.caret, instrumentView(p).end);
+  return Math.min(s.caret, instrumentView(p, s.etude).end);
 }
 
 /** The active slot: Write etude's caret slot, else the current slot. */
 export function activeIndex(s: SessionState, p: Progression): number {
-  const v = instrumentView(p);
+  const v = instrumentView(p, s.etude);
   return s.mode === 'write' ? v.slotAt(caretOf(s, p)).index : Math.min(s.slot, v.slots.length - 1);
 }
 
@@ -246,7 +252,9 @@ function allowed(s: SessionState, intent: Intent): boolean {
 }
 
 export function reduce(state: SessionState, p: Progression, intent: Intent): Outcome {
-  const view = instrumentView(p);
+  const view = instrumentView(p, state.etude);
+  /** The open etude's melody; edits write it back with `melodyEdit`. */
+  const melody = etudeOf(p, state.etude).melody;
   const { slots } = view;
   const caret = Math.min(state.caret, view.end);
   const writing = state.mode === 'write';
@@ -258,6 +266,7 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
   const effects: Effect[] = [];
   const set = (patch: Partial<SessionState>) => (s = { ...s, ...patch });
   const done = (): Outcome => ({ state: s, edit, effects });
+  const melodyEdit = (next: MelodyEvent[]) => (edit = setMelody(p, s.etude, next));
 
   /**
    * Improvise / Read etude: reach a slot by hand. In Improvise its *On arrival* sound waits for the first note played
@@ -274,7 +283,7 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
 
   /** Write etude: insert a note (or rest) at the caret; past the end, writing continues from the start (SPEC §6.2). */
   const insert = (d: Duration, pitch: number | null) => {
-    const r = insertWrapping(p.melody, slots, caret, d, pitch);
+    const r = insertWrapping(melody, slots, caret, d, pitch);
     if (!r.ok) {
       set({ refusal: { d, message: r.message, n: (s.refusal?.n ?? 0) + 1 } });
       return;
@@ -283,7 +292,7 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
     const at = caret >= view.end ? 0 : caret;
     const slot = view.slotAt(at);
     if (slot.start === at) effects.push(...arrivalSounds(s.onArrival, slot.concert));
-    edit = { ...p, melody: r.melody };
+    melodyEdit(r.melody);
     set({ refusal: null, caret: r.caret });
   };
 
@@ -295,7 +304,7 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
     }
     edit = e.progression;
     set({ caret: e.caret });
-    if (!writing) set({ slot: Math.min(s.slot, instrumentView(e.progression).slots.length - 1), arrival: null });
+    if (!writing) set({ slot: Math.min(s.slot, instrumentView(e.progression, s.etude).slots.length - 1), arrival: null });
     return true;
   };
 
@@ -317,7 +326,7 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
     case 'step-play': {
       // Write etude (SPEC §6.2): note by note through the melody from the caret. A note sounds (with its slot's
       // *On arrival* when it starts the slot); a rest passes silently; after the last event the next press starts at bar 1.
-      const events = timeline(p.melody).filter((e) => e.start < view.end);
+      const events = timeline(melody).filter((e) => e.start < view.end);
       if (events.length === 0) return done();
       // Back: the event before the caret (before the first: the last), played, with the caret moved to its start.
       const back = intent.dir === -1;
@@ -338,22 +347,22 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
       set({ rest: !s.rest });
       return done();
     case 'delete': {
-      const r = (intent.back ? backspaceAt : deleteAt)(p.melody, caret);
-      if (r.melody !== p.melody) edit = { ...p, melody: r.melody };
+      const r = (intent.back ? backspaceAt : deleteAt)(melody, caret);
+      if (r.melody !== melody) melodyEdit(r.melody);
       set({ caret: r.caret });
       return done();
     }
     case 'nudge': {
       // `scale`: a step of the owning slot's scale (↑ / ↓; no chord there: semitones anyway); else a semitone (⇧).
-      const r = nudge(p.melody, slots, caret, intent.dir, intent.octave, (slot) => (intent.scale ? (stepPitchClasses(slots[slot.index].concert) ?? CHROMATIC) : CHROMATIC));
+      const r = nudge(melody, slots, caret, intent.dir, intent.octave, (slot) => (intent.scale ? (stepPitchClasses(slots[slot.index].concert) ?? CHROMATIC) : CHROMATIC));
       if (!r.ok) return done();
-      edit = { ...p, melody: r.melody };
+      melodyEdit(r.melody);
       effects.push({ type: 'note', midi: r.pitch });
       set({ halo: { pitch: r.pitch, caret, melody: r.melody } });
       return done();
     }
     case 'step':
-      if (writing) set({ caret: stepCaret(p.melody, slots, caret, intent.dir, s.length) });
+      if (writing) set({ caret: stepCaret(melody, slots, caret, intent.dir, s.length) });
       else arrive(stepSlot(active.index, intent.dir, slots.length));
       return done();
     case 'browse': {
@@ -376,7 +385,7 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
       return done();
     }
     case 'time-click':
-      if (writing) set({ selection: null, caret: caretFromClick(p.melody, slots, intent.t, s.length) });
+      if (writing) set({ selection: null, caret: caretFromClick(melody, slots, intent.t, s.length) });
       else arrive(view.slotAt(intent.t).index);
       return done();
     case 'slot-click': {
@@ -494,12 +503,12 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
           }
           break;
         case 'copy': {
-          set({ clip: copyBars(p, from, to) });
+          set({ clip: copyBars(p, from, to, s.etude) });
           say(from === to ? `Copied bar ${from + 1}` : `Copied bars ${from + 1}–${to + 1}`);
           break;
         }
         case 'paste':
-          if (s.clip) barEdit(pasteBars(p, from, s.clip, caret));
+          if (s.clip) barEdit(pasteBars(p, from, s.clip, caret, s.etude));
           break;
         case 'split':
           barEdit(splitBar(p, bar, caret));
@@ -520,11 +529,11 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
       set({ selection: null });
       return done();
     case 'clear-notes':
-      edit = clearMelody(p); // one undo step, no confirm (SPEC §6.2 item 10)
+      edit = clearMelody(p, s.etude); // one undo step, no confirm (SPEC §6.2 item 10)
       set({ caret: 0 });
       return done();
     case 'clear-all':
-      edit = clearEverything(p); // one undo step; the menu asks first
+      edit = clearEverything(p, s.etude); // one undo step; the menu asks first
       set({ caret: 0, selection: null });
       return done();
     case 'time-signature': {
@@ -532,7 +541,7 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
       if (next === p) return done();
       edit = next; // bars resize, the melody is re-fitted; the caret keeps its time, snapped to an event start
       set({
-        caret: snapToEvent(next.melody, Math.min(caret, instrumentView(next).end)),
+        caret: snapToEvent(etudeOf(next, s.etude).melody, Math.min(caret, instrumentView(next, s.etude).end)),
       });
       return done();
     }
@@ -554,11 +563,11 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
       edit = setTitle(p, intent.text);
       return done();
     case 'instrument':
-      edit = setInstrument(p, intent.id);
-      effects.push({ type: 'device', patch: { lastInstrument: edit.instrument } });
+      edit = setInstrument(p, s.etude, intent.id);
+      effects.push({ type: 'device', patch: { lastInstrument: etudeOf(edit, s.etude).instrument } });
       return done();
     case 'clef':
-      edit = setConcertClef(p, intent.clef);
+      edit = setConcertClef(p, s.etude, intent.clef);
       return done();
     case 'undo':
     case 'redo':

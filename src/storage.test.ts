@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { melodyOf } from './test-progression';
 import { newProgression, setChord } from './progression';
 import { countUnreadable, listProgressions, onSaveStatus, openInitial, PROGRESSION_PREFIX, saveProgression } from './storage';
 import { MemoryStorage } from './test-memory-storage';
@@ -12,7 +13,7 @@ describe('storage', () => {
     expect(p.bars).toHaveLength(4);
     expect(p.timeSignature).toBe('4/4');
     expect(p.barsPerRow).toBe(4);
-    expect(p.melody).toEqual([]);
+    expect(melodyOf(p)).toEqual([]);
     expect(s.getItem(PROGRESSION_PREFIX + 'abc')).not.toBeNull();
   });
 

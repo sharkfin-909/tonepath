@@ -60,18 +60,17 @@ export function useChartSession(o: ChartSessionOptions): ChartSession {
   const doc = docRef.current;
   const [, rerender] = useReducer((n: number) => n + 1, 0);
   const progression = doc.progression;
-  const view = useMemo(() => instrumentView(progression), [progression]);
-
   const [session, setSession] = useState<SessionState>(() => {
     const device = readDevice(localStorage);
     return initialSession(doc.progression, { muted: device.muted, onArrival: onArrivalOf(device) });
   });
+  const view = useMemo(() => instrumentView(progression, session.etude), [progression, session.etude]);
   const sessionRef = useRef(session);
   /** Mic intake (SPEC §3.3): the echo guard over the app's own sounds. */
   const intakeRef = useRef<MicIntake>(NEW_INTAKE);
   const [sounded, setSounded] = useState<{ midi: number; n: number } | null>(null);
 
-  const caretNow = () => Math.min(sessionRef.current.caret, instrumentView(doc.progression).end);
+  const caretNow = () => Math.min(sessionRef.current.caret, instrumentView(doc.progression, sessionRef.current.etude).end);
 
   /** Commit an edit at the current caret: one undo step and one save (SPEC §6.3, §12.1). */
   const commit = (next: Progression) => {

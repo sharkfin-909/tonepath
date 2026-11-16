@@ -4,7 +4,7 @@
 // Storage is passed in (localStorage in the app, MemoryStorage in tests).
 
 import { emptyHistory, record, redo, undo, type History } from './history';
-import type { Progression } from './progression';
+import { newEtude, type Progression } from './progression';
 import { PROGRESSION_PREFIX, saveProgression, writeProgression, type StoredProgression } from './storage';
 
 /** One undo step: the whole progression and the caret. */
@@ -32,8 +32,8 @@ export interface ProgressionDocument {
 }
 
 export function openDocument(storage: Storage, initial: StoredProgression, now: () => Date = () => new Date()): ProgressionDocument {
-  // Pre-melody saves get an empty melody (full repair is the schema's job).
-  let current: StoredProgression = Array.isArray(initial.melody) ? initial : { ...initial, melody: [] };
+  // Storage is migrated on launch (full repair is the schema's job); a record without etudes gets one empty etude.
+  let current: StoredProgression = Array.isArray(initial.etudes) && initial.etudes.length ? initial : { ...initial, etudes: [newEtude()] };
   let history: History<Snapshot> = emptyHistory();
 
   const restore = (r: { history: History<Snapshot>; state: Snapshot } | null): number | null => {
@@ -66,7 +66,7 @@ export function openDocument(storage: Storage, initial: StoredProgression, now: 
       if (value === null) return 'deleted';
       try {
         const next = JSON.parse(value) as StoredProgression;
-        if (!Array.isArray(next.bars) || !Array.isArray(next.melody)) return 'ignored';
+        if (!Array.isArray(next.bars) || !Array.isArray(next.etudes) || next.etudes.length === 0) return 'ignored';
         current = next;
         history = emptyHistory();
         return 'reloaded';

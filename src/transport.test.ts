@@ -1,4 +1,5 @@
 // The transport (SPEC §3.7): looped bars as a slot range, the slot after a slot, the metronome's form, the targets.
+import { withFlat } from './test-progression';
 import { describe, expect, it } from 'vitest';
 import { newProgression, type Progression } from './progression';
 import { loopRange, transportForm, upcomingSlot, upcomingTargets } from './transport';
@@ -37,7 +38,7 @@ describe('targets while running: the upcoming chord\'s tones', () => {
     expect(sorted(upcomingTargets(view, { first: 1, last: 2 }, 2))).toEqual([2, 5, 7, 11]); // the range wraps to G7
   });
   it('in written pitch; nothing when the upcoming slot has no chord', () => {
-    expect(sorted(upcomingTargets(instrumentView(prog({ instrument: 'bb-trumpet' })), null, 0))).toEqual([1, 4, 7, 9]); // G7 → A C♯ E G
+    expect(sorted(upcomingTargets(instrumentView(withFlat(prog(), { instrument: 'bb-trumpet' })), null, 0))).toEqual([1, 4, 7, 9]); // G7 → A C♯ E G
     expect(upcomingTargets(instrumentView(prog({ bars: [[{ chord: 'C' }], [{ chord: 'N.C.' }]] })), null, 0)).toBeNull();
   });
 });

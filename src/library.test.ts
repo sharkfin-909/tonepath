@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { melodyOf, withFlat } from './test-progression';
 import demo from '../examples/demo.tonepath.json';
 import rhythmChanges from '../examples/rhythm-changes.tonepath.json';
 import { readDevice, writeDevice } from './device';
@@ -77,17 +78,17 @@ describe('library', () => {
     const s = new MemoryStorage();
     writeDevice(s, { lastInstrument: 'eb-alto-sax' });
     const p = createProgression(s, ids, at(0));
-    expect(p).toMatchObject({ title: 'Untitled', timeSignature: '4/4', barsPerRow: 4, instrument: 'eb-alto-sax', melody: [] });
+    expect(p).toMatchObject({ title: 'Untitled', timeSignature: '4/4', barsPerRow: 4, etudes: [{ name: 'Etude 1', instrument: 'eb-alto-sax', melody: [] }] });
     expect(p.bars).toHaveLength(4);
   });
 
   it('Duplicate copies everything as "‹title› (copy)" and lands at the top', () => {
     const s = new MemoryStorage();
-    const src = saveProgression(s, { ...newProgression(), title: 'Blues', melody: [{ pitch: 60, d: 'q' }], id: 'src', updatedAt: '' }, at(0));
+    const src = saveProgression(s, withFlat(newProgression(), { title: 'Blues', melody: [{ pitch: 60, d: 'q' }], id: 'src', updatedAt: '' }), at(0));
     createProgression(s, ids, at(1));
     const d = duplicateProgression(s, src, ids, at(2));
     expect(d.title).toBe('Blues (copy)');
-    expect(d.melody).toEqual(src.melody);
+    expect(melodyOf(d)).toEqual(melodyOf(src));
     expect(d.id).not.toBe(src.id);
     expect(listProgressions(s)[0].id).toBe(d.id);
   });
@@ -112,7 +113,7 @@ describe('library', () => {
 describe('import and storage migration', () => {
   it('Export one → import round-trips exactly, with a new id; a title clash gets "(2)"', () => {
     const s = new MemoryStorage();
-    const p = saveProgression(s, { ...newProgression('violin'), title: 'Blues', melody: [{ pitch: 67, d: 'h' }], id: 'orig', updatedAt: '' }, at(0));
+    const p = saveProgression(s, withFlat(newProgression('violin'), { title: 'Blues', melody: [{ pitch: 67, d: 'h' }], id: 'orig', updatedAt: '' }), at(0));
     const r = importTexts(s, [{ name: 'Blues.tonepath.json', text: exportOne(p).text }], ids, at(5));
     expect(r.added).toHaveLength(1);
     const { id, updatedAt, ...data } = r.added[0];
@@ -135,7 +136,7 @@ describe('import and storage migration', () => {
     const s = new MemoryStorage();
     const text = JSON.stringify({ app: 'tonepath', v: 2, kind: 'progression', progression: { title: 'X', bars: [[{ chord: 'C' }, { chord: 'F' }], [{ chord: 'G' }]], melody: [{ pitch: 60, d: 'q' }, { pitch: 62, d: 'h' }, { pitch: 64, d: 'q' }] } });
     const r = importTexts(s, [{ name: 'x.json', text }], ids, at(0));
-    expect(r.added[0].melody).toEqual([{ pitch: 60, d: 'q' }, { pitch: 62, d: 'q' }, { d: 'q' }, { pitch: 64, d: 'q' }]);
+    expect(melodyOf(r.added[0])).toEqual([{ pitch: 60, d: 'q' }, { pitch: 62, d: 'q' }, { d: 'q' }, { pitch: 64, d: 'q' }]);
     expect(r.summary).toBe('Imported 1 progression · 1 note shortened');
   });
 
@@ -152,14 +153,20 @@ describe('import and storage migration', () => {
     s.setItem(PROGRESSION_PREFIX + 'bad', '{corrupt');
     writeDevice(s, { v: 1, seeded: true });
     expect(migrateStorage(s)).toBe(true);
-    expect(JSON.parse(s.getItem(PROGRESSION_PREFIX + 'a')!)).toEqual({ id: 'a', updatedAt: 'T', title: 'Old', bars: [[{ chord: 'C' }]], melody: [] });
+    expect(JSON.parse(s.getItem(PROGRESSION_PREFIX + 'a')!)).toEqual({
+      id: 'a',
+      updatedAt: 'T',
+      title: 'Old',
+      bars: [[{ chord: 'C' }]],
+      etudes: [{ id: 'e1', name: 'Etude 1', instrument: 'concert', melody: [] }],
+    });
     expect(s.getItem(PROGRESSION_PREFIX + 'bad')).toBe('{corrupt'); // raw string kept
-    expect(readDevice(s).v).toBe(2);
+    expect(readDevice(s).v).toBe(3);
   });
 
   it('newer storage → read-only: nothing is written', () => {
     const s = new MemoryStorage();
-    writeDevice(s, { v: 3 });
+    writeDevice(s, { v: 4 });
     const before = s.getItem('tonepath:device');
     expect(migrateStorage(s)).toBe(false);
     expect(isReadOnly()).toBe(true);

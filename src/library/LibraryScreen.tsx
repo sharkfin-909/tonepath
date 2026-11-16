@@ -3,7 +3,7 @@
 // Import (several files at once; one toast with counts; new rows highlighted) · the backup reminder · a line for
 // unreadable keys.
 import { useEffect, useRef, useState } from 'react';
-import { instrumentOf } from '../instruments';
+import { etudeSummary } from '../library';
 import type { StoredProgression } from '../storage';
 
 export interface LibraryScreenProps {
@@ -167,7 +167,7 @@ function Row({ p, fresh, onOpen, onDuplicate, onRename, onDelete, onExportOne }:
         <button type="button" className="library-open" onClick={() => onOpen(p)}>
           <span className="library-title">{p.title}</span>
           <span className="library-meta">
-            {instrumentOf(p.instrument).name} · {p.bars.length} bar{p.bars.length === 1 ? '' : 's'} · {lastEdited(p.updatedAt)}
+            {etudeSummary(p)} · {p.bars.length} bar{p.bars.length === 1 ? '' : 's'} · {lastEdited(p.updatedAt)}
           </span>
         </button>
       )}

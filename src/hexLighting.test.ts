@@ -1,5 +1,6 @@
 // What lights the docked hex, by mode (SPEC §3.3, §3.8, §6.2).
 import { describe, expect, it } from 'vitest';
+import { withFlat } from './test-progression';
 import { hexLighting, type HexLightingInput } from './hexLighting';
 import { modeProfile } from './modeProfile';
 import { newProgression } from './progression';
@@ -7,12 +8,11 @@ import type { Mode } from './session';
 import { instrumentView } from './view';
 
 /** Dm7 | G7 | Cmaj7, on B♭ trumpet (written a tone above concert). */
-const view = instrumentView({
-  ...newProgression(),
+const view = instrumentView(withFlat(newProgression(), {
   instrument: 'bb-trumpet',
   bars: [[{ chord: 'Dm7' }], [{ chord: 'G7' }], [{ chord: 'Cmaj7' }]],
   melody: [],
-});
+}));
 
 const light = (mode: Mode, running: boolean, more: Partial<HexLightingInput> = {}) =>
   hexLighting({ profile: modeProfile(mode, running), view, active: 0, range: null, heard: 60, sounded: { midi: 62, n: 1 }, halo: 64, ...more });

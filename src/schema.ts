@@ -5,7 +5,7 @@ import { layoutMeter, parseTimeSignature, slotsOf } from './form';
 import { isScaleId, withValidOverride } from './harmony';
 import { isInstrumentId } from './instruments';
 import { DURATIONS, fitToForm } from './melody';
-import { SCHEMA_VERSION, type Bar, type Duration, type MelodyEvent, type Progression, type Slot } from './progression';
+import { SCHEMA_VERSION, freshEtudeId, type Bar, type Duration, type Etude, type MelodyEvent, type Progression, type Slot } from './progression';
 
 export const APP = 'tonepath';
 /** The app's name before the rename: files exported under it still import. */
@@ -24,7 +24,18 @@ export function migrate1to2(p: Json): Json {
   return { ...p, bars, melody: Array.isArray(p.melody) ? p.melody : [] };
 }
 
-const STEPS: Record<number, (p: Json) => Json> = { 1: migrate1to2 };
+/**
+ * v2 → v3: the progression's instrument, Concert clef and melody move into its one etude, named after `etudeName`
+ * (else *Etude 1*); `etudeName` goes. Everything else (ids, timestamps, unknown keys) is kept.
+ */
+export function migrate2to3(p: Json): Json {
+  const { instrument, concertClef, melody, etudeName, ...rest } = p;
+  const name = typeof etudeName === 'string' && etudeName.trim() ? etudeName.trim() : 'Etude 1';
+  const etude: Json = { id: 'e1', name, instrument: instrument ?? 'concert', ...(concertClef !== undefined ? { concertClef } : {}), melody: Array.isArray(melody) ? melody : [] };
+  return { ...rest, etudes: [etude] };
+}
+
+const STEPS: Record<number, (p: Json) => Json> = { 1: migrate1to2, 2: migrate2to3 };
 
 /** Run the chain from version `v` up to the current one. */
 export function migrate(p: Json, v: number): Json {
@@ -69,32 +80,45 @@ export function repairProgression(x: Json): { progression: Progression; repairs:
   const timeSignature = typeof x.timeSignature === 'string' && parseTimeSignature(x.timeSignature) ? x.timeSignature : '4/4';
   const bpr = x.barsPerRow;
   const barsPerRow = typeof bpr === 'number' && Number.isInteger(bpr) && bpr >= 1 && bpr <= 8 ? bpr : 4;
-  // A missing instrument quietly means Concert; a present but unknown one is noted in the toast.
-  const instrument = isInstrumentId(x.instrument) ? x.instrument : 'concert';
-  const unknownInstrument = x.instrument !== undefined && !isInstrumentId(x.instrument);
   const bars = Array.isArray(x.bars) && x.bars.length ? x.bars.map(repairBar) : emptyBars();
-  const events = Array.isArray(x.melody) ? x.melody.map(repairEvent).filter((e): e is MelodyEvent => e !== null) : [];
-  const fit = fitToForm(events, slotsOf(bars, layoutMeter(timeSignature)));
-  const etudeName = typeof x.etudeName === 'string' && x.etudeName.trim() ? x.etudeName.trim() : '';
-  const progression: Progression = {
-    title,
-    ...(etudeName ? { etudeName } : {}),
-    timeSignature,
-    barsPerRow,
-    instrument,
-    ...(x.concertClef === 'bass' ? { concertClef: 'bass' as const } : {}),
-    bars,
-    melody: fit.melody,
-  };
-  return { progression, repairs: { shortened: fit.shortened, unknownInstrument } };
+  const slots = slotsOf(bars, layoutMeter(timeSignature));
+  let shortened = 0;
+  let unknownInstrument = false;
+  const etudes: Etude[] = [];
+  for (const raw of Array.isArray(x.etudes) ? x.etudes : []) {
+    if (!isObj(raw)) continue; // not an etude: skipped
+    // A missing instrument quietly means Concert; a present but unknown one is noted in the toast.
+    const instrument = isInstrumentId(raw.instrument) ? raw.instrument : 'concert';
+    if (raw.instrument !== undefined && !isInstrumentId(raw.instrument)) unknownInstrument = true;
+    const events = Array.isArray(raw.melody) ? raw.melody.map(repairEvent).filter((e): e is MelodyEvent => e !== null) : [];
+    const fit = fitToForm(events, slots);
+    shortened += fit.shortened;
+    const id = typeof raw.id === 'string' && raw.id && !etudes.some((e) => e.id === raw.id) ? raw.id : freshEtudeId([...etudes, ...idsAhead(x.etudes)]);
+    const name = typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim() : `Etude ${etudes.length + 1}`;
+    etudes.push({ id, name, instrument, ...(raw.concertClef === 'bass' ? { concertClef: 'bass' as const } : {}), melody: fit.melody });
+  }
+  if (etudes.length === 0) etudes.push({ id: 'e1', name: 'Etude 1', instrument: 'concert', melody: [] }); // always one
+  const progression: Progression = { title, timeSignature, barsPerRow, bars, etudes };
+  return { progression, repairs: { shortened, unknownInstrument } };
+}
+
+/** The ids the remaining entries claim, so a fresh id never takes one a later etude keeps. */
+function idsAhead(entries: unknown): { id: string }[] {
+  return Array.isArray(entries) ? entries.filter(isObj).filter((e) => typeof e.id === 'string').map((e) => ({ id: e.id as string })) : [];
 }
 
 // ── Files (§12.3) ───────────────────────────────────────────────────────────────────────────────────────────
 
-/** File data for a progression: no ids, timestamps or device state. */
-export function fileData(p: Progression): Progression {
-  const { title, etudeName, timeSignature, barsPerRow, instrument, concertClef, bars, melody } = p;
-  return { title, ...(etudeName ? { etudeName } : {}), timeSignature, barsPerRow, instrument, ...(concertClef ? { concertClef } : {}), bars, melody };
+/** File data for a progression: no ids (the etudes' neither: import gives them fresh ones), timestamps or device state. */
+export function fileData(p: Progression): Omit<Progression, 'etudes'> & { etudes: Omit<Etude, 'id'>[] } {
+  const { title, timeSignature, barsPerRow, bars, etudes } = p;
+  return {
+    title,
+    timeSignature,
+    barsPerRow,
+    bars,
+    etudes: etudes.map(({ name, instrument, concertClef, melody }) => ({ name, instrument, ...(concertClef ? { concertClef } : {}), melody })),
+  };
 }
 
 /** A filename-safe version of a title. */

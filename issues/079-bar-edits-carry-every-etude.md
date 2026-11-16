@@ -2,9 +2,9 @@
 id: 79
 title: "Bar edits carry every etude"
 labels: [ready-for-agent]
-status: open
+status: closed
 blocked_by: [78]
-assignee:
+assignee: claude
 ---
 
 ## Parent
@@ -26,12 +26,18 @@ Form edits move every etude's melody with the bars, not just one (`bars.ts`, `se
 
 ## Acceptance criteria
 
-- [ ] Test table with a two-etude progression: each of insert / duplicate / split / merge / delete / append keeps
+- [x] Test table with a two-etude progression: each of insert / duplicate / split / merge / delete / append keeps
       both melodies aligned to their bars (a note in bar 3 stays in the same bar of music)
-- [ ] Time signature 4/4 → 3/4 refits both etudes as one does today
-- [ ] Paste: the open etude gets the clip's notes; the other etude gets rests there and keeps the rest of its music
-- [ ] Existing one-melody bar tests pass unchanged against a one-etude progression
+- [x] Time signature 4/4 → 3/4 refits both etudes as one does today
+- [x] Paste: the open etude gets the clip's notes; the other etude gets rests there and keeps the rest of its music
+- [x] Existing one-melody bar tests pass unchanged against a one-etude progression
 
 ## Blocked by
 
 - [078](078-schema-v3-etudes.md)
+
+## Resolution
+
+Built in the same pass as 078 (`bars.ts` had to change shape anyway): every bar edit and the time-signature
+refit map over `etudes`; Duplicate copies every etude's music in the bars; Copy / Paste take the open etude's id.
+Split refuses when a note crosses the middle in any etude. Tests: "bar edits carry every etude" in `bars.test.ts`.

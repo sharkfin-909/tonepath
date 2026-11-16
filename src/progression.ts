@@ -1,4 +1,5 @@
-// Progression shape (SPEC §12.2, schema v2). Terms per CONTEXT.md.
+// Progression shape (SPEC §12.2, schema v3). Terms per CONTEXT.md: a progression (the chords and the form) holds its
+// etudes — each a melody over that form, with the instrument it is written for. Always at least one.
 
 import { splitSymbols } from './chords';
 import { slotHarmony, withValidOverride, type ScaleId } from './harmony';
@@ -20,30 +21,63 @@ export interface Slot {
 /** A bar holds one or two slots (equal halves). */
 export type Bar = Slot[];
 
-export interface Progression {
-  title: string;
-  /** The etude's own name (SPEC §3.1), shown above the title; omitted when blank. */
-  etudeName?: string;
-  timeSignature: string;
-  barsPerRow: number;
+/** One etude: a melody over its progression's form, written for an instrument (SPEC §6, §10). */
+export interface Etude {
+  /** Unique within its progression (`e1`, `e2`, …); stable across edits. */
+  id: string;
+  name: string;
   instrument: string;
+  /** Concert only (SPEC §7.3): `"bass"`, absent for Treble. */
   concertClef?: 'bass';
-  bars: Bar[];
   melody: MelodyEvent[];
 }
 
-export const SCHEMA_VERSION = 2;
+export interface Progression {
+  title: string;
+  timeSignature: string;
+  barsPerRow: number;
+  bars: Bar[];
+  /** At least one. */
+  etudes: Etude[];
+}
+
+export const SCHEMA_VERSION = 3;
+
+/** An etude id not yet used in `etudes`: `e1`, `e2`, … */
+export function freshEtudeId(etudes: readonly { id: string }[]): string {
+  const used = new Set(etudes.map((e) => e.id));
+  for (let k = 1; ; k++) if (!used.has(`e${k}`)) return `e${k}`;
+}
+
+export function newEtude(instrument = 'concert', name = 'Etude 1', id = 'e1'): Etude {
+  return { id, name, instrument: isInstrumentId(instrument) ? instrument : 'concert', melody: [] };
+}
 
 export function newProgression(instrument = 'concert'): Progression {
   return {
     title: 'Untitled',
     timeSignature: '4/4',
     barsPerRow: 4,
-    instrument: isInstrumentId(instrument) ? instrument : 'concert',
     bars: Array.from({ length: 4 }, () => [{ chord: '' }]),
-    melody: [],
+    etudes: [newEtude(instrument)],
   };
 }
+
+/** The etude with this id; missing (or no id) → the first. */
+export function etudeOf(p: Pick<Progression, 'etudes'>, id?: string | null): Etude {
+  return p.etudes.find((e) => e.id === id) ?? p.etudes[0];
+}
+
+/** Replace the etude with this id (missing → the first) by `fn` of it. The same object when `fn` changes nothing. */
+export function withEtude(p: Progression, id: string | null | undefined, fn: (e: Etude) => Etude): Progression {
+  const e = etudeOf(p, id);
+  const next = fn(e);
+  return next === e ? p : { ...p, etudes: p.etudes.map((x) => (x === e ? next : x)) };
+}
+
+/** Set the melody of the etude with this id. */
+export const setMelody = (p: Progression, id: string | null | undefined, melody: MelodyEvent[]): Progression =>
+  withEtude(p, id, (e) => (e.melody === melody ? e : { ...e, melody }));
 
 export type ChordCommit =
   | { ok: true; progression: Progression; /** last slot (part) written in that bar */ lastPart: number }
@@ -105,14 +139,6 @@ export function setScaleOverride(p: Progression, bar: number, part: number, scal
 
 // ── Rail settings (SPEC §3.1, §4.1, §6.2 item 10). Each returns the same object when nothing changes. ────────
 
-/** The etude name, inline: trimmed; blank removes it. */
-export function setEtudeName(p: Progression, text: string): Progression {
-  const name = text.trim();
-  if (name === (p.etudeName ?? '')) return p;
-  const { etudeName: _, ...rest } = p;
-  return name ? { ...rest, etudeName: name } : rest;
-}
-
 /** Inline rename: trimmed; blank → "Untitled". */
 export function setTitle(p: Progression, text: string): Progression {
   const title = text.trim() || 'Untitled';
@@ -126,8 +152,8 @@ export function setTitle(p: Progression, text: string): Progression {
  */
 export function setTimeSignature(p: Progression, text: string): Progression {
   if (text === p.timeSignature) return p;
-  const { melody } = fitToForm(p.melody, slotsOf(p.bars, layoutMeter(text)));
-  return { ...p, timeSignature: text, melody };
+  const slots = slotsOf(p.bars, layoutMeter(text));
+  return { ...p, timeSignature: text, etudes: p.etudes.map((e) => ({ ...e, melody: fitToForm(e.melody, slots).melody })) };
 }
 
 export const BARS_PER_ROW = [1, 2, 3, 4, 5, 6, 7, 8] as const;
@@ -137,29 +163,33 @@ export function setBarsPerRow(p: Progression, n: number): Progression {
   return { ...p, barsPerRow: n };
 }
 
-/** Clear all: melody → `[]`; chords, scales, title, instrument untouched. */
-export function clearMelody(p: Progression): Progression {
-  return p.melody.length ? { ...p, melody: [] } : p;
+/** Clear notes: the etude's melody → `[]`; chords, scales, title, instrument and the other etudes untouched. */
+export function clearMelody(p: Progression, etude?: string | null): Progression {
+  return withEtude(p, etude, (e) => (e.melody.length ? { ...e, melody: [] } : e));
 }
 
 /**
- * Clear all (SPEC §6.2 item 10): every chord, scale override and note removed; the bars (and their splits), title,
- * time signature and instrument stay. Unchanged when there is nothing to clear.
+ * Clear all (SPEC §6.2 item 10): every chord and scale override, and the etude's notes, removed; the bars (and their
+ * splits), title, time signature, instruments and the other etudes' notes stay. Unchanged when there is nothing to
+ * clear.
  */
-export function clearEverything(p: Progression): Progression {
-  const empty = p.melody.length === 0 && p.bars.every((b) => b.every((s) => s.chord === '' && s.scale === undefined));
-  return empty ? p : { ...p, bars: p.bars.map((b) => b.map(() => ({ chord: '' }))), melody: [] };
+export function clearEverything(p: Progression, etude?: string | null): Progression {
+  const noChords = p.bars.every((b) => b.every((s) => s.chord === '' && s.scale === undefined));
+  const cleared = clearMelody(p, etude);
+  return noChords ? cleared : { ...cleared, bars: p.bars.map((b) => b.map(() => ({ chord: '' }))) };
 }
 
-/** Instrument switch (SPEC §10): a progression setting; unknown ids are ignored. */
-export function setInstrument(p: Progression, id: string): Progression {
-  return id === p.instrument || !isInstrumentId(id) ? p : { ...p, instrument: id };
+/** Instrument switch (SPEC §10): the etude's setting; unknown ids are ignored. */
+export function setInstrument(p: Progression, etude: string | null | undefined, id: string): Progression {
+  return withEtude(p, etude, (e) => (id === e.instrument || !isInstrumentId(id) ? e : { ...e, instrument: id }));
 }
 
-/** Concert clef choice (SPEC §7.3): saved as `concertClef: "bass"`, absent for Treble. */
-export function setConcertClef(p: Progression, clef: 'treble' | 'bass'): Progression {
-  if ((p.concertClef === 'bass') === (clef === 'bass')) return p;
-  if (clef === 'bass') return { ...p, concertClef: 'bass' };
-  const { concertClef: _old, ...rest } = p;
-  return rest;
+/** Concert clef choice (SPEC §7.3): the etude's, saved as `concertClef: "bass"`, absent for Treble. */
+export function setConcertClef(p: Progression, etude: string | null | undefined, clef: 'treble' | 'bass'): Progression {
+  return withEtude(p, etude, (e) => {
+    if ((e.concertClef === 'bass') === (clef === 'bass')) return e;
+    if (clef === 'bass') return { ...e, concertClef: 'bass' };
+    const { concertClef: _old, ...rest } = e;
+    return rest;
+  });
 }
