@@ -417,15 +417,15 @@ button.dock-label {
 }
 
 /* Bar lines span the staff only (no line between two chords in a bar). */
+/* A bar line at the end of each bar: the slot's full height (chord labels to the stave's headroom), 3px. */
 .bar-line {
   position: absolute;
+  top: 0;
+  bottom: 0;
   right: 0;
-  pointer-events: none;
-}
-
-.bar-line {
-  width: 2px;
+  width: 3px;
   background: var(--line);
+  pointer-events: none;
 }
 
 
@@ -1392,10 +1392,6 @@ button.dock-label {
   font-weight: 500;
 }
 /* The bar line spans the tones' band as it spans the stave. */
-.bar-line.lead {
-  opacity: 0.35;
-}
-
 /* Read etude (SPEC §3.4): no hex — the chart takes the whole main area, every bar fitted to it (no zoom floor). */
 .main.read {
   grid-template-rows: minmax(0, 1fr);

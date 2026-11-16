@@ -406,7 +406,7 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
         </button>
       )}
       {/* A bar line at the end of each bar; nothing between two chords in a bar (a chord change, not a bar). */}
-      {slot.barEnd && <div className={hideMelody ? 'bar-line lead' : 'bar-line'} style={{ top: header + staffTop, height: staffBottom - staffTop }} />}
+      {slot.barEnd && <div className="bar-line" />}
     </div>
   );
 }
