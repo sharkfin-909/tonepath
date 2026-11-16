@@ -558,7 +558,12 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
           </span>
         </div>
       </header>
-      <main ref={mainRef} className={read ? 'main read' : tune ? 'main tuner-mode' : hideHex ? 'main hex-hidden' : 'main'}>
+      <main
+        ref={mainRef}
+        className={['main', read && 'read', tune && 'tuner-mode', improvise && 'improvise', hideHex && 'hex-hidden']
+          .filter(Boolean)
+          .join(' ')}
+      >
         <section
           className="chart-area"
           style={{

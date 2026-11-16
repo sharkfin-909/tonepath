@@ -1488,6 +1488,11 @@ button.dock-label {
   overflow: hidden;
 }
 
+/* Improvise: warm paper behind the lead sheet. */
+.main.improvise > .chart-area {
+  background: #ece5c3;
+}
+
 .chord-label:disabled {
   color: var(--ink);
   cursor: default;
