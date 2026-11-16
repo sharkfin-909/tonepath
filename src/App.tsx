@@ -281,14 +281,16 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
         <div className="topbar-row">
           {/* Row 2, left (under TONEPATH): the title and the etude picker (the library is in the ☰ menu). */}
           <div className="topbar-file">
-            {/* The title is the progression's name; each etude has its own (the picker). */}
-            <div className="title-stack">
+            {/* The chord sequence's name (inline rename), and the etude picker — every mode: the open etude also sets
+                the instrument (SPEC §3.1). Labelled pills, like Ins:. */}
+            <span className="seq-group group">
+              <span className="rail-label">chord sequence:</span>
               <h1 className="rail-heading">
                 <TitleField title={progression.title} editing={renameOnOpen} onRename={(text) => dispatch({ type: 'title', text })} />
               </h1>
-            </div>
-            {/* The etude picker (SPEC §3.1): every mode — the open etude also sets the instrument. */}
+            </span>
             <span className="etude-group group">
+              <span className="rail-label">etude:</span>
               <EtudePicker
                 etudes={progression.etudes}
                 open={etude.id}

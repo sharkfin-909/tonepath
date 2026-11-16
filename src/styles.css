@@ -1355,8 +1355,9 @@ button.dock-label {
 .dropdown-prefix {
   opacity: 0.75;
 }
+/* Every picker's value in one weight (SPEC §3.1): regular — the labels beside them stay lighter. */
 .dropdown-value {
-  font-weight: 600;
+  font-weight: 400;
 }
 .dropdown-caret {
   opacity: 0.7;
@@ -1505,19 +1506,6 @@ button.dock-label {
   max-width: 220px;
 }
 
-/* The title (SPEC §3.1), the progression's one name. */
-.title-stack {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  min-width: 0;
-  line-height: 1.15;
-}
-.title-stack .inline-value,
-.title-stack .inline-field {
-  padding-block: 0;
-  line-height: 1.15;
-}
 .inline-value.placeholder {
   opacity: 0.5;
   font-style: italic;
@@ -2359,8 +2347,7 @@ select {
   margin-right: -4px;
 }
 
-/* The selected instrument (and its Ins: label) in Outfit Thin, like the title and the sound pill. */
-.topbar .instrument-select .dropdown-value,
+/* The Ins: label in Outfit Thin, like the title and the sound pill (its value: every picker's weight). */
 .topbar .ins-label {
   font-weight: 100;
 }
@@ -2453,7 +2440,7 @@ select {
 }
 .topbar > .hamburger {
   grid-column: 4;
-  grid-row: 1 / -1;
+  grid-row: 1 / span 2; /* the header's rows are implicit: span them by count (-1 would mean row 1 only) */
   align-self: center;
   margin-left: 4px;
 }
@@ -2488,6 +2475,9 @@ select {
     grid-row: 2;
     grid-column: 1 / 4;
     justify-self: center;
+  }
+  .topbar > .hamburger {
+    grid-row: 1 / span 3;
   }
 }
 
@@ -2994,20 +2984,50 @@ select {
   }
 }
 
-/* The etude picker (SPEC §3.1): a pill after the title, in every mode. Etude names are shown as typed. */
+/* Row 2's left end (SPEC §3.1): two labelled pills — chord sequence: ‹name› and etude: ‹name ▾›, in every mode. The
+   names are shown as typed (not lowercased) and shorten with an ellipsis only when the row runs out of room. */
+.seq-group,
 .etude-group {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.seq-group > .rail-label,
+.etude-group > .rail-label {
   flex: none;
+  white-space: nowrap;
+}
+.seq-group > .rail-heading {
+  display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.seq-group .inline-value.rail-title,
+.seq-group .inline-field.rail-title {
+  flex: 0 1 auto;
+  min-width: 3em;
+  max-width: 220px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
+  text-transform: none;
 }
 .etude-picker {
   display: inline-flex;
   min-width: 0;
 }
+.etude-select {
+  min-width: 0;
+}
 .etude-select .dropdown-trigger {
   max-width: 180px;
+  min-width: 3em;
 }
 .etude-select .dropdown-value {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3035,18 +3055,6 @@ select {
 .etude-picker .inline-field {
   width: 160px;
   text-transform: none;
-}
-/* Row 2's left end holds the title and the etude picker: the picker keeps its size, the title shortens first. */
-.topbar-file > .title-stack {
-  flex: 0 1 auto;
-  overflow: hidden;
-}
-.topbar-file .rail-title {
-  display: block;
-  max-width: 100%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 /* The slot's trash (Improvise, a split bar): bottom left of the card, shown on hover; the other chord fills the bar. */
@@ -3099,4 +3107,33 @@ select {
 .main.write .slot:hover > .delete-slot,
 .main.write .slot.active > .delete-slot {
   opacity: 1;
+}
+
+/* The mode pill and the Ins: pill share one width, their labels at the left, so nothing shifts when the mode or the
+   instrument changes: wide
+   enough for the widest of either ("mode: Write etude", "ins: E♭ baritone sax"). In em: it follows the text size.
+   Concert's clef choice widens the Ins: pill (an extra control). */
+.topbar .mode-panel,
+.topbar .ins-group {
+  min-width: 11.9em; /* a little over the widest, so even it never pushes the label */
+  justify-content: flex-start; /* the labels stay put; the values change to their right */
+}
+/* Ins: lines up under mode: (whose label sits inside its button's padding). */
+.topbar .ins-group > .instrument-picker {
+  margin-left: 3px;
+}
+/* …and the values at the right: the label left, the value (and its ▾) right, in one fixed-width pill. */
+.topbar .mode-panel > .dropdown,
+.topbar .ins-group > .instrument-picker {
+  flex: 1;
+}
+.topbar .mode-panel .dropdown-trigger {
+  width: 100%;
+}
+.topbar .mode-panel .dropdown-prefix {
+  margin-right: auto;
+}
+.topbar .ins-group .instrument-select {
+  margin-left: auto;
+  margin-right: -5px; /* its ▾ lines up with mode's, whose button fills its pill */
 }
