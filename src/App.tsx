@@ -246,10 +246,18 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
           if (el.closest('.dropdown-option') || (el.closest('button') && !el.closest('.inline-value') && !el.closest('.dropdown'))) focusHex();
         }}
       >
-        {/* Row 1: title (left) · sound pill (centre) · mode panel (right); row 2: the editing controls (SPEC §3.1). */}
-        {/* Row 1, left: the app's name. */}
-        <div className="topbar-left">
+        {/* 3×2 content grid (SPEC §3.1); wordmark and ☰ sit outside it, vertically centred. */}
+        <div className="topbar-brand">
           <span className="brand">TONEPATH</span>
+        </div>
+        {/* Row 1, col beside the wordmark: chord sequence (etude sits in row 2 of this column). */}
+        <div className="topbar-seq">
+          <span className="seq-group group">
+            <span className="rail-label">chord sequence:</span>
+            <h1 className="rail-heading">
+              <TitleField title={progression.title} editing={renameOnOpen} onRename={(text) => dispatch({ type: 'title', text })} />
+            </h1>
+          </span>
         </div>
         {/* Row 1, centred: sound and *Audio on chord* (*On arrival*), in a pill. */}
         <div className="sound-section group topbar-center">
@@ -276,34 +284,24 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
         {/* Row 1, right: the mode panel (Mode:), in a pill. */}
         {/* Row 1, right: the mode panel. */}
         <div className="mode-corner">{modeSwitch}</div>
-        {/* The ☰ menu: a column of its own at the right end, as tall as both rows. */}
         <HamburgerMenu items={[{ label: 'Library', onChoose: onLibrary }]} />
-        <div className="topbar-row">
-          {/* Row 2, left (under TONEPATH): the title and the etude picker (the library is in the ☰ menu). */}
-          <div className="topbar-file">
-            {/* The chord sequence's name (inline rename), and the etude picker — every mode: the open etude also sets
-                the instrument (SPEC §3.1). Labelled pills, like Ins:. */}
-            <span className="seq-group group">
-              <span className="rail-label">chord sequence:</span>
-              <h1 className="rail-heading">
-                <TitleField title={progression.title} editing={renameOnOpen} onRename={(text) => dispatch({ type: 'title', text })} />
-              </h1>
-            </span>
-            <span className="etude-group group">
-              <span className="rail-label">etude:</span>
-              <EtudePicker
-                etudes={progression.etudes}
-                open={etude.id}
-                onOpen={(id) => dispatch({ type: 'etude-open', id })}
-                onNew={() => dispatch({ type: 'etude-new' })}
-                onDuplicate={() => dispatch({ type: 'etude-duplicate' })}
-                onRename={(text) => dispatch({ type: 'etude-rename', text })}
-                onDelete={() => dispatch({ type: 'etude-delete' })}
-              />
-            </span>
-          </div>
-          {/* Row 2, centred: the mode's own groups, side by side (SPEC §3.0) — none in Tune. */}
-          <div className="mode-groups">
+        {/* Row 2, col beside the wordmark: etude under chord sequence (SPEC §3.1). */}
+        <div className="topbar-file">
+          <span className="etude-group group">
+            <span className="rail-label">etude:</span>
+            <EtudePicker
+              etudes={progression.etudes}
+              open={etude.id}
+              onOpen={(id) => dispatch({ type: 'etude-open', id })}
+              onNew={() => dispatch({ type: 'etude-new' })}
+              onDuplicate={() => dispatch({ type: 'etude-duplicate' })}
+              onRename={(text) => dispatch({ type: 'etude-rename', text })}
+              onDelete={() => dispatch({ type: 'etude-delete' })}
+            />
+          </span>
+        </div>
+        {/* Row 2, centre: the mode's own groups (SPEC §3.0) — none in Tune. */}
+        <div className="mode-groups">
             {/* Improvise (SPEC §3.3): the lead sheet's form group — time, bars per row, undo / redo — while stopped. */}
             {profile.formGroup && (
               <div className="edit-pill form-group group">
@@ -405,18 +403,16 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
                 />
               </div>
             )}
-          </div>
-          {/* The instrument picker: after the mode's group, in every mode. */}
-          {/* Clef (Concert only) and instrument, in a pill. */}
-          <span className="ins-group group">
-            <InstrumentPicker
-              instrument={view.inst.id}
-              concertClef={etude.concertClef === 'bass' ? 'bass' : 'treble'}
-              onInstrument={(id) => dispatch({ type: 'instrument', id })}
-              onConcertClef={(clef) => dispatch({ type: 'clef', clef })}
-            />
-          </span>
         </div>
+        {/* Row 2, right: clef (Concert) and instrument, in a pill (SPEC §3.1). */}
+        <span className="ins-group group">
+          <InstrumentPicker
+            instrument={view.inst.id}
+            concertClef={etude.concertClef === 'bass' ? 'bass' : 'treble'}
+            onInstrument={(id) => dispatch({ type: 'instrument', id })}
+            onConcertClef={(clef) => dispatch({ type: 'clef', clef })}
+          />
+        </span>
       </header>
       <main
         ref={mainRef}
