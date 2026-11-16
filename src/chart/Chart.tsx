@@ -123,7 +123,7 @@ export function Chart({ progression, view, caret, onSlotClick, onEventClick, onT
   // rows leave of the usual slot height (header + stave), so rows keep their size and the zoom is unchanged.
   const chordPx = labelPx(CHORD_PX, MIN_CHORD_PX, zoom);
   const scalePx = labelPx(SCALE_PX, MIN_SCALE_PX, zoom);
-  const leadHexHeight = Math.max(24, header + staveHeight - (1.885 * scalePx + 6) - (1.25 * chordPx + 8));
+  const leadHexHeight = Math.max(24, header + staveHeight - (1.595 * scalePx + 6) - (1.25 * chordPx + 8));
   const zoomStyle = {
     width: area.width / zoom,
     transform: `scale(${zoom})`,

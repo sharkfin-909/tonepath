@@ -341,9 +341,7 @@ button.dock-label {
   flex: none;
   z-index: 4;
   max-width: 45%;
-  /* Every pill at least as wide as "A mel" (measured: 3.59em incl. padding and border), the name centred. */
   box-sizing: border-box;
-  min-width: 3.6em;
   text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -352,7 +350,7 @@ button.dock-label {
   border-radius: 1em;
   border: 1px solid color-mix(in srgb, #ffdd57 70%, #1d1b19);
   background: color-mix(in srgb, #ffdd57 18%, transparent);
-  font-size: calc(var(--scale-px, 11px) * 1.3);
+  font-size: calc(var(--scale-px, 11px) * 1.1);
   font-weight: 600;
   line-height: 1.45;
   color: var(--muted);
@@ -1453,7 +1451,7 @@ button.dock-label {
 }
 /* The bar number: row 1's left, level with the key pill. */
 .slot.lead > .bar-handle {
-  top: calc(var(--slot-pad-top, 6px) + (1.885 * var(--scale-px, 11px) + 2px - 1.5em) / 2);
+  top: calc(var(--slot-pad-top, 6px) + (1.595 * var(--scale-px, 11px) + 2px - 1.5em) / 2);
   left: 6px;
 }
 .slot.lead .lead-tones {
