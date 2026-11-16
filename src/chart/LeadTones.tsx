@@ -8,6 +8,9 @@ import type { SlotHarmony } from '../harmony';
 import { prettyName } from '../spelling';
 import { staveMetrics } from '../notation/Stave';
 
+/** Each cell's size within its slot of the honeycomb: the rest is the gap between cells (~1.5px at zoom 0.5). */
+const GAP = 0.9;
+
 /** Pointy-top hexagon of circumradius r, centred at (cx, cy). */
 function hexPoints(cx: number, cy: number, r: number): string {
   return Array.from({ length: 6 }, (_, i) => {
@@ -40,7 +43,8 @@ export function LeadTones({ harmony, height = staveMetrics().height }: { harmony
               return (
                 <g key={`${ri}-${ci}`} className={`lead-cell ${t.role}`}>
                   <title>{t.role === 'guide' ? 'Guide tone' : t.role === 'triad' ? 'Chord tone' : t.role === 'chord' ? 'Chord tone (extension)' : 'Scale tone'}</title>
-                  <polygon points={hexPoints(cx, cy, r - 0.6)} style={lit ? { fill: colour } : undefined} />
+                  {/* Drawn at GAP of its size: the gap is geometry (scales with the cell), so it stays visible at any zoom. */}
+                  <polygon points={hexPoints(cx, cy, r * GAP)} style={lit ? { fill: colour } : undefined} />
                   <text x={cx} y={cy} style={{ fontSize: r * 0.82, fill: lit ? inkOn(colour) : undefined }}>
                     {prettyName(t.name)}
                   </text>

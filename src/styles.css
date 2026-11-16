@@ -1441,8 +1441,6 @@ button.dock-label {
 /* Cells as the docked hex: neutral taupe, coloured on triad tones and the guide tone (set inline). */
 .lead-cell polygon {
   fill: var(--cell-neutral);
-  stroke: #fff;
-  stroke-width: 1.2;
 }
 .lead-cell.guide polygon {
   stroke: var(--ink);
