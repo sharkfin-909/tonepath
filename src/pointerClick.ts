@@ -31,18 +31,9 @@ export function clickUnderPointer(): boolean {
   const ptr = { ...base, pointerId: 1, pointerType: 'mouse', isPrimary: true };
   el.dispatchEvent(new PointerEvent('pointerdown', { ...ptr, buttons: 1 }));
   el.dispatchEvent(new MouseEvent('mousedown', { ...base, buttons: 1 }));
-  // A real press focuses form fields: a text field starts editing, a dropdown opens.
-  const field = el.closest('input, textarea, select');
-  if (field instanceof HTMLElement) {
-    field.focus();
-    if (field instanceof HTMLSelectElement) {
-      try {
-        field.showPicker();
-      } catch {
-        /* not supported: focused is enough (arrow keys choose) */
-      }
-    }
-  }
+  // A real press focuses form fields: a text field starts editing. (Dropdowns are buttons: the click opens them.)
+  const field = el.closest('input, textarea');
+  if (field instanceof HTMLElement) field.focus();
   el.dispatchEvent(new PointerEvent('pointerup', ptr));
   el.dispatchEvent(new MouseEvent('mouseup', base));
   el.dispatchEvent(new MouseEvent('click', base));

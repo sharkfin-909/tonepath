@@ -4,7 +4,7 @@
 // The caller ignores keys while a text field has focus (native undo and typing there).
 
 import type { Duration } from './progression';
-import type { Intent } from './session';
+import type { Intent, Mode } from './session';
 
 export interface KeyPress {
   key: string;
@@ -16,13 +16,13 @@ export interface KeyPress {
 }
 
 export interface KeyContext {
-  mode: 'write' | 'play' | 'stand';
-  /** A bar selection is active (Write). */
+  mode: Mode;
+  /** The transport is running (Improvise, Read etude): slots aren't moved by hand, the form isn't edited. */
+  running?: boolean;
+  /** A bar selection is active. */
   selection: { from: number } | null;
   /** The written pitch A would pick: the hovered hex cell or ♯ / ♭ button, if playable. */
   hovered: number | null;
-  /** Practice (SPEC §3.7): Play with the mic; keys 1–5 still choose the note length (it sets the note count). */
-  practice?: boolean;
 }
 
 export interface KeyResult {
@@ -40,7 +40,7 @@ const LENGTHS: Duration[] = ['w', 'h', 'q', 'e', 's'];
 /** Space (no ⇧): a click under the pointer, in every mode. */
 const CLICK: KeyResult = { intent: null, handled: true, click: true };
 
-/** Keys shared by Write and Play: A picks, S / ⇧Space scale, C / B sound, < > browse, ⇧M mute. */
+/** Keys shared by Write etude, Improvise and Read etude: A picks, S / ⇧Space scale, C / B sound, < > browse, ⇧M mute. */
 function shared(e: KeyPress, ctx: KeyContext): KeyResult | null {
   const k = e.key.toLowerCase();
   if (e.key === ' ') {
@@ -62,33 +62,35 @@ export function keyIntent(e: KeyPress, ctx: KeyContext): KeyResult {
   const plain = !e.metaKey && !e.ctrlKey && !e.altKey;
   const cmd = (e.metaKey || e.ctrlKey) && !e.altKey;
 
-  if (plain && e.key === '\\') return handled({ type: 'stand', on: 'toggle' });
+  // Every mode: \ Write etude ↔ Read etude, [ / ] the previous / next mode (SPEC §11).
+  if (plain && e.key === '\\') return handled({ type: 'mode', mode: 'toggle-read' });
+  if (plain && (e.key === '[' || e.key === ']')) return handled(e.repeat ? null : { type: 'mode', mode: e.key === '[' ? 'prev' : 'next' });
 
-  if (ctx.mode === 'stand') {
-    // Etude view (`stand`): only ⇧M, Space = click (and \ above). Nothing is editable.
-    if (plain && e.shiftKey && (e.key === 'm' || e.key === 'M')) return handled({ type: 'toggle-mute' });
-    if (plain && e.key === ' ' && !e.shiftKey) return e.repeat ? handled() : CLICK;
-    if (plain && (e.key === ' ' || e.key.startsWith('Arrow') || e.key === 'Backspace')) return handled();
+  if (ctx.mode === 'tuner') {
+    // Tuner: Space = click, A picks, ⇧M; no chord to sound (C, B, S do nothing), no chart.
+    if (!plain) return NONE;
+    if (e.key === ' ') return e.repeat || e.shiftKey ? handled() : CLICK;
+    const k = e.key.toLowerCase();
+    if (k === 'a') return handled(!e.repeat && ctx.hovered !== null ? { type: 'pick', written: ctx.hovered } : null);
+    if (k === 'm' && e.shiftKey) return handled({ type: 'toggle-mute' });
+    if (e.key.startsWith('Arrow') || e.key === 'Backspace') return handled();
     return NONE;
   }
 
-  // P leaves Practice for Write (there is no Play mode in the UI: P never enters it).
-  if (plain && !e.shiftKey && (e.key === 'p' || e.key === 'P') && ctx.mode === 'play') return handled({ type: 'mode', mode: 'write' });
-
-  if (ctx.mode === 'play') {
-    // Play: ← / → step slots (wrapping); the shared keys; everything else does nothing.
+  if (ctx.mode === 'improvise' || ctx.mode === 'read') {
+    // Improvise / Read etude: ← / → step slots (stopped); the shared keys; Esc: the whole form again (no looped bars).
+    if (cmd && (e.key === 'z' || e.key === 'Z')) return handled(ctx.mode === 'improvise' && !ctx.running ? { type: e.shiftKey ? 'redo' : 'undo' } : null);
     if (!plain) return NONE;
-    if (e.key === 'Escape' && ctx.practice) return handled({ type: 'practice-all-bars' }); // stop looping bars
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') return handled({ type: 'step', dir: e.key === 'ArrowLeft' ? -1 : 1 });
+    if (e.key === 'Escape') return ctx.selection ? handled({ type: 'clear-selection' }) : NONE;
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') return handled(ctx.running ? null : { type: 'step', dir: e.key === 'ArrowLeft' ? -1 : 1 });
+    if (ctx.mode === 'read' && e.key.toLowerCase() === 'a') return handled(); // no hex in Read etude
     const r = shared(e, ctx);
     if (r) return r;
     if (e.key.startsWith('Arrow') || e.key === 'Backspace' || e.key === 'Delete') return handled();
-    const d = ctx.practice && !e.shiftKey ? LENGTHS[Number(e.key) - 1] : undefined;
-    if (d && e.key.length === 1) return handled({ type: 'length', d });
     return NONE;
   }
 
-  // Write.
+  // Write etude.
   if (cmd && (e.key === 'z' || e.key === 'Z')) return handled({ type: e.shiftKey ? 'redo' : 'undo' });
   if (ctx.selection) {
     // With a bar selection: ⌘C / ⌘V / ⌘D, ⌫ / Del deletes the bar(s), Esc clears it.

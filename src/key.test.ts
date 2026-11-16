@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { suggestChords } from './chordSuggest';
 import { slotHarmony } from './harmony';
-import { keyChords, keyOf, sameKey, stepsUp } from './key';
+import { keyChords, keyName, keyOf, sameKey, stepsUp } from './key';
 
 const h = (chord: string, scale?: string) => slotHarmony({ chord, scale });
 
@@ -57,5 +57,30 @@ describe("the key's simple chords (SPEC §4.2)", () => {
     const inKey = ['C', 'Dm', 'Em', 'F', 'Am', 'Bdim'];
     expect(suggestChords('', [], 8, inKey).items.map((i) => i.symbol)).toEqual(inKey);
     expect(suggestChords('D', [], 8, inKey).items[0].symbol).toBe('Dm');
+  });
+});
+
+describe('the key pill\'s name', () => {
+  const name = (chord: string, scale?: Parameters<typeof slotHarmony>[0]['scale']) => {
+    const k = keyOf(slotHarmony({ chord, scale }));
+    return k && keyName(k);
+  };
+  it('a mode of a major key: its tonic, spelled as the scale spells it', () => {
+    expect([name('Dm7'), name('G7'), name('Cmaj7'), name('Bm7b5')]).toEqual(['C', 'C', 'C', 'C']);
+    expect([name('Gm7'), name('F7'), name('Ebmaj7')]).toEqual(['F', 'Bb', 'Eb']); // defaults: Dorian, Mixolydian, Ionian
+    expect([name('Gm7', 'aeolian'), name('Ebmaj7', 'lydian')]).toEqual(['Bb', 'Bb']); // overrides that hold the key
+    expect(name('F#m7')).toBe('E'); // F♯ Dorian
+  });
+  it('a mode of melodic or harmonic minor: its tonic and a tag', () => {
+    expect(name('G7alt')).toBe('Ab mel'); // G altered = A♭ melodic minor
+    expect(name('Cm(maj7)')).toBe('C mel');
+    expect(name('G7b9b13')).toBe('C harm'); // G Phrygian dominant
+  });
+  it('whole-tone and diminished: no tonic', () => {
+    expect(name('C7#5')).toBe('whole-tone');
+    expect(name('C7b9')).toBe('dim'); // C half-whole
+  });
+  it('no scale: no key', () => {
+    expect(name('N.C.')).toBeNull();
   });
 });

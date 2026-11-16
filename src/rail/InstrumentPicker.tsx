@@ -1,5 +1,6 @@
 // The header's **Ins:** instrument picker (SPEC §3.1, §10), with Concert's clef choice before it (§7.3).
 import { INSTRUMENTS } from '../instruments';
+import { Dropdown } from './Dropdown';
 
 export interface InstrumentPickerProps {
   instrument: string;
@@ -12,26 +13,21 @@ export function InstrumentPicker({ instrument, concertClef, onInstrument, onConc
   return (
     <div className="instrument-picker">
       {instrument === 'concert' && (
-        <label className="rail-setting">
+        <div className="rail-setting">
           <span className="rail-label">Clef</span>
-          <select
-            className="rail-select"
+          <Dropdown
             value={concertClef}
-            onChange={(e) => onConcertClef(e.target.value === 'bass' ? 'bass' : 'treble')}
-          >
-            <option value="treble">Treble</option>
-            <option value="bass">Bass</option>
-          </select>
-        </label>
+            label="Clef"
+            options={[
+              { value: 'treble', label: 'Treble' },
+              { value: 'bass', label: 'Bass' },
+            ]}
+            onChange={onConcertClef}
+          />
+        </div>
       )}
       <span className="rail-label ins-label">Ins:</span>
-      <select className="rail-select instrument-select" aria-label="Instrument" value={instrument} onChange={(e) => onInstrument(e.target.value)}>
-        {INSTRUMENTS.map((i) => (
-          <option key={i.id} value={i.id}>
-            {i.name}
-          </option>
-        ))}
-      </select>
+      <Dropdown value={instrument} label="Instrument" className="instrument-select" options={INSTRUMENTS.map((i) => ({ value: i.id, label: i.name }))} onChange={onInstrument} />
     </div>
   );
 }

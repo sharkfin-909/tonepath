@@ -48,8 +48,16 @@ export interface InstrumentView {
   keyChords: (index: number) => KeyChord[];
   /** The docked hex for the slot at `index` (SPEC §8.4), as the honeycomb or Linear (§8.5). */
   dock: (index: number, shape?: HexShape) => DockHex;
+  /** Tuner's hex (SPEC §3.8): the unchecked hex — no active slot, so C major, names only, every pitch playable. */
+  tunerDock: (shape?: HexShape) => DockHex;
+  /** A concert pitch's written name with no slot to spell it for (Tuner): the default set `C# Eb F# Ab Bb`. */
+  plainName: (concertMidi: number) => string;
 }
 
+
+/** No chord: Tuner's hex and spelling. */
+const NO_CHORD = slotHarmony({ chord: '' });
+const NO_CHORD_SPELLING = slotSpelling(NO_CHORD);
 
 export function instrumentView(p: Progression): InstrumentView {
   const inst = instrumentOf(p.instrument);
@@ -76,6 +84,8 @@ export function instrumentView(p: Progression): InstrumentView {
     name: (m, slot) => noteName(toWritten(m, inst), slot.spelling),
     mark: (m, slot) => noteMark(toWritten(m, inst), slot.harmony, slot.chord, inst),
     dock: (index, shape) => dockHex(slots.map((s) => s.harmony), index, range, shape),
+    tunerDock: (shape) => dockHex([NO_CHORD], 0, range, shape),
+    plainName: (m) => noteName(toWritten(m, inst), NO_CHORD_SPELLING),
     keyChords: (index) => keyChords(slots.slice(0, index).reverse().map((s) => s.harmony)),
   };
 }

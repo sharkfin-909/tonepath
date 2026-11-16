@@ -1,6 +1,7 @@
 // Device settings (SPEC §12.5): `tonepath:device`, never exported. Reads / writes `muted`, `playArrival`,
 // `lastInstrument`, `lastOpenId`, `seeded`, `seededDemos`, `v`, `lastBackupAt`, `reminderDismissedAt`, `hexShape`,
-// `practiceRule`, `practiceLoop` and `micGainDb`; unknown fields are preserved untouched.
+// `practiceLoop` (the transport's Loop), `metronomeBpm`, `metronomeSound` and `micGainDb`; unknown fields — e.g. the
+// dropped Practice rule's `practiceRule` / `practiceCount` — are preserved untouched.
 
 import { isReadOnly } from './readOnly';
 
@@ -26,19 +27,16 @@ export interface DeviceSettings {
   muted?: boolean;
   /** Listen's input level control (SPEC §9.2), in dB: −12 … +24, default 0. */
   micGainDb?: number;
-  /** Practice (SPEC §3.7): the advance rule, and whether the form loops (default) or stops at the end. */
-  practiceRule?: string;
+  /** The transport's Loop (SPEC §3.7): the form (or the looped bars) goes round again (default) or stops at the end. Named for the old Practice mode. */
   practiceLoop?: boolean;
-  /** Practice: the note count per chord (count rules), default 4. */
-  practiceCount?: number;
-  /** Practice's metronome: tempo (bpm, 30–300, default 100) and click sound. */
+  /** The transport: tempo (bpm, 30–300, default 100) and click sound. */
   metronomeBpm?: number;
   metronomeSound?: string;
   /** The dock's layout (SPEC §8.5): the honeycomb (default) or one row, Linear. */
   hexShape?: 'honeycomb' | 'linear';
   /** The hex panel hidden (SPEC §3.1). */
   hexHidden?: boolean;
-  /** Play mode *On arrival* (SPEC §3.3). */
+  /** *Audio on chord* (*On arrival*, SPEC §3.3). */
   playArrival?: OnArrival;
   /** Last-picked instrument: the default for new progressions (SPEC §10). */
   lastInstrument?: string;

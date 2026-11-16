@@ -5,6 +5,7 @@ import {
   commitChordText,
   newProgression,
   setBarsPerRow,
+  setChord,
   setConcertClef,
   setInstrument,
   setTimeSignature,
@@ -167,5 +168,12 @@ describe('two chords into a one-slot bar (SPEC §4.2 → §4.1 split)', () => {
     const r = commitChordText(p, 0, 0, 'Dm7 G7');
     expect(r.ok && chords(r.progression)).toEqual(['Dm7 | G7', '', '', '']);
     expect(r.ok && r.progression.melody).toEqual([{ d: 'h' }, { d: 'h' }, { pitch: 60, d: 'q' }]);
+  });
+});
+
+describe('clearing a chord (the × after it, SPEC §4.2)', () => {
+  it('empties the slot and drops its scale override; the rest of the bar stays', () => {
+    const p = { ...newProgression(), bars: [[{ chord: 'G7alt', scale: 'altered' as const }, { chord: 'C' }]] };
+    expect(setChord(p, 0, 0, '').bars).toEqual([[{ chord: '' }, { chord: 'C' }]]);
   });
 });

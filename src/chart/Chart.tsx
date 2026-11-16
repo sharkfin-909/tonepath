@@ -1,6 +1,6 @@
 // The chart (SPEC §3.1): rows of `barsPerRow` bars, a clef gutter per row, slots at time-proportional width.
 import type { Clef } from '../instruments';
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { FormSlot, Meter } from '../form';
 import { eventsForSlot, type TimedEvent } from '../melody';
 import { parseChord, interpretation } from '../chords';
@@ -11,8 +11,11 @@ import type { InstrumentView, ViewSlot } from '../view';
 import { ChordField } from './ChordField';
 import { ScaleLabel } from './ScaleLabel';
 import { BarHandle, type BarAction } from './BarHandle';
+import { LeadTones } from './LeadTones';
+import { keyName, keyOf, sameKey } from '../key';
+import { prettyName } from '../spelling';
 
-import { CHORD_PX, MIN_CHORD_PX, MIN_SCALE_PX, ROW_GAP_PX, SCALE_PX, chartHeight, fitZoom, headerPx, labelPx } from '../zoom';
+import { CHORD_PX, MIN_CHORD_PX, MIN_SCALE_PX, ROW_AFTER_PX, ROW_GAP_PX, SCALE_PX, SLOT_GAP_PX, SLOT_PAD_TOP_PX, chartHeight, fitZoom, headerPx, labelPx } from '../zoom';
 
 const GUTTER_WIDTH = 46;
 
@@ -33,6 +36,8 @@ export interface ChartProps {
   onChordCommit: (bar: number, part: number, text: string) => ChordCommit;
   /** Set (or with null, clear) a slot's scale override. */
   onScaleChange: (bar: number, part: number, scale: ScaleId | null) => void;
+  /** The × after a chord: clear the slot's chord (one undo step). Where chords are editable. */
+  onChordClear?: (bar: number, part: number) => void;
   /** Open a slot's chord field from outside (the dock label); `n` changes on every request. */
   editRequest?: { bar: number; part: number; n: number } | null;
   /** Bar selection (a run), for the bar handles and ⌘C / ⌘V / ⌘D / ⌫ (SPEC §4.1). */
@@ -40,17 +45,19 @@ export interface ChartProps {
   onBarSelect: (bar: number, extend: boolean) => void;
   onBarAction: (bar: number, action: BarAction) => void;
   onAppendBar: () => void;
+  /** Improvise / Read etude: remove the loop (the × at its end repeat) — back to the whole form. */
+  onLoopClear?: () => void;
   canPaste: boolean;
-  /** Practice, Follow the etude (SPEC §3.7): show the written melody in Play after all, the notes already played green. */
-  follow?: { played: ReadonlySet<number> } | null;
-  /** Practice: bar numbers (no menu) pick the bars to loop; `selection` is those bars. */
-  practiceBars?: boolean;
-  /** Play mode (SPEC §3.3): the current slot. The caret, bar handles and "+" are hidden; chords and scales stay editable. */
-  playIndex?: number | null;
-  /** Explore (SPEC §3.2): empty staves like Play, and no caret, bar handles or "+"; chords and scales stay editable. */
-  explore?: boolean;
-  /** Etude view (SPEC §3.4; `stand` in code): read-only, nothing highlighted or clickable, fit the page with no zoom floor. */
-  stand?: boolean;
+  /**
+   * The chart's mode (SPEC §3.0): Write etude (the caret, the bar menu); Improvise (a lead sheet — empty staves,
+   * chords, scales and the form editable while stopped; bar numbers pick the looped bars); Read etude (the etude,
+   * fitted to the page with no zoom floor; nothing edits; bar numbers pick the looped bars).
+   */
+  mode?: 'improvise' | 'write' | 'read';
+  /** Improvise / Read etude: the current slot (the playhead), highlighted. */
+  current?: number | null;
+  /** The transport is running: nothing on the chart edits; in Read etude nothing is clickable. */
+  running?: boolean;
   /**
    * Height budget (rendered px) to fit the rows into, when the chart's own area sizes to its content (the chart
    * screen: the hex takes whatever the chart leaves). Without it the chart fits its parent's height.
@@ -86,29 +93,45 @@ function useParentSize<T extends HTMLElement>() {
   return [ref, size] as const;
 }
 
-export function Chart({ progression, view, caret, onSlotClick, onEventClick, onTimeClick, onChordCommit, onScaleChange, editRequest, selection, onBarSelect, onBarAction, onAppendBar, canPaste, playIndex = null, explore = false, stand = false, maxHeight, follow = null, practiceBars = false }: ChartProps) {
-  const playing = playIndex !== null;
-  /** Play, Explore and Etude view hide the caret, bar handles, trash cans and "+" (Play keeps chord and scale entry; Practice keeps bar numbers, to pick bars to loop). */
-  const readOnly = playing || stand || explore;
+export function Chart({ progression, view, caret, onSlotClick, onEventClick, onTimeClick, onChordCommit, onScaleChange, onChordClear, editRequest, selection, onBarSelect, onBarAction, onAppendBar, onLoopClear, canPaste, mode = 'write', current = null, running = false, maxHeight }: ChartProps) {
+  const writing = mode === 'write';
+  const read = mode === 'read';
+  /** Read etude while running: nothing on the chart answers a click. */
+  const inert = read && running;
+  /** Chords, scales, "+" and the trash cans: Write etude, and Improvise while stopped. */
+  const editsForm = writing || (mode === 'improvise' && !running);
   const { bars, barsPerRow } = progression;
   const [fitRef, area] = useParentSize<HTMLDivElement>();
   const chartRef = useRef<HTMLDivElement>(null);
   const { slots, meter: layout, clef, usedChords } = view;
-  const activeSlot = stand ? -1 : playing ? playIndex : view.slotAt(caret).index;
+  const activeSlot = writing ? view.slotAt(caret).index : (current ?? -1);
   const [editing, setEditing] = useState<{ bar: number; part: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // The key pill on each slot (SPEC §3.1), and the slots sharing the current slot's key — highlighted like it.
+  const keys = useMemo(() => slots.map((s) => keyOf(s.harmony)), [slots]);
+  const activeKey = activeSlot >= 0 ? keys[activeSlot] : null;
 
   const rows: ViewSlot[][] = [];
   for (const s of slots) (rows[Math.floor(s.bar / barsPerRow)] ??= []).push(s);
 
   // Chart zoom (SPEC §3.1): lay out at logical width area/z, scale by z. Fit every row, capped at 1.4×, floor 0.5.
   const staveHeight = staveMetrics().height;
-  const { zoom, scrolls } = fitZoom(rows.length, staveHeight, maxHeight ?? area.height, stand ? 0 : undefined);
+  const { zoom, scrolls } = fitZoom(rows.length, staveHeight, maxHeight ?? area.height, read ? 0 : undefined);
   const header = headerPx(zoom);
+  // Improvise's 3-row slot (SPEC §3.3): [bar number · key pill] [hex] [chord · scale]. The hex gets what the two label
+  // rows leave of the usual slot height (header + stave), so rows keep their size and the zoom is unchanged.
+  const chordPx = labelPx(CHORD_PX, MIN_CHORD_PX, zoom);
+  const scalePx = labelPx(SCALE_PX, MIN_SCALE_PX, zoom);
+  const leadHexHeight = Math.max(24, header + staveHeight - (1.595 * scalePx + 6) - (1.25 * chordPx + 8));
   const zoomStyle = {
     width: area.width / zoom,
     transform: `scale(${zoom})`,
-    gap: ROW_GAP_PX,
+    gap: ROW_GAP_PX + ROW_AFTER_PX,
+    '--row-gap': `${ROW_GAP_PX}px`,
+    '--row-after': `${ROW_AFTER_PX}px`,
+    '--slot-gap': `${SLOT_GAP_PX}px`,
+    '--slot-pad-top': `${SLOT_PAD_TOP_PX}px`,
     '--chord-px': `${labelPx(CHORD_PX, MIN_CHORD_PX, zoom)}px`,
     '--scale-px': `${labelPx(SCALE_PX, MIN_SCALE_PX, zoom)}px`,
   } as CSSProperties;
@@ -117,7 +140,7 @@ export function Chart({ progression, view, caret, onSlotClick, onEventClick, onT
   useEffect(() => {
     if (!scrolls) return;
     chartRef.current?.querySelector('.slot.active')?.scrollIntoView({ block: 'nearest' });
-  }, [scrolls, caret, zoom, playIndex]);
+  }, [scrolls, caret, zoom, current]);
 
   const startEditing = (target: { bar: number; part: number } | null) => {
     setError(null);
@@ -156,30 +179,37 @@ export function Chart({ progression, view, caret, onSlotClick, onEventClick, onT
           style={{ gridTemplateColumns: `${GUTTER_WIDTH}px repeat(${barsPerRow * 2}, minmax(0, 1fr))` }}
         >
           <div className="clef-gutter" style={{ paddingTop: header }}>
-            <ClefGutter width={GUTTER_WIDTH} clef={clef} />
+            {/* Improvise's lead sheet has no stave, so no clef (SPEC §3.3). */}
+            {mode !== 'improvise' && <ClefGutter width={GUTTER_WIDTH} clef={clef} />}
           </div>
-          {row.map((slot) => (
+          {row.map((slot, si) => (
             <SlotView
               key={slot.index}
               slot={slot}
               view={view}
               active={slot.index === activeSlot}
-              onActivate={stand ? () => {} : () => onSlotClick(slot)}
+              onActivate={inert ? () => {} : () => onSlotClick(slot)}
               clef={clef}
               melody={progression.melody}
-              caret={!readOnly && slot.index === activeSlot ? caret : undefined}
-              playing={playing || explore}
-              follow={follow}
-              onEventClick={stand ? undefined : onEventClick}
-              onTimeClick={stand ? undefined : onTimeClick}
+              caret={writing && slot.index === activeSlot ? caret : undefined}
+              playing={!writing}
+              keyLabel={keys[slot.index] && keyName(keys[slot.index]!)}
+              keyMate={slot.index !== activeSlot && sameKey(keys[slot.index], activeKey)}
+              hideMelody={mode === 'improvise'}
+              leadHexHeight={leadHexHeight}
+              onEventClick={inert ? undefined : onEventClick}
+              onTimeClick={inert ? undefined : onTimeClick}
               span={2 / bars[slot.bar].length}
+              // Write etude / Read etude: one card per bar — a split bar's two slots join (SPEC §3.1). Improvise: a card per slot.
+              barCard={mode !== 'improvise' && bars[slot.bar].length === 2 ? (slot.part === 0 ? 'first' : 'second') : null}
+              rowEnd={si === row.length - 1}
               layout={layout}
               header={header}
               showTimeSignature={slot.index === 0}
               barTools={
-                (!readOnly || practiceBars) && slot.part === 0
+                !inert && slot.part === 0
                   ? {
-                      menu: !readOnly,
+                      menu: writing,
                       selected: !!selection && slot.bar >= selection.from && slot.bar <= selection.to,
                       split: bars[slot.bar].length === 2,
                       canPaste,
@@ -190,22 +220,33 @@ export function Chart({ progression, view, caret, onSlotClick, onEventClick, onT
                   : null
               }
               inSelection={!!selection && slot.bar >= selection.from && slot.bar <= selection.to}
-              onShiftSelect={!readOnly || practiceBars ? () => onBarSelect(slot.bar, true) : undefined}
-              onDeleteBar={!readOnly && slot.barEnd && bars.length > 1 ? () => onBarAction(slot.bar, 'delete') : undefined}
-              onAppend={!readOnly && slot.index === slots.length - 1 ? onAppendBar : undefined}
+              loop={
+                // Improvise / Read etude: the selection is the looped bars, drawn as one band with repeat signs (SPEC §3.7).
+                !writing && selection && slot.bar >= selection.from && slot.bar <= selection.to
+                  ? {
+                      start: slot.bar === selection.from && slot.part === 0,
+                      end: slot.bar === selection.to && slot.barEnd,
+                      onClear: inert ? undefined : onLoopClear,
+                    }
+                  : null
+              }
+              onShiftSelect={!inert ? () => onBarSelect(slot.bar, true) : undefined}
+              onDeleteBar={editsForm && slot.barEnd && bars.length > 1 ? () => onBarAction(slot.bar, 'delete') : undefined}
+              onAppend={editsForm && slot.index === slots.length - 1 ? onAppendBar : undefined}
               editing={editing?.bar === slot.bar && editing.part === slot.part}
               error={error}
               usedChords={usedChords}
               onEdit={
-                stand
-                  ? undefined
-                  : () => {
-                      if (playing) onSlotClick(slot); // Play: the slot becomes current too
-                      startEditing({ bar: slot.bar, part: slot.part }); // chord entry in Write and Play
+                editsForm
+                  ? () => {
+                      if (!writing) onSlotClick(slot); // Improvise: the slot becomes current too
+                      startEditing({ bar: slot.bar, part: slot.part }); // chord entry in Write etude and Improvise
                     }
+                  : undefined
               }
               onCommit={(text, move) => commit(slot, text, move)}
-              onScaleChange={stand ? undefined : (scale) => onScaleChange(slot.bar, slot.part, scale)} // Write and Play
+              onClear={editsForm && onChordClear && slot.data.chord !== '' ? () => onChordClear(slot.bar, slot.part) : undefined}
+              onScaleChange={editsForm ? (scale) => onScaleChange(slot.bar, slot.part, scale) : undefined} // Write etude and Improvise
             />
           ))}
         </div>
@@ -223,9 +264,16 @@ interface SlotViewProps {
   clef: Clef;
   melody: Progression['melody'];
   caret?: number;
-  /** Play mode: the active slot gets the solid "current slot" highlight. */
+  /** Improvise / Read etude: the active slot gets the solid "current slot" highlight. */
   playing: boolean;
-  follow: { played: ReadonlySet<number> } | null;
+  /** The key pill's text (the parent scale's name), or null (no scale). */
+  keyLabel: string | null;
+  /** Shares the current slot's key: its key pill lights like the current slot's (the slot itself isn't tinted). */
+  keyMate: boolean;
+  /** Improvise: the lead sheet — the slot's chord and scale tones in place of the stave. */
+  hideMelody: boolean;
+  /** Improvise: the hex's height in the 3-row slot. */
+  leadHexHeight: number;
   onEventClick?: (e: TimedEvent) => void;
   onTimeClick?: (t: number) => void;
   span: number;
@@ -236,6 +284,12 @@ interface SlotViewProps {
   /** Bar number + ⋯ handle, on the bar's first slot. */
   barTools: { menu: boolean; selected: boolean; split: boolean; canPaste: boolean; canDelete: boolean; onSelect: (bar: number, extend: boolean) => void; onAction: (bar: number, action: BarAction) => void } | null;
   inSelection: boolean;
+  /** Write etude / Read etude: this slot is half of a bar's card (a split bar) — no border or gap between the halves. */
+  barCard: 'first' | 'second' | null;
+  /** The last slot of its row: the loop band's bridge doesn't run past it. */
+  rowEnd: boolean;
+  /** Part of the loop (Improvise / Read etude): its first slot carries the start repeat, its last the end repeat and the ×. */
+  loop: { start: boolean; end: boolean; onClear?: () => void } | null;
   /** Write: ⇧-click anywhere in the bar extends the bar selection to it (instead of moving the caret). */
   onShiftSelect?: () => void;
   /** On a bar's last slot: the trash can at its bottom right that deletes the bar (the selection, if it's in one). */
@@ -248,28 +302,35 @@ interface SlotViewProps {
   error: string | null;
   onEdit?: () => void;
   onCommit: (text: string, move: -1 | 1 | null) => boolean;
+  /** The × after the chord: clear it. */
+  onClear?: () => void;
   usedChords: string[];
   onScaleChange?: (scale: ScaleId | null) => void;
 }
 
-const NO_EVENTS: TimedEvent[] = [];
-
-function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing, follow, onEventClick, onTimeClick, span, layout, header, barTools, inSelection, onShiftSelect, onDeleteBar, onAppend, showTimeSignature, editing, error, usedChords, onEdit, onCommit, onScaleChange }: SlotViewProps) {
+function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing, keyLabel, keyMate, hideMelody, leadHexHeight, onEventClick, onTimeClick, span, layout, header, barTools, inSelection, barCard, rowEnd, loop, onShiftSelect, onDeleteBar, onAppend, showTimeSignature, editing, error, usedChords, onEdit, onCommit, onClear, onScaleChange }: SlotViewProps) {
   // Everything shown runs against the written chord; the stored melody stays concert (SPEC §5.3, §10).
   const { chord, harmony } = slot;
   const spell = (midi: number) => view.name(midi, slot);
   const [ref, width] = useWidth<HTMLDivElement>();
-  const { staffTop, staffBottom } = staveMetrics();
+  const { staffTop, staffBottom, height: staveHeight } = staveMetrics();
   // Unparseable time signatures are shown in the header as typed; the stave shows (and beams by) the layout meter.
   const meter = showTimeSignature ? layout : undefined;
+  // The key pill (SPEC §3.1): the key this slot's scale belongs to; lit on the current slot and its key mates (only the pill).
+  const keyPill = keyLabel && (
+    <span className={['key-pill', onAppend && 'beside-append'].filter(Boolean).join(' ')} title={`Key family: ${prettyName(keyLabel)}`}>
+      {prettyName(keyLabel)}
+    </span>
+  );
   /** Marks against this (owning) slot's written harmony (SPEC §7.2). */
   const markOf = (e: TimedEvent) => ('pitch' in e.ev ? view.mark(e.ev.pitch, slot) : null);
 
   return (
     <div
-      className={['slot', active && 'active', active && playing && 'playing', inSelection && 'bar-selected'].filter(Boolean).join(' ')}
+      className={['slot', active && 'active', keyMate && 'key-mate', (active || keyMate) && playing && 'playing', inSelection && !loop && 'bar-selected', loop && 'looped', loop?.start && 'loop-start', loop?.end && 'loop-end', hideMelody && 'lead', barCard && `bar-${barCard}`, rowEnd && 'row-end'].filter(Boolean).join(' ')}
       // --staff-top: where the stave's top line sits in the slot; the bar number sits just above it (CSS .bar-handle).
-      style={{ gridColumn: `span ${span}`, ['--staff-top' as string]: `${header + staffTop}px` }}
+      // Improvise's 3-column slot keeps the usual slot height (labels + stave), so rows and the zoom stay as they were.
+      style={{ gridColumn: `span ${span}`, ['--staff-top' as string]: `${SLOT_PAD_TOP_PX + header + staffTop}px`, ...(hideMelody ? { minHeight: header + staveHeight + SLOT_PAD_TOP_PX + 2 } : {}) }}
       data-slot={slot.index}
       // ⇧-click (Write): extend the bar selection to this bar — caught before notes, the stave or the chord see it.
       onClickCapture={(e) => {
@@ -298,24 +359,32 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
           +
         </button>
       )}
-      <div className="slot-header" style={{ height: header }}>
-        {editing ? (
-          <ChordField initial={chord} error={error} onCommit={onCommit} used={usedChords} inKey={view.keyChords(slot.index).map((k) => k.symbol)} />
-        ) : (
-          <ChordLabel chord={chord} harmony={harmony} bar={slot.bar} part={slot.part} onEdit={onEdit} />
-        )}
+      {/* Improvise: the key pill tops the slot's right (row 1 of the 3-row slot, beside the bar number). */}
+      {hideMelody && keyPill}
+      <div className="slot-header" style={hideMelody ? undefined : { height: header }}>
+        {/* The chord name's row; elsewhere the key pill shares it, centred on the chord name. */}
+        <div className="slot-title">
+          {editing ? (
+            <ChordField initial={chord} error={error} onCommit={onCommit} used={usedChords} inKey={view.keyChords(slot.index).map((k) => k.symbol)} />
+          ) : (
+            <ChordLabel chord={chord} harmony={harmony} bar={slot.bar} part={slot.part} onEdit={onEdit} onClear={onClear} />
+          )}
+          {!hideMelody && keyPill}
+        </div>
         <ScaleLabel harmony={harmony} bar={slot.bar} onPick={onScaleChange} />
       </div>
       <div ref={ref} className="slot-body">
+        {hideMelody ? (
+          // Improvise (SPEC §3.3): the slot's scale, chord tones marked, where the stave would be.
+          <LeadTones harmony={harmony} height={leadHexHeight} />
+        ) : (
         <SlotStave
           width={width}
           timeSignature={meter && `${meter.beats}/${meter.unit}`}
           clef={clef}
           start={slot.start}
           end={slot.end}
-          // Play: an empty stave to play over (SPEC §3.3) — unless Practice follows the etude (§3.7).
-          events={playing && !follow ? NO_EVENTS : eventsForSlot(melody, slot)}
-          played={follow?.played}
+          events={eventsForSlot(melody, slot)}
           spell={spell}
           caret={caret}
           onEventClick={onEventClick}
@@ -323,6 +392,7 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
           meter={layout}
           markOf={markOf}
         />
+        )}
       </div>
       {onDeleteBar && (
         <button
@@ -344,8 +414,25 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
           </svg>
         </button>
       )}
+      {/* The loop's repeat signs (SPEC §3.7): [: at its first bar line, :] and the × (stop looping) at its last. */}
+      {loop?.start && <RepeatSign side="start" top={SLOT_PAD_TOP_PX + header + staffTop} height={staffBottom - staffTop} />}
+      {loop?.end && <RepeatSign side="end" top={SLOT_PAD_TOP_PX + header + staffTop} height={staffBottom - staffTop} />}
+      {loop?.end && loop.onClear && (
+        <button
+          type="button"
+          className="loop-clear"
+          style={{ top: SLOT_PAD_TOP_PX + header + staffTop }}
+          title="Stop looping: back to the whole form (Esc)"
+          aria-label="Stop looping"
+          onClick={loop.onClear}
+        >
+          <svg viewBox="0 0 12 12" width="9" height="9" aria-hidden>
+            <path d="M3 3l6 6M9 3 3 9" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+        </button>
+      )}
       {/* A bar line at the end of each bar; nothing between two chords in a bar (a chord change, not a bar). */}
-      {slot.barEnd && <div className="bar-line" style={{ top: header + staffTop, height: staffBottom - staffTop }} />}
+      {slot.barEnd && <div className="bar-line" />}
     </div>
   );
 }
@@ -363,9 +450,10 @@ interface ChordLabelProps {
   bar: number;
   part: number;
   onEdit?: () => void;
+  onClear?: () => void;
 }
 
-function ChordLabel({ chord, harmony, bar, part, onEdit }: ChordLabelProps) {
+function ChordLabel({ chord, harmony, bar, part, onEdit, onClear }: ChordLabelProps) {
   const overridden = harmony.kind === 'chord' && harmony.overridden;
   const kind = parseChord(chord).kind;
   const tipId = `chord-tip-${bar}-${part}`;
@@ -383,9 +471,30 @@ function ChordLabel({ chord, harmony, bar, part, onEdit }: ChordLabelProps) {
         {chord || '+'}
       </button>
       {overridden && <span className="override-dot" aria-hidden title="Scale override" />}
+      {onClear && (
+        // Clear the chord (SPEC §4.2): faint until the slot is hovered or current, like the bar's trash can.
+        <button type="button" className="chord-clear" aria-label={`Clear chord ${chord}, bar ${bar + 1}`} onClick={onClear}>
+          <svg viewBox="0 0 12 12" width="9" height="9" aria-hidden>
+            <path d="M3 3l6 6M9 3 3 9" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
+        </button>
+      )}
       <span role="tooltip" id={tipId} className="chord-tip">
         {tooltip(chord, harmony)}
       </span>
     </span>
+  );
+}
+
+/** A repeat sign over the stave's height: start `[:` (thick, thin, dots) or end `:]` (dots, thin, thick). */
+function RepeatSign({ side, top, height }: { side: 'start' | 'end'; top: number; height: number }) {
+  const x = side === 'start' ? { thick: 0, thin: 7, dots: 14 } : { thick: 15, thin: 11, dots: 6 };
+  return (
+    <svg className={`repeat-sign ${side}`} style={{ top, height }} viewBox="0 0 20 40" preserveAspectRatio="none" aria-hidden>
+      <rect x={x.thick} y={0} width={5} height={40} />
+      <rect x={x.thin} y={0} width={2} height={40} />
+      <circle cx={x.dots} cy={14.5} r={3} />
+      <circle cx={x.dots} cy={25.5} r={3} />
+    </svg>
   );
 }

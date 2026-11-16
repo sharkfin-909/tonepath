@@ -21,7 +21,7 @@ describe('chart zoom fit', () => {
     expect(fitZoom(8, STAVE, 360)).toEqual({ zoom: ZOOM_FLOOR, scrolls: true });
   });
 
-  it('with no floor (Stand) it keeps shrinking to fit', () => {
+  it('with no floor (Read etude) it keeps shrinking to fit', () => {
     const f = fitZoom(8, STAVE, 700, 0);
     expect(f.scrolls).toBe(false);
     expect(f.zoom).toBeLessThan(ZOOM_FLOOR + 0.3);

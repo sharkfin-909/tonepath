@@ -1,14 +1,14 @@
 // Chart screen (SPEC §3.1): the two-row control header over the chart, above the docked hex (which takes the height
-// the chart leaves). Modes: Explore | Practice | Write | Etude view (`stand`) (§3.2–3.4, §3.7); Listen and Practice (§9.2, §3.7).
-// The rules live in pure modules: the editing session (`session.ts`), the keyboard table (`keymap.ts`), the
-// progression document (`document.ts`: undo + saving), the instrument view (`view.ts`), chord entry
-// (`chordEntry.ts`) and practice (`practice.ts`). This file renders them and performs their effects (Web Audio,
-// device settings, browser events, the mic).
+// the chart leaves). Modes (§3.0): Tuner (§3.8) · Improvise (§3.3) · Write etude (§3.2) · Read etude (§3.4); the
+// transport (§3.7) and Listen (§9.2). The rules live in pure modules: the editing session (`session.ts`), the keyboard
+// table (`keymap.ts`), the progression document (`document.ts`: undo + saving), the instrument view (`view.ts`), chord
+// entry (`chordEntry.ts`), the transport (`transport.ts`, `metronomeRun.ts`) and the mic intake (`micIntake.ts`). This
+// file renders them and performs their effects (Web Audio, device settings, browser events, the mic).
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { LengthLatch } from './rail/LengthLatch';
 import { Chart } from './chart/Chart';
-import { setBarsPerRow, setConcertClef, setEtudeName, setInstrument, setScaleOverride, setTitle, type Progression } from './progression';
-import { BarsPerRow, ClearMenu, EtudeNameField, TimeSignatureField, TitleField } from './rail/RailSettings';
+import { setBarsPerRow, setChord, setConcertClef, setInstrument, setScaleOverride, setTitle, type Progression } from './progression';
+import { BarsPerRow, ClearMenu, TimeSignatureField, TitleField } from './rail/RailSettings';
 import { InstrumentPicker } from './rail/InstrumentPicker';
 import { playBass, playChord, playNote, playRoot, playScale, setMuted, unlockAudio } from './audio';
 import { onArrivalOf, ON_ARRIVAL_LABELS, readDevice, writeDevice, type OnArrival } from './device';
@@ -16,20 +16,21 @@ import { AudioControls } from './rail/AudioControls';
 import { DockedHex } from './hex/DockedHex';
 import type { StoredProgression } from './storage';
 import { openDocument, type ProgressionDocument } from './document';
-import { chooseMode, initialSession, modeOf, reduce, type Effect, type Intent, type SessionState } from './session';
+import { hasTransport, initialSession, listens, reduce, type Effect, type Intent, type SessionState } from './session';
 import { enterChord } from './chordEntry';
 import { HONEYCOMB, linearOctaves, type HexShape } from './hex';
 import { keyIntent } from './keymap';
 import { clickUnderPointer, trackPointer } from './pointerClick';
 import { instrumentView } from './view';
 import { ListenPill } from './listen/ListenPill';
-import { PracticePanel } from './listen/PracticePanel';
-import { HEX_HIDDEN, HEX_LINEAR, METRONOME_BPM, METRONOME_SOUND, PRACTICE_COUNT, PRACTICE_LOOP, PRACTICE_RULE } from './deviceSettings';
+import { TransportBar } from './rail/TransportBar';
+import { HEX_HIDDEN, HEX_LINEAR, METRONOME_BPM, METRONOME_SOUND, TRANSPORT_LOOP } from './deviceSettings';
 import { useDeviceSetting } from './useDeviceSetting';
 import { ModePanel } from './rail/ModePanel';
-import { NEW_INTAKE, appSounded, heard, micStopped, type MicIntake } from './micIntake';
+import { Dropdown } from './rail/Dropdown';
+import { NEW_INTAKE, appSounded, isPlayed, type MicIntake } from './micIntake';
 import { useMetronome } from './useMetronome';
-import { followSlot, metronomeChord, metronomeEnd, restartSlot, runNote, runTargets, type PracticeRun, type RunContext } from './practiceRun';
+import { loopRange, transportForm, upcomingTargets } from './transport';
 
 /** A CSS media query as React state (SPEC §3.6 responsive layout). */
 function useMediaQuery(query: string): boolean {
@@ -96,7 +97,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
     const ro = new ResizeObserver(([e]) => setMainHeight(Math.floor(e.contentRect.height)));
     ro.observe(el);
     return () => ro.disconnect();
-  }, [session.stand]);
+  }, [session.mode]);
   /** Clicking an unparseable slot's dock label opens its chord field. */
   // Linear (SPEC §8.5): the dock as one row, switched by octave. The layout is a device setting; the octave isn't
   // saved (it starts mid-range and is kept within the instrument's range).
@@ -111,30 +112,15 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
   const [heardConcert, setHeardConcert] = useState<number | null>(null);
   const [tunerSlot, setTunerSlot] = useState<HTMLDivElement | null>(null);
   const [levelsSlot, setLevelsSlot] = useState<HTMLDivElement | null>(null);
-  // Practice (SPEC §3.7): which slot is being practised and how many notes were played in it; the rule and loop are
-  // device settings.
-  const runRef = useRef<PracticeRun | null>(null);
-  const [run, setRunState] = useState<PracticeRun | null>(null);
-  /** The Practice run, kept in a ref too, so notes arriving between renders build on the latest. */
-  const setRun = (r: PracticeRun | null) => {
-    runRef.current = r;
-    setRunState(r);
-  };
-  const [practiceRule, setPracticeRule] = useDeviceSetting(PRACTICE_RULE);
-  const [practiceLoop, setPracticeLoop] = useDeviceSetting(PRACTICE_LOOP);
-  const [practiceCountN, setPracticeCountN] = useDeviceSetting(PRACTICE_COUNT);
-  // Practice's metronome (SPEC §3.7): on = the form moves on in time; tempo and sound are device settings.
-  const [metroOn, setMetroOn] = useState(true); // on by default (not saved)
-  const [metroRunning, setMetroRunning] = useState(false);
+  // The transport (SPEC §3.7): tempo, click sound and Loop are device settings shared by Improvise and Read etude;
+  // whether it runs is the session's. `restart` is bumped to start it afresh from the current slot (start, rewind).
+  const [loop, setLoop] = useDeviceSetting(TRANSPORT_LOOP);
   const [metroBpm, setMetroBpm] = useDeviceSetting(METRONOME_BPM);
   const [metroSound, setMetroSound] = useDeviceSetting(METRONOME_SOUND);
-  const [metroStart, setMetroStart] = useState(0);
   const [metroRestart, setMetroRestart] = useState(0);
-  /** Mic intake (write / count / ignore each heard note): its echo guard and last written note. */
+  /** Mic intake (SPEC §3.3): the echo guard over the app's own sounds. */
   const intakeRef = useRef<MicIntake>(NEW_INTAKE);
-  /** Write + Listen: skip note audition so the speaker does not re-trigger the mic. */
-  const listeningRef = useRef(false);
-  /** Write: the last note sounded by ` (step-play) or a melody-note click, concert pitch; lights the hex (`n` replays). */
+  /** Write etude: the last note sounded by ` (step-play) or a melody-note click, concert pitch; lights the hex (`n` replays). */
   const [sounded, setSounded] = useState<{ midi: number; n: number } | null>(null);
   const [editRequest, setEditRequest] = useState<{ bar: number; part: number; n: number } | null>(null);
 
@@ -153,8 +139,9 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
   }, [octave, linear]);
   const shape: HexShape = linear ? { kind: 'linear', octave } : HONEYCOMB;
   const caretAt = Math.min(session.caret, view.end); // the form can shrink under the caret
-  const playing = session.playIndex !== null;
-  const active = playing ? view.slots[Math.min(session.playIndex!, view.slots.length - 1)] : view.slotAt(caretAt);
+  const { mode, running } = session;
+  const writing = mode === 'write';
+  const active = writing ? view.slotAt(caretAt) : view.slots[Math.min(session.slot, view.slots.length - 1)];
 
   /** Commit an edit at the current caret: one undo step and one save (SPEC §6.3, §12.1). */
   const commit = (next: Progression) => {
@@ -166,9 +153,8 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
   };
 
   const perform = (effects: Effect[]) => {
-    // Practice: the mic will hear these sounds — guard against counting them as played notes (SPEC §3.7).
-    // That includes a hex pick's audition: hex picks count in Practice even with Audio input enabled.
-    if (sessionRef.current.practice) {
+    // Listening (Tuner, Improvise): the mic will hear these sounds — guard against taking them for the player (SPEC §3.3).
+    if (listens(sessionRef.current.mode)) {
       const sounds = effects.filter(
         (e): e is Extract<Effect, { type: 'chord' | 'root' | 'bass' | 'note' }> =>
           e.type === 'chord' || e.type === 'root' || e.type === 'bass' || e.type === 'note',
@@ -177,13 +163,9 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
     }
     for (const e of effects) {
       switch (e.type) {
-        case 'note': {
-          const s = sessionRef.current;
-          const writing = s.playIndex === null && !s.practice && !s.stand;
-          const mutePick = writing && listeningRef.current && e.pick === true;
-          if (!mutePick) playNote(e.midi);
+        case 'note':
+          playNote(e.midi);
           break;
-        }
         case 'chord':
           playChord(e.harmony);
           break;
@@ -215,25 +197,22 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
   /** Run an intent through the session: commit its edit, keep its state, perform its effects. */
   const dispatch = (intent: Intent) => {
     const before = sessionRef.current;
-    const writing = before.playIndex === null;
     const out = reduce(sessionRef.current, doc.progression, intent);
     if (out.edit) commit(out.edit);
     sessionRef.current = out.state;
     setSession(out.state);
     perform(out.effects);
-    // Write: a stepped (`) or selected melody note lights its hex cells as if played (a click lights its own).
-    if (writing && (intent.type === 'step-play' || intent.type === 'event-click')) {
+    // Write etude: a stepped (`) or selected melody note lights its hex cells as if played (a click lights its own).
+    if (before.mode === 'write' && (intent.type === 'step-play' || intent.type === 'event-click')) {
       const note = out.effects.find((e): e is Extract<Effect, { type: 'note' }> => e.type === 'note');
       if (note) setSounded((f) => ({ midi: note.midi, n: (f?.n ?? 0) + 1 }));
     }
-    // Practice: a hex pick is always a played note (an attack), as the mic's would be — with Audio input on or off.
-    if (intent.type === 'pick' && before.practice) {
-      practicePlayedRef.current(instrumentView(doc.progression).toConcert(intent.written), true);
+    // Starting the transport, or rewinding it while it runs: afresh from the (new) current slot.
+    if ((intent.type === 'transport' && intent.run && !before.running && out.state.running) || (intent.type === 'rewind' && before.running)) {
+      setMetroRestart((n) => n + 1);
     }
   };
   const dispatchRef = useRef(dispatch);
-  /** Practice's note handler (set below, once its state is in scope). */
-  const practicePlayedRef = useRef<(heard: number, fromOnset: boolean) => void>(() => {});
   dispatchRef.current = dispatch;
 
   // Groups (the header's pills, the hex panel's wells) flash when one of their controls is used: replay the CSS
@@ -300,10 +279,10 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
       if (inTextField(e.target)) return; // native undo and typing there
       const s = sessionRef.current;
       const r = keyIntent(e, {
-        mode: s.stand ? 'stand' : s.playIndex !== null ? 'play' : 'write',
+        mode: s.mode,
+        running: s.running,
         selection: s.selection,
         hovered: hovered.current,
-        practice: s.practice,
       });
       if (r.handled) e.preventDefault(); // no page scroll, no button activation, no browser back
       if (r.click) clickUnderPointer();
@@ -350,136 +329,61 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
   const haloPitch = halo && halo.caret === caretAt && halo.melody === progression.melody ? halo.pitch : null;
   const { muted } = session;
 
-  // Practice (SPEC §3.7): the run follows the session's slot — fresh when Practice starts or the slot changes by hand
-  // or by the metronome; kept when the run itself moved the form on.
-  const practiceSlot = session.practice ? session.playIndex : null;
-  useEffect(() => setRun(followSlot(runRef.current, practiceSlot)), [practiceSlot]);
-  // Looping selected bars (SPEC §3.7): their slots, and the metronome's form rebased to start at the first.
-  const bars = session.practice ? session.practiceBars : null;
-  const range = useMemo(() => {
-    if (!bars) return null;
-    const inRange = view.slots.filter((x) => x.bar >= bars.from && x.bar <= bars.to);
-    return inRange.length ? { first: inRange[0].index, last: inRange[inRange.length - 1].index } : null;
-  }, [bars, view.slots]);
-  const metroForm = useMemo(() => {
-    if (!range) return { slots: view.slots, end: view.end };
-    const base = view.slots[range.first].start;
-    return {
-      slots: view.slots.slice(range.first, range.last + 1).map((x) => ({ index: x.index, start: x.start - base })),
-      end: view.slots[range.last].end - base,
-    };
-  }, [range, view.slots, view.end]);
-  const first = range?.first ?? 0;
-  const runCtx: RunContext = {
-    view,
-    melody: progression.melody,
-    rule: practiceRule,
-    count: practiceCountN,
-    loop: practiceLoop,
-    metronome: metroOn,
-    range,
-  };
-  // The metronome runs only in Practice with it switched on; leaving either stops it.
-  useEffect(() => {
-    if (!session.practice || !metroOn) setMetroRunning(false);
-  }, [session.practice, metroOn]);
+  // The transport (SPEC §3.7): over the looped bars (the selection) or the whole form, from the current slot.
+  const range = useMemo(() => (hasTransport(mode) ? loopRange(view.slots, session.selection) : null), [mode, view.slots, session.selection]);
+  const form = useMemo(() => transportForm(view, range), [view, range]);
   useMetronome({
-    running: metroRunning && session.practice && metroOn,
+    running: running && hasTransport(mode),
     bpm: metroBpm,
     sound: metroSound,
     meter: view.meter,
-    slots: metroForm.slots,
-    end: metroForm.end,
-    startSlot: metroStart,
-    loop: practiceLoop,
+    slots: form.slots,
+    end: form.end,
+    startSlot: session.slot,
+    loop,
     restart: metroRestart,
-    onSlot: (index) => metronomeChord(index).forEach((i) => dispatchRef.current(i)),
-    onEnd: () => {
-      setMetroRunning(false);
-      metronomeEnd(first).forEach((i) => dispatchRef.current(i));
-    },
+    onSlot: (index) => dispatchRef.current({ type: 'transport-chord', index }),
+    onEnd: () => dispatchRef.current({ type: 'transport-end' }),
   });
-  /** Mic note starts: Write writes them (Audio input), Practice counts them. */
-  const micNoteRef = useRef({
-    runCtx,
-    practiceOn: session.practice,
-    view,
-    writeOn: false,
-  });
-  micNoteRef.current = {
-    runCtx,
-    practiceOn: session.practice,
-    view,
-    writeOn: !playing && !session.practice && !session.stand && !session.explore && session.input === 'instrument',
-  };
-  const onMicNote = useCallback((concert: number, fromOnset: boolean) => {
-    const { practiceOn, view: v, writeOn } = micNoteRef.current;
-    const r = heard(intakeRef.current, { concert, written: v.toWritten(concert), fromOnset }, performance.now(), writeOn && !practiceOn);
-    intakeRef.current = r.intake;
-    if (r.action.kind === 'write')
-      dispatchRef.current({
-        type: 'pick',
-        written: r.action.written,
-        silent: true,
-      });
-    else if (r.action.kind === 'count') practicePlayedRef.current(concert, fromOnset);
-  }, []);
-  /** Practice: a note played (concert) — from the mic, or a hex pick — goes through the run; its intents go to the session. */
-  practicePlayedRef.current = (concert: number, fromOnset: boolean) => {
-    const run = runRef.current;
-    if (!run || !micNoteRef.current.practiceOn) return;
-    const r = runNote(run, concert, fromOnset, micNoteRef.current.runCtx);
-    setRun(r.run);
-    r.intents.forEach((i) => dispatchRef.current(i));
-  };
-  const targets = run ? runTargets(run, runCtx, active) : null;
+  /** Improvise, running: the upcoming chord's tones, ringed on the hex. */
+  const targets = mode === 'improvise' && running ? upcomingTargets(view, range, active.index) : null;
 
-  // The mode panel (SPEC §3.1): Audio input and Mode; after a choice, keys go back to the hex.
+  /** A note start the mic heard (concert): in Improvise, the player's (not the app's own) brings a waiting sound. */
+  const onMicNote = useCallback((concert: number) => {
+    if (!isPlayed(intakeRef.current, concert, performance.now())) return;
+    if (sessionRef.current.mode === 'improvise') dispatchRef.current({ type: 'heard' });
+  }, []);
+
+  // The mode panel (SPEC §3.1): Mode; after a choice, keys go back to the hex.
   const modeSwitch = (
     <ModePanel
-      input={session.input}
-      mode={modeOf(session)}
-      onInput={(how) => {
-        dispatch({ type: 'input', how });
-        focusHex();
-      }}
+      mode={mode}
       onMode={(m) => {
-        chooseMode(session, m).forEach(dispatch);
-        if (m !== 'read') focusHex();
+        dispatch({ type: 'mode', mode: m });
+        focusHex();
       }}
     />
   );
-
-  if (session.stand) {
-    return (
-      <div className="stand-layout">
-        <header className="stand-header">
-          <span className="stand-title">{progression.title}</span>
-          <span className="stand-instrument">{view.inst.name}</span>
-          <span className="stand-spacer" />
-          {modeSwitch}
-        </header>
-        <section className="chart-area stand-chart">
-          <Chart
-            progression={progression}
-            view={view}
-            caret={caretAt}
-            onSlotClick={() => {}}
-            onEventClick={() => {}}
-            onTimeClick={() => {}}
-            onChordCommit={onChordCommit}
-            onScaleChange={onScaleChange}
-            selection={null}
-            onBarSelect={() => {}}
-            onBarAction={() => {}}
-            onAppendBar={() => {}}
-            canPaste={false}
-            stand
-          />
-        </section>
-      </div>
-    );
-  }
+  /** Undo / redo (SPEC §6.3): Write etude's editing pill, and Improvise's form group. */
+  const undoRedo = (
+        <div className="undo-controls">
+          <button type="button" className="rail-button icon-button" title="Undo (⌘Z)" aria-label="Undo" disabled={!doc.canUndo} onClick={() => dispatch({ type: 'undo' })}>
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
+              <path fill="currentColor" d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z" />
+            </svg>
+          </button>
+          <button type="button" className="rail-button icon-button" title="Redo (⇧⌘Z)" aria-label="Redo" disabled={!doc.canRedo} onClick={() => dispatch({ type: 'redo' })}>
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
+              <path fill="currentColor" d="M18.4 10.6C16.55 8.99 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z" />
+            </svg>
+          </button>
+        </div>
+  );
+  const tuner = mode === 'tuner';
+  const read = mode === 'read';
+  const improvise = mode === 'improvise';
+  /** Hide hex: Improvise only (SPEC §3.1); Read etude has no hex at all. */
+  const hideHex = improvise && hexHidden;
 
   return (
     <div className="layout-c">
@@ -490,10 +394,8 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
         // time signature) keep it: clicking them starts editing.
         onClick={(e) => {
           const el = e.target as Element;
-          if (el.closest('button') && !el.closest('.inline-value')) focusHex();
-        }}
-        onChange={(e) => {
-          if (e.target instanceof HTMLSelectElement) focusHex();
+          // A dropdown's button keeps focus while its menu is open; a choice in the menu hands keys back to the hex.
+          if (el.closest('.dropdown-option') || (el.closest('button') && !el.closest('.inline-value') && !el.closest('.dropdown'))) focusHex();
         }}
       >
         {/* Row 1: title (left) · sound pill (centre) · mode panel (right); row 2: the editing controls (SPEC §3.1). */}
@@ -509,33 +411,24 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
             onChord={() => dispatch({ type: 'sound', what: 'chord' })}
             onBass={() => dispatch({ type: 'sound', what: 'bass' })}
             onScale={() => dispatch({ type: 'sound', what: 'scale' })}
+            noChord={tuner}
           />
-          {/* The same dropdown whatever the Audio input: listening never swaps it for a readout. */}
-          <p className="rail-setting on-arrival">
+          {/* In every mode (SPEC §3.0); Tuner has no chord, so it is greyed there. */}
+          <div className="rail-setting on-arrival">
             <span className="rail-label">Audio on chord</span>
-            <select
-              className="rail-select"
-              aria-label="Audio on chord"
+            <Dropdown
               value={session.onArrival}
-              onChange={(e) =>
-                dispatch({
-                  type: 'set-arrival',
-                  how: e.target.value as OnArrival,
-                })
-              }
-            >
-              {(Object.keys(ON_ARRIVAL_LABELS) as OnArrival[]).map((v) => (
-                <option key={v} value={v}>
-                  {ON_ARRIVAL_LABELS[v]}
-                </option>
-              ))}
-            </select>
-          </p>
+              label="Audio on chord"
+              disabled={tuner}
+              options={(Object.keys(ON_ARRIVAL_LABELS) as OnArrival[]).map((v) => ({ value: v, label: ON_ARRIVAL_LABELS[v] }))}
+              onChange={(how) => dispatch({ type: 'set-arrival', how })}
+            />
+          </div>
         </div>
-        {/* Row 1, right: the mode panel (Audio input: / Mode:), in a pill. */}
+        {/* Row 1, right: the mode panel (Mode:), in a pill. */}
         <div className="mode-corner">{modeSwitch}</div>
         <div className="topbar-row">
-          {/* Row 2, left (under TONEPATH): ← Library, then the etude name above the file name (the title), stacked. */}
+          {/* Row 2, left (under TONEPATH): ← Library, then the title. */}
           <div className="topbar-file">
             <button
               type="button"
@@ -544,147 +437,116 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
             >
               ← Library
             </button>
+            {/* The title is the progression's one name (the stored etudeName is kept but not shown). */}
             <div className="title-stack">
-              <EtudeNameField name={progression.etudeName ?? ''} onRename={(t) => commit(setEtudeName(doc.progression, t))} />
               <h1 className="rail-heading">
                 <TitleField title={progression.title} editing={renameOnOpen} onRename={(t) => commit(setTitle(doc.progression, t))} />
               </h1>
             </div>
           </div>
-          {/* Practice (SPEC §3.7): its panel, bottom left of the header (where Write's note lengths sit). */}
-          {session.practice && run && targets && (
-            <PracticePanel
-              rule={practiceRule}
-              onRule={(r) => {
-                setPracticeRule(r);
-                setRun(restartSlot(run));
-              }}
-              loop={practiceLoop}
-              onLoop={setPracticeLoop}
-              bars={bars}
-              onAllBars={() => dispatch({ type: 'practice-all-bars' })}
-              count={run.state.count}
-              need={targets.need}
-              targetNames={targets.names}
-              advanced={run.advances}
-              notesPerChord={practiceCountN}
-              onNotesPerChord={setPracticeCountN}
-              metronome={{
-                on: metroOn,
-                onToggle: () => setMetroOn((on) => !on),
-                bpm: metroBpm,
-                onBpm: setMetroBpm,
-                sound: metroSound,
-                onSound: setMetroSound,
-                running: metroRunning,
-                onStartStop: () => {
-                  if (metroRunning) return setMetroRunning(false);
-                  setMetroStart(range && (active.index < range.first || active.index > range.last) ? range.first : active.index);
-                  setMetroRestart((n) => n + 1);
-                  setMetroRunning(true);
-                },
-                onRewind: () => {
-                  if (metroRunning) {
-                    setMetroStart(first);
-                    setMetroRestart((n) => n + 1);
-                  } else
-                    dispatch({
-                      type: 'practice-advance',
-                      index: first,
-                      landed: false,
-                    });
-                },
-              }}
-            />
-          )}
-          {/* The editing controls, in a pill: Write only (not Practice, whose note count is its own number, SPEC §3.7;
-              not Explore, which writes nothing, §3.2). */}
-          {!playing && !session.explore && (
-            <div className="edit-pill group">
-              <LengthLatch
-                value={session.length}
-                onChange={(d) => dispatch({ type: 'length', d })}
-                rest={session.rest}
-                onToggleRest={() => dispatch({ type: 'toggle-rest' })}
-                refusal={session.refusal}
-                onRefusalShown={onRefusalShown}
+          {/* Row 2, centred: the mode's own groups, side by side (SPEC §3.0) — none in Tuner. */}
+          <div className="mode-groups">
+            {/* Improvise (SPEC §3.3): the lead sheet's form group — time, bars per row, undo / redo — while stopped. */}
+            {improvise && !running && (
+              <div className="edit-pill form-group group">
+                <TimeSignatureField value={progression.timeSignature} onChange={(text) => dispatch({ type: 'time-signature', text })} />
+                <BarsPerRow value={progression.barsPerRow} onChange={(n) => commit(setBarsPerRow(doc.progression, n))} />
+                {undoRedo}
+              </div>
+            )}
+            {/* The transport (SPEC §3.7): Improvise and Read etude. */}
+            {(improvise || read) && (
+              <TransportBar
+                bpm={metroBpm}
+                onBpm={setMetroBpm}
+                sound={metroSound}
+                onSound={setMetroSound}
+                running={running}
+                onStartStop={() => dispatch({ type: 'transport', run: !running })}
+                onRewind={() => dispatch({ type: 'rewind' })}
+                loop={loop}
+                onLoop={setLoop}
+                bars={session.selection}
+                onAllBars={() => dispatch({ type: 'clear-selection' })}
               />
-              <TimeSignatureField value={progression.timeSignature} onChange={(text) => dispatch({ type: 'time-signature', text })} />
-              <BarsPerRow value={progression.barsPerRow} onChange={(n) => commit(setBarsPerRow(doc.progression, n))} />
-              {/* Nudge (SPEC §6.2): the note at the caret up / down a scale step (↑ / ↓); ⇧ a semitone, ⌥ an octave. */}
-              <div className="step-controls">
-                <button
-                  type="button"
-                  className="rail-button icon-button"
-                  title="Nudge the note at the caret down a scale step (↓) · ⇧-click / ⇧↓ a semitone · ⌥↓ an octave"
-                  aria-label="Nudge down"
-                  onClick={(e) =>
-                    dispatch({
-                      type: 'nudge',
-                      dir: -1,
-                      octave: false,
-                      scale: !e.shiftKey,
-                    })
-                  }
-                >
-                  <svg viewBox="0 0 12 12" width="16" height="16" aria-hidden>
-                    <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  className="rail-button icon-button"
-                  title="Nudge the note at the caret up a scale step (↑) · ⇧-click / ⇧↑ a semitone · ⌥↑ an octave"
-                  aria-label="Nudge up"
-                  onClick={(e) =>
-                    dispatch({
-                      type: 'nudge',
-                      dir: 1,
-                      octave: false,
-                      scale: !e.shiftKey,
-                    })
-                  }
-                >
-                  <svg viewBox="0 0 12 12" width="16" height="16" aria-hidden>
-                    <path d="M2.5 7.5 6 4l3.5 3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
+            )}
+            {/* The editing controls, in a pill: Write etude only (SPEC §3.2). */}
+            {writing && (
+              <div className="edit-pill group">
+                <LengthLatch
+                  value={session.length}
+                  onChange={(d) => dispatch({ type: 'length', d })}
+                  rest={session.rest}
+                  onToggleRest={() => dispatch({ type: 'toggle-rest' })}
+                  refusal={session.refusal}
+                  onRefusalShown={onRefusalShown}
+                />
+                <TimeSignatureField value={progression.timeSignature} onChange={(text) => dispatch({ type: 'time-signature', text })} />
+                <BarsPerRow value={progression.barsPerRow} onChange={(n) => commit(setBarsPerRow(doc.progression, n))} />
+                {/* Nudge (SPEC §6.2): the note at the caret up / down a scale step (↑ / ↓); ⇧ a semitone, ⌥ an octave. */}
+                <div className="step-controls">
+                  <button
+                    type="button"
+                    className="rail-button icon-button"
+                    title="Nudge the note at the caret down a scale step (↓) · ⇧-click / ⇧↓ a semitone · ⌥↓ an octave"
+                    aria-label="Nudge down"
+                    onClick={(e) =>
+                      dispatch({
+                        type: 'nudge',
+                        dir: -1,
+                        octave: false,
+                        scale: !e.shiftKey,
+                      })
+                    }
+                  >
+                    <svg viewBox="0 0 12 12" width="16" height="16" aria-hidden>
+                      <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    className="rail-button icon-button"
+                    title="Nudge the note at the caret up a scale step (↑) · ⇧-click / ⇧↑ a semitone · ⌥↑ an octave"
+                    aria-label="Nudge up"
+                    onClick={(e) =>
+                      dispatch({
+                        type: 'nudge',
+                        dir: 1,
+                        octave: false,
+                        scale: !e.shiftKey,
+                      })
+                    }
+                  >
+                    <svg viewBox="0 0 12 12" width="16" height="16" aria-hidden>
+                      <path d="M2.5 7.5 6 4l3.5 3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                </div>
+                {/* Stepwise playback (SPEC §6.2): ‹ back, › forward (`) — play the note and move the caret past it. */}
+                <div className="step-controls">
+                  <button type="button" className="rail-button icon-button" title="Step back: play the note before the caret, and move the caret to it" aria-label="Step back" onClick={() => dispatch({ type: 'step-play', dir: -1 })}>
+                    <svg viewBox="0 0 12 12" width="16" height="16" aria-hidden>
+                      <path d="M7.5 2.5 4 6l3.5 3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                  <button type="button" className="rail-button icon-button" title="Step forward: play the note at the caret, and move past it (` or ~)" aria-label="Step forward" onClick={() => dispatch({ type: 'step-play' })}>
+                    <svg viewBox="0 0 12 12" width="16" height="16" aria-hidden>
+                      <path d="M4.5 2.5 8 6 4.5 9.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                </div>
+                {/* Undo / redo: at the end, just before Clear. */}
+                {undoRedo}
+                <ClearMenu
+                  canClearNotes={progression.melody.length > 0}
+                  canClearAll={progression.melody.length > 0 || progression.bars.some((b) => b.some((s) => s.chord !== '' || s.scale !== undefined))}
+                  onClearNotes={() => dispatch({ type: 'clear-notes' })}
+                  onClearAll={() => dispatch({ type: 'clear-all' })}
+                />
               </div>
-              {/* Stepwise playback (SPEC §6.2): ‹ back, › forward (`) — play the note and move the caret past it. */}
-              <div className="step-controls">
-                <button type="button" className="rail-button icon-button" title="Step back: play the note before the caret, and move the caret to it" aria-label="Step back" onClick={() => dispatch({ type: 'step-play', dir: -1 })}>
-                  <svg viewBox="0 0 12 12" width="16" height="16" aria-hidden>
-                    <path d="M7.5 2.5 4 6l3.5 3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-                <button type="button" className="rail-button icon-button" title="Step forward: play the note at the caret, and move past it (` or ~)" aria-label="Step forward" onClick={() => dispatch({ type: 'step-play' })}>
-                  <svg viewBox="0 0 12 12" width="16" height="16" aria-hidden>
-                    <path d="M4.5 2.5 8 6 4.5 9.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-              </div>
-              {/* Undo / redo: at the end, just before Clear. */}
-              <div className="undo-controls">
-                <button type="button" className="rail-button icon-button" title="Undo (⌘Z)" aria-label="Undo" disabled={!doc.canUndo} onClick={() => dispatch({ type: 'undo' })}>
-                  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
-                    <path fill="currentColor" d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z" />
-                  </svg>
-                </button>
-                <button type="button" className="rail-button icon-button" title="Redo (⇧⌘Z)" aria-label="Redo" disabled={!doc.canRedo} onClick={() => dispatch({ type: 'redo' })}>
-                  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
-                    <path fill="currentColor" d="M18.4 10.6C16.55 8.99 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z" />
-                  </svg>
-                </button>
-              </div>
-              <ClearMenu
-                canClearNotes={progression.melody.length > 0}
-                canClearAll={progression.melody.length > 0 || progression.bars.some((b) => b.some((s) => s.chord !== '' || s.scale !== undefined))}
-                onClearNotes={() => dispatch({ type: 'clear-notes' })}
-                onClearAll={() => dispatch({ type: 'clear-all' })}
-              />
-            </div>
-          )}
-          {/* The instrument picker: after the Write-only editing group, and shown in Play too. */}
+            )}
+          </div>
+          {/* The instrument picker: after the mode's group, in every mode. */}
           {/* Clef (Concert only) and instrument, in a pill. */}
           <span className="ins-group group">
             <InstrumentPicker
@@ -696,127 +558,154 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
           </span>
         </div>
       </header>
-      <main ref={mainRef} className={hexHidden ? 'main hex-hidden' : 'main'}>
+      <main ref={mainRef} className={read ? 'main read' : tuner ? 'main tuner-mode' : hideHex ? 'main hex-hidden' : 'main'}>
         <section
           className="chart-area"
           style={{
-            maxHeight: hexHidden ? undefined : mainHeight / 2 || undefined,
+            maxHeight: read || hideHex ? undefined : mainHeight / 2 || undefined,
           }}
         >
-          <Chart
-            progression={progression}
-            view={view}
-            caret={caretAt}
-            onSlotClick={(slot) => dispatch({ type: 'slot-click', index: slot.index })}
-            onEventClick={(event) => dispatch({ type: 'event-click', event })}
-            onTimeClick={(t) => dispatch({ type: 'time-click', t })}
-            onChordCommit={onChordCommit}
-            onScaleChange={onScaleChange}
-            editRequest={editRequest}
-            selection={session.practice ? session.practiceBars : session.selection}
-            practiceBars={session.practice}
-            onBarSelect={(bar, extend) => dispatch({ type: 'bar-select', bar, extend })}
-            onBarAction={(bar, action) => dispatch({ type: 'bar-action', bar, action })}
-            onAppendBar={() => dispatch({ type: 'append-bar' })}
-            canPaste={!!session.clip}
-            playIndex={playing ? active.index : null}
-            explore={session.explore && !playing}
-            follow={session.practice && practiceRule === 'follow' && run ? { played: run.played } : null}
-            maxHeight={mainHeight ? (hexHidden ? mainHeight : mainHeight / 2) - CHART_PAD_Y : undefined}
-          />
+          {tuner ? (
+            // Tuner (SPEC §3.8): the chart pane stays, empty, at the chart's height — nothing moves between modes.
+            <div className="chart-pane-empty" aria-hidden>
+              <Chart
+                progression={progression}
+                view={view}
+                caret={caretAt}
+                onSlotClick={() => {}}
+                onEventClick={() => {}}
+                onTimeClick={() => {}}
+                onChordCommit={onChordCommit}
+                onScaleChange={() => {}}
+                selection={null}
+                onBarSelect={() => {}}
+                onBarAction={() => {}}
+                onAppendBar={() => {}}
+                canPaste={false}
+                mode="improvise"
+                current={null}
+                maxHeight={mainHeight ? mainHeight / 2 - CHART_PAD_Y : undefined}
+              />
+            </div>
+          ) : (
+            <Chart
+              progression={progression}
+              view={view}
+              caret={caretAt}
+              onSlotClick={(slot) => dispatch({ type: 'slot-click', index: slot.index })}
+              onEventClick={(event) => dispatch({ type: 'event-click', event })}
+              onTimeClick={(t) => dispatch({ type: 'time-click', t })}
+              onChordCommit={onChordCommit}
+              onScaleChange={onScaleChange}
+              onChordClear={(bar, part) => commit(setChord(doc.progression, bar, part, ''))}
+              editRequest={editRequest}
+              selection={session.selection}
+              onBarSelect={(bar, extend) => dispatch({ type: 'bar-select', bar, extend })}
+              onBarAction={(bar, action) => dispatch({ type: 'bar-action', bar, action })}
+              onAppendBar={() => dispatch({ type: 'append-bar' })}
+              onLoopClear={() => dispatch({ type: 'clear-selection' })}
+              canPaste={!!session.clip}
+              mode={mode}
+              current={writing ? null : active.index}
+              running={running}
+              maxHeight={mainHeight ? (read || hideHex ? mainHeight : mainHeight / 2) - CHART_PAD_Y : undefined}
+            />
+          )}
         </section>
         {session.notice && (
           <p key={session.notice.n} className="notice" role="status">
             {session.notice.text}
           </p>
         )}
-        <section ref={dockRef} className={linear ? 'dock linear' : 'dock'} aria-label="Docked hex" tabIndex={-1}>
-          {/* Grid on = the 3-row honeycomb; off = Linear (one row, by octave). SPEC §8.5. Not on phones (always Linear).
-              Absolutely positioned at the panel's bottom left. */}
-          {!narrow && (
-            <button
+        {/* Listen (SPEC §9.2): on in Tuner and Improvise (§3.0); its tuner and levels portal into the row above the hex. */}
+        <ListenPill
+          onHeard={setHeardConcert}
+          nameOf={(m) => (tuner ? view.plainName(m) : view.name(m, active))}
+          onNote={onMicNote}
+          auto={listens(mode)}
+          tunerSlot={tunerSlot}
+          levelsSlot={levelsSlot}
+          concertLowMidi={view.inst.range ? view.toConcert(view.inst.range.lo) : null}
+        />
+        {!read && (
+          <section ref={dockRef} className={linear ? 'dock linear' : 'dock'} aria-label="Docked hex" tabIndex={-1}>
+            {/* Grid on = the 3-row honeycomb; off = Linear (one row, by octave). SPEC §8.5. Not on phones (always Linear).
+                Absolutely positioned at the panel's bottom left. */}
+            {!narrow && (
+              <button
+              type="button"
+              className={linear ? 'grid-toggle' : 'grid-toggle on'}
+              aria-pressed={!linear}
+              title={linear ? 'Grid: show the honeycomb' : 'Grid off: one row (Linear), by octave'}
+              onClick={() => {
+                toggleLinear();
+                focusHex();
+              }}
+            >
+              Grid
+            </button>
+            )}
+            {/* Linear (SPEC §8.5): the octave switch, under the row, centred at the panel's bottom. */}
+            {linear && (
+              <div className="octave-switch group" role="group" aria-label="Octave">
+                <button type="button" className="octave-step" aria-label="Octave down" title="Octave down" disabled={octave <= octaves.min} onClick={() => setOctave(octave - 12)}>
+                  <svg viewBox="0 0 12 12" width="14" height="14" aria-hidden>
+                    <path d="M7.5 2.5 4 6l3.5 3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                <span className="octave-name">{`oct ${octave / 12 - 1}`}</span>
+                <button type="button" className="octave-step" aria-label="Octave up" title="Octave up" disabled={octave >= octaves.max} onClick={() => setOctave(octave + 12)}>
+                  <svg viewBox="0 0 12 12" width="14" height="14" aria-hidden>
+                    <path d="M4.5 2.5 8 6 4.5 9.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </div>
+            )}
+            <DockedHex
+              dock={tuner ? view.tunerDock(shape) : view.dock(active.index, shape)}
+              onLabelClick={() =>
+                setEditRequest((r) => ({
+                  bar: active.bar,
+                  part: active.part,
+                  n: (r?.n ?? 0) + 1,
+                }))
+              }
+              onPick={(written) => dispatch({ type: 'pick', written })}
+              onHoverPitch={(p) => {
+                hovered.current = p;
+              }}
+              halo={writing && haloPitch !== null ? view.toWritten(haloPitch) : null}
+              // Heard notes light the hex in Tuner, and in Improvise while the transport is stopped (SPEC §3.3, §3.8).
+              heard={heardConcert !== null && (tuner || (improvise && !running)) ? view.toWritten(heardConcert) : null}
+              targets={targets && { pcs: targets, midi: null }}
+              sounded={writing && sounded ? { midi: view.toWritten(sounded.midi), n: sounded.n } : null}
+              still={improvise && running}
+            />
+          </section>
+        )}
+        {/* While listening (Listen, §9.2): a row on top of the hex panel's top edge, overlaying the chart (it takes
+            none of the hex's space) — the tuner centred, its input level and meter at the left. */}
+        {listens(mode) && (
+          <div className="listen-row">
+            <div className="tuner-slot" ref={setTunerSlot} />
+            <div className="levels-slot" ref={setLevelsSlot} />
+          </div>
+        )}
+        {/* Hide / show the hex panel (SPEC §3.1): Improvise only; the screen's bottom right corner, remembered on the device. */}
+        {improvise && (
+          <button
             type="button"
-            className={linear ? 'grid-toggle' : 'grid-toggle on'}
-            aria-pressed={!linear}
-            title={linear ? 'Grid: show the honeycomb' : 'Grid off: one row (Linear), by octave'}
+            className="hex-hide-toggle"
+            aria-pressed={hexHidden}
+            title={hexHidden ? 'Show the hex panel' : 'Hide the hex panel (the chart takes the screen)'}
             onClick={() => {
-              toggleLinear();
+              setHexHidden(!hexHidden);
               focusHex();
             }}
           >
-            Grid
+            {hexHidden ? 'Show hex' : 'Hide hex'}
           </button>
-          )}
-          {/* Listen (SPEC §9.2): on in Practice with audio instrument input and in Write with instrument audio; its tuner and levels portal into the
-              row above the hex. */}
-          <ListenPill
-            onHeard={setHeardConcert}
-            nameOf={(m) => view.name(m, active)}
-            onNote={onMicNote}
-            onListening={(on) => {
-              listeningRef.current = on;
-              if (!on) intakeRef.current = micStopped(intakeRef.current);
-            }}
-            auto={session.input === 'instrument' && !session.stand}
-            tunerSlot={tunerSlot}
-            levelsSlot={levelsSlot}
-            concertLowMidi={view.inst.range ? view.toConcert(view.inst.range.lo) : null}
-          />
-          {/* Linear (SPEC §8.5): the octave switch, under the row, centred at the panel's bottom. */}
-          {linear && (
-            <div className="octave-switch group" role="group" aria-label="Octave">
-              <button type="button" className="octave-step" aria-label="Octave down" title="Octave down" disabled={octave <= octaves.min} onClick={() => setOctave(octave - 12)}>
-                <svg viewBox="0 0 12 12" width="14" height="14" aria-hidden>
-                  <path d="M7.5 2.5 4 6l3.5 3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-              <span className="octave-name">{`oct ${octave / 12 - 1}`}</span>
-              <button type="button" className="octave-step" aria-label="Octave up" title="Octave up" disabled={octave >= octaves.max} onClick={() => setOctave(octave + 12)}>
-                <svg viewBox="0 0 12 12" width="14" height="14" aria-hidden>
-                  <path d="M4.5 2.5 8 6 4.5 9.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            </div>
-          )}
-          <DockedHex
-            dock={view.dock(active.index, shape)}
-            onLabelClick={() =>
-              setEditRequest((r) => ({
-                bar: active.bar,
-                part: active.part,
-                n: (r?.n ?? 0) + 1,
-              }))
-            }
-            onPick={(written) => dispatch({ type: 'pick', written })}
-            onHoverPitch={(p) => {
-              hovered.current = p;
-            }}
-            halo={haloPitch === null ? null : view.toWritten(haloPitch)}
-            heard={heardConcert === null ? null : view.toWritten(heardConcert)}
-            targets={targets?.hex ?? null}
-            sounded={sounded && { midi: view.toWritten(sounded.midi), n: sounded.n }}
-            still={session.practice && metroOn}
-          />
-        </section>
-        {/* While listening (Listen, §9.2): a row on top of the hex panel's top edge, overlaying the chart (it takes
-            none of the hex's space) — the tuner centred, its input level and meter at the right. */}
-        <div className="listen-row">
-          <div className="tuner-slot" ref={setTunerSlot} />
-          <div className="levels-slot" ref={setLevelsSlot} />
-        </div>
-        {/* Hide / show the hex panel (SPEC §3.1): the screen's bottom right corner, remembered on the device. */}
-        <button
-          type="button"
-          className="hex-hide-toggle"
-          aria-pressed={hexHidden}
-          title={hexHidden ? 'Show the hex panel' : 'Hide the hex panel (the chart takes the screen)'}
-          onClick={() => {
-            setHexHidden(!hexHidden);
-            focusHex();
-          }}
-        >
-          {hexHidden ? 'Show hex' : 'Hide hex'}
-        </button>
+        )}
       </main>
     </div>
   );
