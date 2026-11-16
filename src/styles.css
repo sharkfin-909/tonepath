@@ -2465,14 +2465,30 @@ select {
 }
 /* The looped bars: a chip after Loop, × back to the whole form. */
 .transport-bars {
+  /* Fixed width (fits "bars 12–32 ×"): the transport bar keeps its length whether or not bars are looped. */
+  box-sizing: border-box;
+  width: 9.2em;
+  flex: none;
   display: inline-flex;
   align-items: center;
+  justify-content: space-between;
   gap: 2px;
   padding: 0 2px 0 8px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
   font-size: 12px;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+.transport-bars-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.transport-bars:not(.looping) {
+  opacity: 0.55;
+}
+.transport-bars.looping {
+  background: rgba(255, 255, 255, 0.14);
 }
 .transport-bars-clear {
   border: none;

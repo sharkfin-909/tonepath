@@ -88,14 +88,16 @@ export function TransportBar({ bpm, onBpm, sound, onSound, running, onStartStop,
       <label className="transport-loop" title={bars ? 'Loop: round the looped bars again at their end' : 'Loop: round the form again at its end (click bar numbers to loop just them)'}>
         <input type="checkbox" checked={loop} onChange={(e) => onLoop(e.target.checked)} /> Loop
       </label>
-      {bars && (
-        <span className="transport-bars">
-          {bars.from === bars.to ? `bar ${bars.from + 1}` : `bars ${bars.from + 1}–${bars.to + 1}`}
+      {/* The loop status: always there at a fixed width, so the bar never changes length — "whole form", or the looped
+          bars with × (back to the whole form). */}
+      <span className={bars ? 'transport-bars looping' : 'transport-bars'} role="status">
+        <span className="transport-bars-text">{!bars ? 'whole form' : bars.from === bars.to ? `bar ${bars.from + 1}` : `bars ${bars.from + 1}–${bars.to + 1}`}</span>
+        {bars && (
           <button type="button" className="transport-bars-clear" aria-label="Loop the whole form" title="Loop the whole form" onClick={onAllBars}>
             ×
           </button>
-        </span>
-      )}
+        )}
+      </span>
     </div>
   );
 }
