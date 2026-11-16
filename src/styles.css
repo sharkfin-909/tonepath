@@ -312,6 +312,8 @@ button.dock-label {
   box-sizing: border-box;
   border: 1px solid rgba(29, 27, 25, 0.16);
   border-radius: 10px;
+  /* A little room above the chord name (zoom.ts SLOT_PAD_TOP_PX; chartHeight counts it). */
+  padding-top: var(--slot-pad-top, 6px);
 }
 
 /* The current slot in Improvise and Read etude (SPEC §3.3, §3.4): a solid highlight, distinct from Write etude's tint. */
@@ -326,10 +328,17 @@ button.dock-label {
 
 /* The key pill (SPEC §3.1): top right of each slot, the key its scale belongs to (C, B♭, A♭ mel, dim…). Sized with the
    scale label so it stays readable at any zoom; filled on the current slot and its key mates. */
+/* The chord name's row: the chord (and its ×) at the left, the key pill at the right, centred on each other. */
+.slot-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  align-self: stretch;
+  min-width: 0;
+}
 .key-pill {
-  position: absolute;
-  top: 2px;
-  right: 4px;
+  margin-left: auto;
+  flex: none;
   z-index: 4;
   max-width: 45%;
   /* Every pill at least as wide as "A mel" (measured: 3.59em incl. padding and border), the name centred. */
@@ -350,7 +359,7 @@ button.dock-label {
   pointer-events: auto;
 }
 .key-pill.beside-append {
-  right: 26px;
+  margin-right: 20px;
 }
 /* Lit (the current slot and its key mates): solid warm yellow, dark ink — every mode. */
 .slot.active .key-pill,
@@ -1410,15 +1419,23 @@ button.dock-label {
 }
 /* The key pill takes the right column (in flow here, not over the slot), so the left column gets the rest. */
 .slot.lead > .key-pill {
-  position: static;
   grid-column: 3;
   grid-row: 1;
   justify-self: end;
   max-width: none;
-  margin: 2px 4px 0 0;
+  /* Centred on the chord name, which tops the left column: the chord label's height (1.25 line + 4px padding) less
+     the pill's (1.45 line at 1.3× the scale size, + 2px border), halved. */
+  margin: calc((1.25 * var(--chord-px, 17px) + 4px - 1.885 * var(--scale-px, 11px) - 2px) / 2) 4px 0 0;
 }
 .slot.lead > .key-pill.beside-append {
   margin-right: 26px;
+}
+/* Improvise: the names top their column (the hex has the middle), so the chord row starts at the card's padding. */
+.slot.lead > .slot-header {
+  justify-content: flex-start;
+}
+.slot.lead .chord-label {
+  line-height: 1.25;
 }
 .slot.lead > .slot-header {
   grid-column: 1;

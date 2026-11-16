@@ -15,7 +15,7 @@ import { LeadTones } from './LeadTones';
 import { keyName, keyOf, sameKey } from '../key';
 import { prettyName } from '../spelling';
 
-import { CHORD_PX, MIN_CHORD_PX, MIN_SCALE_PX, ROW_GAP_PX, SCALE_PX, SLOT_GAP_PX, chartHeight, fitZoom, headerPx, labelPx } from '../zoom';
+import { CHORD_PX, MIN_CHORD_PX, MIN_SCALE_PX, ROW_GAP_PX, SCALE_PX, SLOT_GAP_PX, SLOT_PAD_TOP_PX, chartHeight, fitZoom, headerPx, labelPx } from '../zoom';
 
 const GUTTER_WIDTH = 46;
 
@@ -125,6 +125,7 @@ export function Chart({ progression, view, caret, onSlotClick, onEventClick, onT
     gap: ROW_GAP_PX,
     '--row-gap': `${ROW_GAP_PX}px`,
     '--slot-gap': `${SLOT_GAP_PX}px`,
+    '--slot-pad-top': `${SLOT_PAD_TOP_PX}px`,
     '--chord-px': `${labelPx(CHORD_PX, MIN_CHORD_PX, zoom)}px`,
     '--scale-px': `${labelPx(SCALE_PX, MIN_SCALE_PX, zoom)}px`,
   } as CSSProperties;
@@ -306,6 +307,12 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
   const { staffTop, staffBottom, height: staveHeight } = staveMetrics();
   // Unparseable time signatures are shown in the header as typed; the stave shows (and beams by) the layout meter.
   const meter = showTimeSignature ? layout : undefined;
+  // The key pill (SPEC §3.1): the key this slot's scale belongs to; lit on the current slot and its key mates (only the pill).
+  const keyPill = keyLabel && (
+    <span className={['key-pill', onAppend && 'beside-append'].filter(Boolean).join(' ')} title={`Key family: ${prettyName(keyLabel)}`}>
+      {prettyName(keyLabel)}
+    </span>
+  );
   /** Marks against this (owning) slot's written harmony (SPEC §7.2). */
   const markOf = (e: TimedEvent) => ('pitch' in e.ev ? view.mark(e.ev.pitch, slot) : null);
 
@@ -314,7 +321,7 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
       className={['slot', active && 'active', keyMate && 'key-mate', (active || keyMate) && playing && 'playing', inSelection && !loop && 'bar-selected', loop && 'looped', loop?.start && 'loop-start', loop?.end && 'loop-end', hideMelody && 'lead', barCard && `bar-${barCard}`, rowEnd && 'row-end'].filter(Boolean).join(' ')}
       // --staff-top: where the stave's top line sits in the slot; the bar number sits just above it (CSS .bar-handle).
       // Improvise's 3-column slot keeps the usual slot height (labels + stave), so rows and the zoom stay as they were.
-      style={{ gridColumn: `span ${span}`, ['--staff-top' as string]: `${header + staffTop}px`, ...(hideMelody ? { minHeight: header + staveHeight } : {}) }}
+      style={{ gridColumn: `span ${span}`, ['--staff-top' as string]: `${SLOT_PAD_TOP_PX + header + staffTop}px`, ...(hideMelody ? { minHeight: header + staveHeight + SLOT_PAD_TOP_PX + 2 } : {}) }}
       data-slot={slot.index}
       // ⇧-click (Write): extend the bar selection to this bar — caught before notes, the stave or the chord see it.
       onClickCapture={(e) => {
@@ -343,18 +350,18 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
           +
         </button>
       )}
-      {keyLabel && (
-        // The key pill (SPEC §3.1): the key this slot's scale belongs to; lit on the current slot and its key mates (only the pill).
-        <span className={['key-pill', onAppend && 'beside-append'].filter(Boolean).join(' ')} title={`Key family: ${prettyName(keyLabel)}`}>
-          {prettyName(keyLabel)}
-        </span>
-      )}
+      {/* Improvise: the key pill has the right-hand column of the 3-column slot. */}
+      {hideMelody && keyPill}
       <div className="slot-header" style={{ height: header }}>
-        {editing ? (
-          <ChordField initial={chord} error={error} onCommit={onCommit} used={usedChords} inKey={view.keyChords(slot.index).map((k) => k.symbol)} />
-        ) : (
-          <ChordLabel chord={chord} harmony={harmony} bar={slot.bar} part={slot.part} onEdit={onEdit} onClear={onClear} />
-        )}
+        {/* The chord name's row; elsewhere the key pill shares it, centred on the chord name. */}
+        <div className="slot-title">
+          {editing ? (
+            <ChordField initial={chord} error={error} onCommit={onCommit} used={usedChords} inKey={view.keyChords(slot.index).map((k) => k.symbol)} />
+          ) : (
+            <ChordLabel chord={chord} harmony={harmony} bar={slot.bar} part={slot.part} onEdit={onEdit} onClear={onClear} />
+          )}
+          {!hideMelody && keyPill}
+        </div>
         <ScaleLabel harmony={harmony} bar={slot.bar} onPick={onScaleChange} />
       </div>
       <div ref={ref} className="slot-body">
@@ -399,13 +406,13 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
         </button>
       )}
       {/* The loop's repeat signs (SPEC §3.7): [: at its first bar line, :] and the × (stop looping) at its last. */}
-      {loop?.start && <RepeatSign side="start" top={header + staffTop} height={staffBottom - staffTop} />}
-      {loop?.end && <RepeatSign side="end" top={header + staffTop} height={staffBottom - staffTop} />}
+      {loop?.start && <RepeatSign side="start" top={SLOT_PAD_TOP_PX + header + staffTop} height={staffBottom - staffTop} />}
+      {loop?.end && <RepeatSign side="end" top={SLOT_PAD_TOP_PX + header + staffTop} height={staffBottom - staffTop} />}
       {loop?.end && loop.onClear && (
         <button
           type="button"
           className="loop-clear"
-          style={{ top: header + staffTop }}
+          style={{ top: SLOT_PAD_TOP_PX + header + staffTop }}
           title="Stop looping: back to the whole form (Esc)"
           aria-label="Stop looping"
           onClick={loop.onClear}
