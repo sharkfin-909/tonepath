@@ -2,7 +2,7 @@
 id: 61
 title: "Map: Listen and Practice — next steps"
 labels: [wayfinder:map]
-status: open
+status: closed
 assignee:
 ---
 
@@ -54,3 +54,14 @@ resolved into a decision a build slice can be cut from.
 - Recording or transcribing what is played into the melody.
 - Phone layout of the chart (cap bars per row on narrow screens) and the product name / SEO — separate efforts, not
   about listening.
+
+## Resolution
+
+**Dropped** (2026-11-16): superseded by [Mode menu](068-mode-menu.md). Practice and its note-driven advance rules are
+gone; Listen now serves Tuner and Improvise, where heard notes only light the hex and show on the tuner — they never
+move the form on, and nothing is scored. The decided tickets above stay valid for Listen as it is ([Steadier tuner
+needle](062-steadier-tuner-needle.md), [Analysis in an AudioWorklet](063-analysis-in-an-audioworklet.md),
+[Analysis window by register](064-analysis-window-by-register.md), [Echo guard with speakers](065-echo-guard-with-speakers.md)).
+The open ones are dropped: [Practice feedback](066-practice-feedback.md) (nothing left to score) and [Baseline false
+counts](067-baseline-false-counts.md) (no counts). *Practice beyond the five rules* is answered by the transport.
+If stray note-starts lighting the hex prove a problem in Tuner / Improvise, that is a new ticket against SPEC §9.2.

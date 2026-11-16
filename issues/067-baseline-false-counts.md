@@ -2,7 +2,7 @@
 id: 67
 title: "Baseline false counts"
 labels: [wayfinder:grilling]
-status: open
+status: closed
 parent: 61
 blocked_by: []
 assignee:
@@ -18,3 +18,9 @@ Decide among (or combine): raise the onset gate / clarity cut-off; require a str
 lengthen the two-equal lock; a noise-floor–relative gate; hold-through-unlock alone (already decided on
 [Steadier tuner needle](062-steadier-tuner-needle.md)) once built; product copy (quiet room / gain); or defer into
 instrument-specific detector tuning. What is in scope for the next build vs left to later HITL per instrument.
+
+## Resolution
+
+**Dropped** (2026-11-16) with its map ([061](061-map-listen-and-practice-next.md)): [Mode menu](068-mode-menu.md)
+removes note counting. Heard notes now only light the hex (Tuner, Improvise stopped); if baseline false note-starts
+make that flicker, open a new ticket against SPEC §9.2.

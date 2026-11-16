@@ -2,7 +2,7 @@
 id: 66
 title: "Practice feedback"
 labels: [wayfinder:grilling]
-status: open
+status: closed
 parent: 61
 blocked_by: []
 assignee:
@@ -15,3 +15,8 @@ per slot: notes played vs. the count, whether the change was made on a target, w
 through the form: a summary (slots landed on a guide tone, misses), kept or thrown away; shown where (the chart's
 slots, the practice panel, an end-of-pass card). Decide what is measured, where it is shown, and whether anything is
 saved.
+
+## Resolution
+
+**Dropped** (2026-11-16) with its map ([061](061-map-listen-and-practice-next.md)): [Mode menu](068-mode-menu.md)
+removes Practice's note-driven rules, so there is no count, target hit or miss left to report.
