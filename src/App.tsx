@@ -393,7 +393,8 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
         // time signature) keep it: clicking them starts editing.
         onClick={(e) => {
           const el = e.target as Element;
-          if (el.closest('button') && !el.closest('.inline-value')) focusHex();
+          // The mode picker keeps focus while its menu is open (it hands focus back itself on a choice).
+          if (el.closest('button') && !el.closest('.inline-value') && !el.closest('.mode-picker')) focusHex();
         }}
         onChange={(e) => {
           if (e.target instanceof HTMLSelectElement) focusHex();
