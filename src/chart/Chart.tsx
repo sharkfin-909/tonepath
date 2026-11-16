@@ -347,7 +347,7 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
 
   return (
     <div
-      className={['slot', active && 'active', keyMate && 'key-mate', (active || keyMate) && playing && 'playing', inSelection && !loop && 'bar-selected', loop && 'looped', loop?.start && 'loop-start', loop?.end && 'loop-end', hideMelody && 'lead', barCard && `bar-${barCard}`, readEtude && slot.barEnd && 'bar-end', rowEnd && 'row-end'].filter(Boolean).join(' ')}
+      className={['slot', active && 'active', keyMate && 'key-mate', (active || keyMate) && playing && 'playing', inSelection && !loop && 'bar-selected', loop && 'looped', loop?.start && 'loop-start', loop?.end && 'loop-end', hideMelody && 'lead', barCard && `bar-${barCard}`, slot.barEnd && 'bar-end', rowEnd && 'row-end'].filter(Boolean).join(' ')}
       // --staff-top: where the stave's top line sits in the slot; the bar number sits just above it (CSS .bar-handle).
       // Improvise's 3-column slot keeps the usual slot height (labels + stave), so rows and the zoom stay as they were.
       style={{

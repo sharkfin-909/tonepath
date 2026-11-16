@@ -22,8 +22,8 @@ export const ROW_GAP_PX = 30;
 export const ROW_GAP_READ_PX = 10;
 /** Logical space under each row's cards, so a bar strip reads as belonging to the bar below it, not the one above. */
 export const ROW_AFTER_PX = 14;
-/** Logical gap between slots in a row (each slot a card); after a bar, the same gap sits on each side of the bar line. */
-export const SLOT_GAP_PX = 10;
+/** The one gap of the chart's rows: between two cards, and on each side of a bar line (card · gap · line · gap · card). */
+export const SLOT_GAP_PX = 14;
 /** Logical padding at the top of each slot card (above the chord name), and the card's border (1px each side). */
 export const SLOT_PAD_TOP_PX = 6;
 export const SLOT_BORDER_PX = 1;

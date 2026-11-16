@@ -433,13 +433,15 @@ button.dock-label {
   overflow: visible;
 }
 
-/* Bar lines span the staff only (no line between two chords in a bar). */
-/* A bar line at the end of each bar: full card height in Write; staff height in Read (SPEC §3.1). */
+/* A bar line at the end of each bar (no line between two chords in a bar): full card height in Write etude and
+   Improvise; staff height in Read etude (SPEC §3.1). One gap everywhere: card · slot-gap · card, and after a bar
+   card · slot-gap · bar line · slot-gap · card. The line sits a slot-gap past the card's outer (1px border) edge.
+   Write etude and Improvise: it reaches up through the bar strip (--row-gap) too, so each bar holds its number. */
 .bar-line {
   position: absolute;
-  top: 0;
+  top: calc(-1px - var(--row-gap));
   bottom: 0;
-  right: calc(-1px - var(--slot-gap) / 2 - var(--bar-line) / 2);
+  right: calc(-1px - var(--slot-gap) - var(--bar-line));
   width: var(--bar-line);
   background: var(--line);
   pointer-events: none;
@@ -461,8 +463,8 @@ button.dock-label {
   position: relative;
   z-index: 1; /* staff bridges draw over the bar line, not under it */
 }
-/* After a bar: slot-gap + bar line + slot-gap (column-gap is already one slot-gap). */
-.main.read .slot.bar-end {
+/* After a bar: slot-gap + bar line + slot-gap (column-gap is already one slot-gap). Every mode. */
+.slot.bar-end {
   margin-right: calc(var(--slot-gap) + var(--bar-line));
 }
 .main.read .bar-line {
@@ -524,7 +526,7 @@ button.dock-label {
 }
 
 .slot.lead .bar-line {
-  top: 0;
+  top: calc(-1px - var(--row-gap));
   bottom: 0;
   height: auto;
 }
@@ -1582,7 +1584,7 @@ button.dock-label {
 
 /* Improvise: warm paper behind the lead sheet. */
 .main.improvise > .chart-area {
-  background: #ece5c3;
+  background: #f7f3e5; /* #ECE5C3, lightened */
 }
 /* …and the lead sheet's cards keep the original white paper on it. Drawn under the card (the chart's transform makes
    it the stacking context), so the current slot's highlight, the tint and the loop band still sit on top. */
@@ -1592,6 +1594,8 @@ button.dock-label {
   inset: -1px;
   border-radius: inherit;
   background: var(--bg);
+  /* A light shadow lifts each card off the paper. */
+  box-shadow: 0 1px 2px rgba(29, 27, 25, 0.06), 0 2px 8px rgba(29, 27, 25, 0.08);
   z-index: -1;
   pointer-events: none;
 }
