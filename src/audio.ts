@@ -29,12 +29,12 @@ export function chordVoicing(h: SlotHarmony): number[] {
 }
 
 /**
- * ▶ Scale: the slot scale ascending one octave from the tonic (tonic in concert octave 3), top tonic included.
+ * ▶ Scale: the slot scale ascending one octave from the tonic (tonic in concert octave 4), top tonic included.
  * A no-fit chord plays its chord tones ascending over one octave. Empty for slots without a chord.
  */
 export function scaleRun(h: SlotHarmony): number[] {
   if (h.kind !== 'chord') return [];
-  const root = OCTAVE_3 + pc(h.root);
+  const root = OCTAVE_3 + 12 + pc(h.root); // concert octave 4
   const steps = h.scale
     ? SCALES[h.scale].intervals.map(semis)
     : [...new Set(h.intervals.map((iv) => semis(iv) % 12))].sort((a, b) => a - b);

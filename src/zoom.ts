@@ -180,6 +180,8 @@ export function chartArea(
   mainHeight: number,
   /** Improvise / Tune: measured height of the bottom overlay (listen row + hex). */
   dockReserve = 0,
+  /** The hex panel's share of the area under the header ('half': the chart takes the rest). */
+  hexShare = 0.5,
 ): { padTop: number; padBottom: number; maxHeight?: number; fitHeight?: number } {
   const padTop = CHART_PAD_TOP_PX;
   const padBottom = kind === 'read' ? READ_PAD_BOTTOM_PX : 0;
@@ -192,5 +194,6 @@ export function chartArea(
     return { padTop, padBottom };
   }
   if (budget === 'full') return { padTop, padBottom, fitHeight: mainHeight - padTop - padBottom };
-  return { padTop, padBottom, maxHeight: mainHeight / 2, fitHeight: mainHeight / 2 - padTop };
+  const chart = mainHeight * (1 - hexShare);
+  return { padTop, padBottom, maxHeight: chart, fitHeight: chart - padTop };
 }

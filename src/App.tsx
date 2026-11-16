@@ -4,7 +4,7 @@
 // (`modeProfile.ts`), the editing session (`session.ts`, run by `useChartSession`), the keyboard table (`keymap.ts`),
 // the chart layout (`zoom.ts`), what lights the hex (`hexLighting.ts`), the instrument view (`view.ts`), the transport
 // (`transport.ts`, `metronomeRun.ts`, run by `useTransport`) and the mic intake (`micIntake.ts`). This file renders them.
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { LengthLatch } from './rail/LengthLatch';
 import { Chart } from './chart/Chart';
 import { BarsPerRow, ClearMenu, TimeSignatureField, TitleField } from './rail/RailSettings';
@@ -122,8 +122,13 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
   const [hexHidden, setHexHidden] = useDeviceSetting(HEX_HIDDEN);
   // Phones (SPEC §3.6): the honeycomb is too small there, so the dock is always Linear; the saved setting is kept.
   const narrow = useMediaQuery('(max-width: 640px)');
+  /** Phones (SPEC §3.6): the chart shows one bar per row (two cards don't fit); the saved setting is kept and returns
+   *  on a wider screen, and the bars / row picker is hidden. */
+  const chartProgression = useMemo(() => (narrow && progression.barsPerRow !== 1 ? { ...progression, barsPerRow: 1 } : progression), [narrow, progression]);
   /** Tablet and phone: the edit pill and the transport bar leave the header for the bottom stack. */
   const tablet = useMediaQuery('(max-width: 1024px)');
+  /** The hex panel's share of the space under the header (SPEC §3.6): a little more from tablet down. */
+  const hexShare = tablet ? 0.6 : 0.5;
   const linear = linearSetting || narrow;
   const [octaveWanted, setOctave] = useState<number | null>(null);
   const toggleLinear = () => setLinear(!linearSetting);
@@ -266,7 +271,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
   const dockedBottom = improvise || tune;
   /** Tablet and down, hex showing: the input level and chord bump pills move from the listen row into the hex panel. */
   const listenInDock = tablet && profile.hex && !hideHex;
-  const area = chartArea(profile.chartBudget, profile.chart, mainHeight, dockedBottom ? dockWrapHeight : 0);
+  const area = chartArea(profile.chartBudget, profile.chart, mainHeight, dockedBottom ? dockWrapHeight : 0, hexShare);
   useLayoutEffect(() => {
     if (!dockedBottom) {
       setDockWrapHeight(0);
@@ -282,7 +287,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
   const formControls = profile.formGroup && (
     <div className="edit-pill form-group pill">
       <TimeSignatureField value={progression.timeSignature} onChange={(text) => dispatch({ type: 'time-signature', text })} />
-      <BarsPerRow value={progression.barsPerRow} onChange={(n) => dispatch({ type: 'bars-per-row', n })} />
+      {!narrow && <BarsPerRow value={progression.barsPerRow} onChange={(n) => dispatch({ type: 'bars-per-row', n })} />}
       {undoRedo}
     </div>
   );
@@ -300,6 +305,11 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
       onLoop={transport.setLoop}
       bars={session.selection}
       onAllBars={() => dispatch({ type: 'clear-selection' })}
+      barCount={progression.bars.length}
+      onPickBars={(from, to) => {
+        dispatch({ type: 'bar-select', bar: from, extend: false });
+        if (to !== from) dispatch({ type: 'bar-select', bar: to, extend: true });
+      }}
       showScales={read ? showReadScales : undefined}
       onShowScales={read ? setShowReadScales : undefined}
     />
@@ -316,12 +326,12 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
         onRefusalShown={onRefusalShown}
       />
       <TimeSignatureField value={progression.timeSignature} onChange={(text) => dispatch({ type: 'time-signature', text })} />
-      <BarsPerRow value={progression.barsPerRow} onChange={(n) => dispatch({ type: 'bars-per-row', n })} />
+      {!narrow && <BarsPerRow value={progression.barsPerRow} onChange={(n) => dispatch({ type: 'bars-per-row', n })} />}
       <div className="step-controls">
         <button
           type="button"
           className="rail-button chip chip--icon"
-          title="Nudge the note at the caret down a scale step (↓) · ⇧-click / ⇧↓ a semitone · ⌥↓ an octave"
+          title="Nudge the note at the caret down a scale step (⌥↓) · ⇧-click / ⇧↓ a semitone · ↓ an octave"
           aria-label="Nudge down"
           onClick={(e) =>
             dispatch({
@@ -339,7 +349,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
         <button
           type="button"
           className="rail-button chip chip--icon"
-          title="Nudge the note at the caret up a scale step (↑) · ⇧-click / ⇧↑ a semitone · ⌥↑ an octave"
+          title="Nudge the note at the caret up a scale step (⌥↑) · ⇧-click / ⇧↑ a semitone · ↑ an octave"
           aria-label="Nudge up"
           onClick={(e) =>
             dispatch({
@@ -386,14 +396,13 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
         if (el.closest('.dropdown-option') || (el.closest('button') && !el.closest('.inline-value') && !el.closest('.dropdown'))) focusHex();
       }}
     >
-      {tablet && (formControls || editControls || transportControls) && (
+      {tablet && (editControls || transportControls) && (
         <div className="sound-bar-row">
-          {formControls}
           {editControls}
           {transportControls}
         </div>
       )}
-      <div className="sound-section pill pill--solid">
+      <div className="sound-section pill">
         <AudioControls
           muted={muted}
           onToggleMute={() => dispatch({ type: 'toggle-mute' })}
@@ -416,6 +425,22 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
     </div>
   );
 
+  /** Hide / Show hex (Improvise): the hex panel's bottom right corner; tablet and down, the tuner bar's right end (SPEC §3.6). */
+  const hexToggle = profile.hexHideable && (
+    <button
+      type="button"
+      className={tablet ? 'hex-hide-toggle pill pill--sm in-row' : 'hex-hide-toggle pill pill--sm'}
+      aria-pressed={hexHidden}
+      title={hexHidden ? 'Show the hex panel' : 'Hide the hex panel'}
+      onClick={() => {
+        setHexHidden(!hexHidden);
+        focusHex();
+      }}
+    >
+      {hexHidden ? 'Show hex' : 'Hide hex'}
+    </button>
+  );
+
   const chartAreaStyle: CSSProperties = {
     paddingTop: area.padTop,
     paddingBottom: area.padBottom,
@@ -427,7 +452,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
   };
 
   return (
-    <div className="layout-c" style={{ '--sound-bar-h': `${soundBarHeight}px` } as CSSProperties}>
+    <div className="layout-c" style={{ '--sound-bar-h': `${soundBarHeight}px`, '--hex-share': `${hexShare * 100}%` } as CSSProperties}>
       <header
         className="topbar"
         aria-label="Controls"
@@ -446,7 +471,6 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
         {/* Row 1, left: the mode panel and clef (Concert) + instrument, in one pill (SPEC §3.1). */}
         <div className="mode-ins-group pill">
           {modeSwitch}
-          <span className="pill-sep" aria-hidden />
           <span className="ins-group">
             <InstrumentPicker
               instrument={view.inst.id}
@@ -466,7 +490,6 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
                   <TitleField title={progression.title} editing={renameOnOpen} onRename={(text) => dispatch({ type: 'title', text })} />
                 </h1>
               </span>
-              <span className="pill-sep" aria-hidden />
               <span className="etude-group">
                 <span className="pill-label">etude:</span>
                 <EtudePicker
@@ -485,8 +508,9 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
         </div>
         {/* Row 2: the mode's own groups (SPEC §3.0) — none in Tune. */}
         <div className="mode-groups">
-            {/* Tablet and down: form, edit, and transport sit in the bottom stack, above the sound pill. */}
-            {!tablet && formControls}
+            {/* Tablet and down: edit and transport sit in the bottom stack, above the sound pill; Improvise's form
+                group stays here. */}
+            {formControls}
             {!tablet && transportControls}
             {!tablet && editControls}
         </div>
@@ -509,7 +533,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
             // Tune (SPEC §3.8): the chart pane stays, empty, at the chart's height — nothing moves between modes.
             <div className="chart-pane-empty" aria-hidden>
               <Chart
-                progression={progression}
+                progression={chartProgression}
                 melody={etude.melody}
                 view={view}
                 caret={caretAt}
@@ -529,7 +553,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
             </div>
           ) : (
             <Chart
-              progression={progression}
+              progression={chartProgression}
               melody={etude.melody}
               view={view}
               caret={caretAt}
@@ -565,6 +589,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
                 {!listenInDock && <div className="levels-slot" ref={setLevelsSlot} />}
                 <div className="tuner-slot" ref={setTunerSlot} />
                 {improvise && !hideHex && !listenInDock && <div className="bump-slot" ref={setBumpSlot} />}
+                {tablet && hexToggle && <div className="hex-toggle-slot">{hexToggle}</div>}
               </div>
             )}
             {improvise && profile.listens && !hideHex && (
@@ -627,20 +652,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
                 />
               </section>
             )}
-            {profile.hexHideable && (
-              <button
-                type="button"
-                className="hex-hide-toggle pill pill--sm"
-                aria-pressed={hexHidden}
-                title={hexHidden ? 'Show the hex panel' : 'Hide the hex panel'}
-                onClick={() => {
-                  setHexHidden(!hexHidden);
-                  focusHex();
-                }}
-              >
-                {hexHidden ? 'Show hex' : 'Hide hex'}
-              </button>
-            )}
+            {!tablet && hexToggle}
           </div>
         ) : (
           profile.hex && (

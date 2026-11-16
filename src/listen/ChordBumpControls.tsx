@@ -33,15 +33,16 @@ export function ChordBumpControls({
           <span className="switch-knob" />
         </span>
       </button>
-      <Dropdown
-        className="chord-bump-notes"
-        label="Chord bump notes"
-        prefix="notes:"
-        value={notes}
-        disabled={!on}
-        options={CHORD_BUMP_NOTES_OPTIONS.map((n) => ({ value: n, label: String(n) }))}
-        onChange={onNotes}
-      />
+      <span className="chord-bump-notes">
+        <span className="pill-label">notes:</span>
+        <Dropdown
+          label="Chord bump notes"
+          value={notes}
+          disabled={!on}
+          options={CHORD_BUMP_NOTES_OPTIONS.map((n) => ({ value: n, label: String(n) }))}
+          onChange={onNotes}
+        />
+      </span>
     </div>,
     slot,
   );

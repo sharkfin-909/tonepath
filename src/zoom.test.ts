@@ -110,6 +110,10 @@ describe('chart area', () => {
     expect(chartArea('half', 'write', 800)).toEqual({ padTop: CHART_PAD_TOP_PX, padBottom: 0, maxHeight: 400, fitHeight: 400 - CHART_PAD_TOP_PX });
   });
 
+  it('Write etude, tablet and down: the hex panel takes 60%, the chart the other 40%', () => {
+    expect(chartArea('half', 'write', 800, 0, 0.6)).toEqual({ padTop: CHART_PAD_TOP_PX, padBottom: 0, maxHeight: 320, fitHeight: 320 - CHART_PAD_TOP_PX });
+  });
+
   it('Read etude: all of it, less the padding above and below the chart', () => {
     expect(chartArea('full', 'read', 800)).toEqual({
       padTop: CHART_PAD_TOP_PX,

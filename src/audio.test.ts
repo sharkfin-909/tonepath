@@ -31,17 +31,17 @@ describe('▶ Chord voicing', () => {
 });
 
 describe('▶ Scale run', () => {
-  it('one octave from the tonic in octave 3, top tonic included', () => {
-    expect(scaleRun(h('Dm7'))).toEqual([50, 52, 53, 55, 57, 59, 60, 62]);
-    expect(scaleRun(h('Bbm7'))).toEqual([58, 60, 61, 63, 65, 67, 68, 70]);
+  it('one octave from the tonic in octave 4, top tonic included', () => {
+    expect(scaleRun(h('Dm7'))).toEqual([62, 64, 65, 67, 69, 71, 72, 74]);
+    expect(scaleRun(h('Bbm7'))).toEqual([70, 72, 73, 75, 77, 79, 80, 82]);
   });
   it('follows the override, and 6- / 8-note scales', () => {
-    expect(scaleRun(h('Dm7', 'aeolian'))).toEqual([50, 52, 53, 55, 57, 58, 60, 62]);
+    expect(scaleRun(h('Dm7', 'aeolian'))).toEqual([62, 64, 65, 67, 69, 70, 72, 74]);
     expect(scaleRun(h('C7#5'))).toHaveLength(7); // whole-tone: 6 + top
     expect(scaleRun(h('G7b9'))).toHaveLength(9); // half-whole: 8 + top
   });
   it('a no-fit chord plays its chord tones over one octave', () => {
-    expect(scaleRun(h('C7sus4b9'))).toEqual([48, 49, 53, 55, 58, 60]);
+    expect(scaleRun(h('C7sus4b9'))).toEqual([60, 61, 65, 67, 70, 72]);
   });
   it('is silent without a chord', () => expect(scaleRun(h('N.C.'))).toEqual([]));
 });

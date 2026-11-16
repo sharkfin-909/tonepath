@@ -16,8 +16,9 @@ describe('keymap (SPEC §11)', () => {
     expect(intent(key('Backspace'), w)).toEqual({ type: 'delete', back: true });
     expect(intent(key('z', { metaKey: true }), w)).toEqual({ type: 'undo' });
     expect(intent(key('z', { metaKey: true, shiftKey: true }), w)).toEqual({ type: 'redo' });
-    expect(intent(key('ArrowDown'), w)).toEqual({ type: 'nudge', dir: -1, octave: false, scale: true }); // diatonic
-    expect(intent(key('ArrowUp', { altKey: true }), w)).toEqual({ type: 'nudge', dir: 1, octave: true }); // ⌥: an octave
+    expect(intent(key('ArrowDown'), w)).toEqual({ type: 'nudge', dir: -1, octave: true }); // an octave
+    expect(intent(key('ArrowUp'), w)).toEqual({ type: 'nudge', dir: 1, octave: true });
+    expect(intent(key('ArrowUp', { altKey: true }), w)).toEqual({ type: 'nudge', dir: 1, octave: false, scale: true }); // ⌥: a scale step (diatonic)
     expect(intent(key('`'), w)).toEqual({ type: 'step-play' });
     expect(intent(key('~', { shiftKey: true }), w)).toEqual({ type: 'step-play' });
     expect(keyIntent(key('`', { repeat: true }), w)).toEqual({ intent: null, handled: true });

@@ -168,14 +168,14 @@ export function ListenPill({ onHeard, nameOf, onNote, auto = false, tunerSlot = 
 
 /** Tooltip on the tuner well (SPEC §3.1 app tooltips, §9.2). */
 const TUNER_TITLE =
-  'The note the mic hears (written pitch) and how many cents sharp or flat; green within ±10 ¢, amber within ±15 ¢, red beyond; — when nothing clear is heard';
+  'This is a tuner. Play into your device to check your pitch. If it is less than 15 cents (15% of a semitone) sharp or flat, it will show green.';
 
 /**
  * The big tuner above the hex (SPEC §9.2): the note name and octave, a ±50 ¢ scale, the cents off.
- * In tune (±10 ¢): the green band glows and the needle hides. Needle only in amber (±15 ¢) or red.
+ * In tune (±15 ¢): the green band glows and the needle hides. Needle only in amber (±30 ¢) or red.
  */
 function Tuner({ name, cents }: { name: string | null; cents: number }) {
-  const zone = name === null ? 'idle' : Math.abs(cents) <= 10 ? 'in' : Math.abs(cents) <= 15 ? 'near' : 'off';
+  const zone = name === null ? 'idle' : Math.abs(cents) <= 15 ? 'in' : Math.abs(cents) <= 30 ? 'near' : 'off';
   const m = /^(.*?)(-?\d+)$/.exec(name ?? '');
   const showNeedle = zone === 'near' || zone === 'off';
   return (
@@ -187,7 +187,7 @@ function Tuner({ name, cents }: { name: string | null; cents: number }) {
       aria-label={name === null ? 'Tuner: no note' : `Tuner: ${name}, ${cents} cents`}
     >
       <div className="tuner-note">
-        {name === null ? '—' : prettyName(m ? m[1] : name)}
+        {name === null ? '\u00a0' : prettyName(m ? m[1] : name)}
         {m && <sub>{m[2]}</sub>}
       </div>
       <div className="tuner-scale" aria-hidden>

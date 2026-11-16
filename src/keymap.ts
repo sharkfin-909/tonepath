@@ -104,9 +104,9 @@ export function keyIntent(e: KeyPress, ctx: KeyContext): KeyResult {
     if (!e.metaKey && !e.ctrlKey && (e.key === 'Backspace' || e.key === 'Delete')) return handled({ type: 'bar-action', bar, action: 'delete' });
     if (e.key === 'Escape') return handled({ type: 'clear-selection' });
   }
-  // ⌥↑ / ⌥↓: nudge by an octave.
+  // ⌥↑ / ⌥↓: nudge one step of the slot's scale (diatonic).
   if (e.altKey && !e.metaKey && !e.ctrlKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
-    return handled({ type: 'nudge', dir: e.key === 'ArrowUp' ? 1 : -1, octave: true });
+    return handled({ type: 'nudge', dir: e.key === 'ArrowUp' ? 1 : -1, octave: false, scale: true });
   }
   if (!plain) return NONE;
   switch (e.key) {
@@ -118,8 +118,8 @@ export function keyIntent(e: KeyPress, ctx: KeyContext): KeyResult {
       return handled({ type: 'step', dir: e.key === 'ArrowLeft' ? -1 : 1 });
     case 'ArrowUp':
     case 'ArrowDown':
-      // ↑ / ↓: one step of the slot's scale (diatonic); ⇧: a semitone (chromatic).
-      return handled({ type: 'nudge', dir: e.key === 'ArrowUp' ? 1 : -1, octave: false, scale: !e.shiftKey });
+      // ↑ / ↓: an octave; ⇧: a semitone (chromatic).
+      return handled(e.shiftKey ? { type: 'nudge', dir: e.key === 'ArrowUp' ? 1 : -1, octave: false, scale: false } : { type: 'nudge', dir: e.key === 'ArrowUp' ? 1 : -1, octave: true });
     case 'Delete':
     case 'Backspace':
       return handled({ type: 'delete', back: e.key === 'Backspace' });

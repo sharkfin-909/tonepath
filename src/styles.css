@@ -13,6 +13,7 @@
   --note-name: #1d1b19; /* note names in the grid (with a white glow) */
   --grid-glow: #f5e9b0; /* the glow around the honeycomb */
   --grid-glow-opacity: 0.65;
+  --lead-hex-glow: rgba(240, 190, 40, 0.65); /* the slot hexes' glow (Improvise cards) */
   --hex-trigger: #3dff7a; /* heard / flashed / hovered pitch: cells + out-of-scale border buttons */
   /* Inner glow round the header and the hex panel: the grid glow's colour, softer. */
   --panel-glow: inset 0 0 28px color-mix(in srgb, var(--grid-glow) 38%, transparent);
@@ -906,7 +907,7 @@ button.dock-label {
 .instrument-picker {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--pill-gap);
 }
 
 /* Bar number + ⋯ bar handle (SPEC §4.1). */
@@ -1253,6 +1254,7 @@ button.dock-label {
   flex: none;
   display: flex;
   align-items: center;
+  gap: var(--pill-gap);
 }
 .mode-field {
   display: inline-flex;
@@ -1265,7 +1267,7 @@ button.dock-label {
   position: relative;
   display: inline-flex;
 }
-/* The trigger is a .chip (.chip--filled unless `bare`), its prefix a .pill-label (pills.css). */
+/* The trigger is a .chip--filled (pills.css); its label sits outside it, a .pill-label. */
 /* Every picker's value in one weight (SPEC §3.1): regular — the labels beside them stay lighter. */
 .dropdown-value {
   font-weight: 400;
@@ -1497,6 +1499,8 @@ button.dock-label {
 .lead-hex {
   display: block;
   overflow: visible;
+  /* A little warm brown glow round the pattern (follows the cells' outline). */
+  filter: drop-shadow(0 0 4px var(--lead-hex-glow)) drop-shadow(0 1px 1px var(--lead-hex-glow));
 }
 /* Cells as the docked hex: neutral taupe, coloured on triad tones and the guide tone (set inline). */
 .lead-cell polygon {
@@ -1986,24 +1990,25 @@ select {
   right: 10px;
   bottom: 10px;
   z-index: 6;
+  /* It pops: the hex's own glow colour, solid, with dark text and a soft glow (shown or hidden alike). */
+  background: var(--grid-glow);
+  border-color: var(--grid-glow);
+  color: var(--dock-bg);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--grid-glow) 55%, transparent);
 }
-/* Hidden: the chart takes the screen; the toggle sits on the light chart, so it goes dark-on-light. */
+.hex-hide-toggle:hover {
+  background: #fffbe6;
+  border-color: #fffbe6;
+}
+/* Hidden: the chart takes the screen. */
 .main.hex-hidden {
   grid-template-rows: minmax(0, 1fr) 0;
 }
 .main.hex-hidden .dock {
   box-shadow: none;
 }
-.main.hex-hidden .hex-hide-toggle {
-  background: var(--dock-bg);
-  border-color: var(--dock-bg);
-}
 .main.improvise.hex-hidden .dock {
   box-shadow: none;
-}
-.main.improvise.hex-hidden .hex-hide-toggle {
-  background: var(--dock-bg);
-  border-color: var(--dock-bg);
 }
 
 /* The sound section: ▶ buttons and *On arrival*, in a pill centred at the bottom of the screen (every mode). */
@@ -2026,7 +2031,7 @@ select {
   color: var(--ink);
   pointer-events: auto;
 }
-/* Tablet and down: form group, edit pill, and transport share one row above the sound pill. */
+/* Tablet and down: the edit pill or the transport, in a row above the sound pill (the form group stays in the header). */
 .sound-bar-row {
   display: flex;
   flex-wrap: wrap;
@@ -2042,15 +2047,11 @@ select {
   max-width: 100%;
   min-width: 0;
 }
-/* The bottom stack floats over the chart and the hex: every pill in it is opaque. */
-.sound-bar .pill {
-  background: var(--pill-bg-solid);
-}
 .sound-bar .clear-menu {
   top: auto;
   bottom: calc(100% + 4px);
 }
-/* The sound pill (.pill--solid: it sits over the chart), in Outfit Thin throughout. */
+/* The sound pill, in Outfit Thin throughout. */
 .sound-section {
   flex-wrap: nowrap;
   font-weight: 100;
@@ -2198,9 +2199,6 @@ select {
   flex: none;
   min-width: 0;
 }
-.ins-label {
-  margin-right: -4px;
-}
 
 .topbar .instrument-select .dropdown-value {
   max-width: 104px;
@@ -2319,7 +2317,8 @@ select {
   min-width: 0;
 }
 /* Tablet and down: chord sequence and etude live in the library's top section; the mode · ins pill moves to row 2,
-   centred under the wordmark. */
+   centred under the wordmark, and the mode's groups (Improvise: the form group; edit and transport go to the bottom
+   stack) to row 3. */
 @media (max-width: 1024px) {
   .topbar .topbar-file {
     display: none;
@@ -2333,8 +2332,33 @@ select {
     grid-row: 3;
   }
 }
+/* Tablet and down: the bottom stack (sound pill, edit pill or transport) floats over the hex panel's bottom, which
+   keeps that much clear (App measures the stack: --sound-bar-h), so the hex shrinks to fit above it; the octave switch
+   and Hide hex sit just above it too. */
+@media (max-width: 1024px) {
+  .dock {
+    padding-bottom: calc(var(--sound-bar-h, 0px) + 16px);
+  }
+  .dock .octave-switch,
+  .main:not(.hex-hidden) .hex-hide-toggle {
+    bottom: calc(var(--sound-bar-h, 0px) + 16px);
+  }
+}
 /* Phones: the mode and Ins: halves drop their fixed width so the pill fits. */
 @media (max-width: 640px) {
+  /* The mode menu centres under the mode · ins pill (itself centred on the screen), not under the mode button. */
+  .topbar .mode-ins-group {
+    position: relative;
+  }
+  .topbar .mode-panel .dropdown {
+    position: static;
+  }
+  .topbar .mode-panel .dropdown-menu,
+  .topbar .mode-panel .dropdown-menu.right {
+    left: 50%;
+    right: auto;
+    translate: -50% 0;
+  }
   .topbar .mode-ins-group > .mode-panel,
   .topbar .mode-ins-group > .ins-group {
     min-width: 0;
@@ -2486,7 +2510,7 @@ select {
   -moz-appearance: textfield;
   appearance: textfield;
   font: inherit;
-  min-height: var(--chip-h);
+  height: var(--chip-filled-h);
   padding: 0 4px;
   border-radius: var(--pill-radius);
   border: var(--pill-border);
@@ -2532,7 +2556,7 @@ select {
 }
 /* On: the header's light tone (not the grid glow's yellow), the knob dark. */
 .switch.on .switch-track {
-  background: var(--ink);
+  background: var(--pill-ink);
 }
 .switch.on .switch-knob {
   transform: translateX(12px);
@@ -2547,15 +2571,16 @@ select {
 }
 /* The looped bars: a chip after Loop, × back to the whole form. */
 .transport-bars {
-  /* Fixed width (fits "bars 12–32 ×"): the transport bar keeps its length whether or not bars are looped. */
+  /* Fixed width (fits "bars [12 ▾] – [32 ▾]" and "bars 12–32 ×"): the transport bar keeps its length whether or not
+     bars are looped. */
   box-sizing: border-box;
-  width: 9.2em;
+  width: 10em;
   flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
   gap: 2px;
-  min-height: var(--chip-h);
+  min-height: var(--chip-filled-h);
   padding: 0 2px 0 8px;
   border-radius: var(--pill-radius);
   background: rgba(255, 255, 255, 0.06);
@@ -2566,15 +2591,19 @@ select {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.transport-bars:not(.looping) {
-  opacity: 0.55;
+/* Nothing looped: the two loop pickers, no chip of its own. */
+.transport-bars.picking {
+  justify-content: flex-start;
+  gap: 4px;
+  padding: 0;
+  background: none;
 }
 .transport-bars.looping {
   background: rgba(255, 255, 255, 0.14);
 }
 /* × : a .chip, a little smaller than the bar it sits in. */
 .transport-bars-clear {
-  min-height: calc(var(--chip-h) - 4px);
+  min-height: calc(var(--chip-filled-h) - 4px);
   padding: 0 5px;
   font-size: 14px;
 }
@@ -2616,7 +2645,7 @@ select {
   /* A black inner glow round the whole row, and a soft shadow up onto the chart. */
   box-shadow: inset 0 0 14px 2px rgba(0, 0, 0, 0.7), 0 -4px 12px rgba(0, 0, 0, 0.18);
 }
-.listen-row:not(:has(.tuner, .listen-levels, .chord-bump)) {
+.listen-row:not(:has(.tuner, .listen-levels, .chord-bump, .hex-hide-toggle)) {
   display: none;
 }
 
@@ -2644,8 +2673,8 @@ select {
 }
 .main.improvise .hex-dock-wrap:has(.dock),
 .main.tuner-mode .hex-dock-wrap:has(.dock) {
-  height: 50%;
-  max-height: 50%;
+  height: var(--hex-share, 50%); /* App: 50%, 60% from tablet down */
+  max-height: var(--hex-share, 50%);
 }
 .hex-dock-wrap .listen-row {
   position: static;
@@ -2698,16 +2727,34 @@ select {
 .dock > .bump-slot {
   right: 10px;
 }
-/* Tablet and down, hex hidden: the listen row's pills stack, centred, the tuner at the bottom. */
+/* Tablet and down: Hide / Show hex at the tuner bar's right end, on the tuner's line (App). */
+.hex-toggle-slot {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+  display: flex;
+}
+.listen-row .hex-hide-toggle.in-row {
+  position: static;
+}
+/* The right column is at least as wide as the button, so on a narrow phone the tuner moves left rather than under it. */
+.listen-row:has(> .hex-toggle-slot) {
+  grid-template-columns: minmax(0, 1fr) auto minmax(min-content, 1fr);
+}
+/* Tablet and down, hex hidden: the listen row's pills stack, centred — the input level on top, the tuner (with Show
+   hex at the bar's right end) at the bottom. */
 @media (max-width: 1024px) {
   .main.hex-hidden .listen-row:has(.tuner, .listen-levels, .chord-bump) {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
+    row-gap: 6px;
   }
-  .main.hex-hidden .listen-row > .tuner-slot {
-    order: 1;
+  .main.hex-hidden .listen-row > .levels-slot {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    justify-self: center;
+  }
+  .main.hex-hidden .listen-row > .tuner-slot,
+  .main.hex-hidden .listen-row > .hex-toggle-slot {
+    grid-row: 2;
   }
   /* Bottom up: the tuner, then the bottom stack (sound pill, the mode's groups), then the input level. */
   .layout-c:has(.main.hex-hidden .listen-row .tuner) > .sound-bar {
@@ -2728,6 +2775,11 @@ select {
   gap: 8px;
 }
 /* notes: picker stays in the layout when off so the row doesn't jump on toggle (SPEC §9.2). */
+.chord-bump-notes {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pill-gap);
+}
 .chord-bump:not(.on) .chord-bump-notes {
   visibility: hidden;
   pointer-events: none;
@@ -2787,10 +2839,10 @@ select {
   background: rgba(255, 255, 255, 0.25);
 }
 .tuner-band {
-  /* ±10 ¢: in tune — quiet until locked, then glows instead of a centred needle */
+  /* ±15 ¢: in tune — quiet until locked, then glows instead of a centred needle */
   position: absolute;
-  left: 40%;
-  width: 20%;
+  left: 35%;
+  width: 30%;
   top: 4px;
   bottom: 4px;
   border-radius: 4px;
@@ -2991,19 +3043,11 @@ select {
   min-width: 11.9em; /* a little over the widest, so even it never pushes the label */
   justify-content: flex-start; /* the labels stay put; the values change to their right */
 }
-/* …and the values at the right: the label left, the value (and its ▾) right, in one fixed-width pill. */
-.topbar .mode-panel > .dropdown,
+/* …and the values at the right: the label left, the value (and its ▾) right, in one fixed-width half. */
 .topbar .ins-group > .instrument-picker {
   flex: 1;
 }
-.topbar .mode-panel .dropdown-trigger {
-  width: 100%;
-}
-.topbar .mode-panel .dropdown-prefix {
-  margin-right: auto;
-}
+.topbar .mode-panel > .dropdown,
 .topbar .ins-group .instrument-select {
   margin-left: auto;
-  margin-right: -5px; /* its ▾ sits as close to the pill's edge as mode: sits to the other */
 }
-

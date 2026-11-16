@@ -6,12 +6,10 @@
    lay things out. Loaded before styles.css, so component layout rules win where they overlap.
 
    .pill          an outlined pill: a row of controls, fully rounded, lowercase; flashes when it appears or is used
-   .pill--solid   opaque, for a pill over the chart (the sound pill)
    .pill--sm      a small standalone pill button (Grid, Hide hex)
-   .pill-sep      the hairline between two halves of one pill (mode | ins, chord sequence | etude)
-   .pill-label    a pill's Thin label (chord sequence:, etude:, ins:, audio on chord, chord bump, in, bpm …)
+   .pill-label    a pill's Thin label, always outside its control (mode:, ins:, chord sequence:, notes:, bpm …)
    .chip          a control inside a pill: buttons, dropdown triggers, switches; no fill until hovered
-   .chip--filled  a chip with a resting fill (dropdown triggers)
+   .chip--filled  a chip with a resting fill, shorter (dropdown triggers)
    .chip--icon    an icon-only chip (undo / redo, step, rewind, octave ‹ ›)
    .chip.on       a latched chip (note length, rest)
    ───────────────────────────────────────────────────────────────────────────────────────────────────────────────── */
@@ -22,19 +20,18 @@
   --pill-gap: 6px;
   --pill-radius: 999px; /* always fully rounded */
   --pill-border: 1px solid rgba(255, 255, 255, 0.3);
-  --pill-bg: rgba(255, 255, 255, 0.08);
-  --pill-bg-solid: var(--dock-bg);
+  --pill-bg: color-mix(in srgb, #fff 8%, var(--dock-bg)); /* opaque: the same fill over the panels, the chart or the hex */
   --pill-ink: #f3eee6;
   --pill-font: 12px;
   --pill-label-weight: 100; /* Outfit Thin */
   --pill-label-ink: #b8afa3;
-  --pill-sep: rgba(255, 255, 255, 0.25);
   /* Small standalone pills */
   --pill-sm-h: 20px;
   --pill-sm-pad-x: 8px;
   --pill-sm-font: 11px;
   /* Chips: the controls inside a pill */
-  --chip-h: 22px; /* a chip's minimum height */
+  --chip-h: 22px; /* a chip's minimum height (its box only shows on hover) */
+  --chip-filled-h: 18px; /* a filled chip's height: pickers, the bpm field, the looped bars (their box always shows) */
   --chip-pad-x: 6px;
   --chip-icon-w: 26px; /* an icon chip's minimum width */
   --chip-gap: 4px;
@@ -83,9 +80,6 @@
     animation: none;
   }
 }
-.pill--solid {
-  background: var(--pill-bg-solid);
-}
 .pill--sm {
   display: inline-flex;
   justify-content: center;
@@ -94,20 +88,13 @@
   font: inherit;
   font-size: var(--pill-sm-font);
   font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
 }
-button.pill--sm:hover:not(.on) {
+:where(button.pill--sm):hover:not(.on) { /* low specificity: a pill--sm with its own colours sets its own hover */
   background: var(--chip-bg-hover);
 }
-.pill-sep {
-  flex: none;
-  align-self: stretch;
-  width: 1px;
-  margin: 6px 2px;
-  background: var(--pill-sep);
-}
-.pill-label,
-.pill .dropdown-prefix {
+.pill-label {
   color: var(--pill-label-ink);
   font-weight: var(--pill-label-weight);
   white-space: nowrap;
@@ -132,6 +119,7 @@ button.pill--sm:hover:not(.on) {
   cursor: pointer;
 }
 .chip--filled {
+  min-height: var(--chip-filled-h);
   background: var(--chip-bg);
 }
 .chip:hover:not(:disabled),
@@ -161,16 +149,42 @@ button.pill--sm:hover:not(.on) {
     /* e.g. --pill-font: 12px; */
   }
 }
-/* Phones. */
+/* Phones: tighter and a size smaller, so the bottom stack's pills keep to one line on a 360–430px screen. */
 @media (max-width: 640px) {
   :root {
-    /* e.g. --pill-pad-x: 6px; --pill-gap: 4px; */
+    --pill-h: 26px;
+    --pill-pad-x: 6px;
+    --pill-gap: 4px;
+    --pill-font: 11px;
+    --chip-h: 20px;
+    --chip-pad-x: 4px;
+    --chip-gap: 3px;
+    --chip-icon-w: 22px;
+    --chip-filled-h: 17px;
   }
 }
-/* Touch screens: every chip at least a fingertip tall and wide; pills grow to hold them. */
-@media (hover: none) and (pointer: coarse) {
+/* Small phones (360–400px): tighter still. */
+@media (max-width: 400px) {
   :root {
-    --chip-h: var(--touch-min);
-    --chip-icon-w: var(--touch-min);
+    --pill-pad-x: 5px;
+    --pill-gap: 3px;
+    --chip-pad-x: 3px;
+    --chip-gap: 2px;
+  }
+}
+/* Touch screens: chips keep their size (so pills don't balloon); an invisible hit area round each one makes it at
+   least a fingertip (--touch-min) tall and wide. */
+@media (hover: none) and (pointer: coarse) {
+  .chip {
+    position: relative;
+  }
+  .chip::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(calc(100% + 4px), var(--touch-min));
+    height: max(100%, var(--touch-min));
+    transform: translate(-50%, -50%);
   }
 }

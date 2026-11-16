@@ -19,9 +19,37 @@ export interface TransportBarProps {
   /** The looped bars (0-based, inclusive), or null (the whole form); × goes back to the whole form. */
   bars: { from: number; to: number } | null;
   onAllBars: () => void;
+  /** How many bars the form has: the loop pickers' choices. */
+  barCount: number;
+  /** The loop pickers: loop bars `from`–`to` (0-based, inclusive; either order). */
+  onPickBars: (from: number, to: number) => void;
   /** Read etude only: show scale names above each chord. */
   showScales?: boolean;
   onShowScales?: (on: boolean) => void;
+}
+
+/**
+ * The loop pickers (nothing looped yet): bars [first ▾] – [last ▾]. Picking both loops them; the last bar's choices
+ * start at the first bar's. Fresh each time (they unmount while bars are looped).
+ */
+function LoopPickers({ barCount, onPick }: { barCount: number; onPick: (from: number, to: number) => void }) {
+  const [from, setFrom] = useState<number | null>(null);
+  const [to, setTo] = useState<number | null>(null);
+  const bar = (i: number) => ({ value: i, label: String(i + 1) });
+  const all = Array.from({ length: barCount }, (_, i) => bar(i));
+  const pick = (f: number | null, t: number | null) => {
+    setFrom(f);
+    setTo(t);
+    if (f !== null && t !== null) onPick(f, t);
+  };
+  return (
+    <span className="transport-bars picking">
+      <span className="pill-label">bars</span>
+      <Dropdown label="First looped bar" value={from ?? -1} placeholder="–" options={all} onChange={(f) => pick(f, to !== null && to < f ? null : to)} />
+      <span className="pill-label">–</span>
+      <Dropdown label="Last looped bar" value={to ?? -1} placeholder="–" options={from === null ? all : all.slice(from)} onChange={(t) => pick(from, t)} />
+    </span>
+  );
 }
 
 /**
@@ -78,6 +106,8 @@ export function TransportBar({
   onLoop,
   bars,
   onAllBars,
+  barCount,
+  onPickBars,
   showScales,
   onShowScales,
 }: TransportBarProps) {
@@ -138,16 +168,20 @@ export function TransportBar({
           </span>
         </button>
       )}
-      {/* The loop status: always there at a fixed width, so the bar never changes length — "whole form", or the looped
-          bars with × (back to the whole form). */}
-      <span className={bars ? 'transport-bars looping' : 'transport-bars'} role="status">
-        <span className="transport-bars-text">{!bars ? 'whole form' : bars.from === bars.to ? `bar ${bars.from + 1}` : `bars ${bars.from + 1}–${bars.to + 1}`}</span>
-        {bars && (
+      {/* The loop status, always there at a fixed width so the bar never changes length: with nothing looped, a picker
+          for the first and the last bar (both picked: they loop); looping, the looped bars with × (back to the whole form). */}
+      {bars ? (
+        <span className="transport-bars looping">
+          <span className="transport-bars-text" role="status">
+            {bars.from === bars.to ? `bar ${bars.from + 1}` : `bars ${bars.from + 1}–${bars.to + 1}`}
+          </span>
           <button type="button" className="transport-bars-clear chip" aria-label="Loop the whole form" title="Loop the whole form" onClick={onAllBars}>
             ×
           </button>
-        )}
-      </span>
+        </span>
+      ) : (
+        <LoopPickers barCount={barCount} onPick={onPickBars} />
+      )}
     </div>
   );
 }

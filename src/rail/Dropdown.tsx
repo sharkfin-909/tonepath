@@ -1,5 +1,5 @@
 // The app's dropdown (SPEC §3.1): every choice in the header — Mode, Audio on chord, bars per row, click sound, clef,
-// instrument. A button showing the value (with an optional prefix like "mode:") opens a dark card under it. Options
+// instrument. A button showing the value opens a dark card under it. Options
 // with descriptions or tags get the rich layout (the mode menu); plain ones a compact list. The current value is
 // marked (accent bar, ✓).
 // Keyboard: ↑ / ↓ / Home / End move, a letter jumps to the next option starting with it, Enter / Space choose,
@@ -25,20 +25,18 @@ export interface DropdownProps<T extends string | number> {
   value: T;
   options: DropdownOption<T>[];
   onChange: (value: T) => void;
-  /** The accessible name (e.g. "Instrument"); the prefix, if any, is shown too. */
+  /** The accessible name (e.g. "Instrument"). */
   label: string;
-  /** Shown before the value on the button, e.g. "mode:". */
-  prefix?: string;
   disabled?: boolean;
-  /** No resting fill on the button (a `.chip` rather than `.chip--filled`): the mode panel. */
-  bare?: boolean;
+  /** Shown on the button while `value` matches no option (e.g. "–": nothing picked yet). */
+  placeholder?: string;
   /** Extra class on the wrapper. */
   className?: string;
   /** Under the options (e.g. the mode menu's keys). */
   footer?: ReactNode;
 }
 
-export function Dropdown<T extends string | number>({ value, options, onChange, label, prefix, disabled = false, bare = false, className, footer }: DropdownProps<T>) {
+export function Dropdown<T extends string | number>({ value, options, onChange, label, disabled = false, placeholder = '', className, footer }: DropdownProps<T>) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const [alignRight, setAlignRight] = useState(false);
@@ -48,8 +46,9 @@ export function Dropdown<T extends string | number>({ value, options, onChange, 
   const button = useRef<HTMLButtonElement>(null);
   const id = useId();
   const rich = options.some((o) => o.description || o.tags?.length);
-  const currentIndex = Math.max(0, options.findIndex((o) => o.value === value));
-  const current = options[currentIndex];
+  const found = options.findIndex((o) => o.value === value);
+  const currentIndex = Math.max(0, found);
+  const current = found >= 0 ? options[found] : undefined;
 
   useEffect(() => {
     if (disabled) setOpen(false);
@@ -120,16 +119,15 @@ export function Dropdown<T extends string | number>({ value, options, onChange, 
       <button
         ref={button}
         type="button"
-        className={bare ? 'dropdown-trigger chip' : 'dropdown-trigger chip chip--filled'}
+        className="dropdown-trigger chip chip--filled"
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? id : undefined}
-        aria-label={`${label}: ${current?.label ?? ''}`}
+        aria-label={`${label}: ${current?.label ?? 'none'}`}
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
       >
-        {prefix && <span className="dropdown-prefix">{prefix}</span>}
-        <span className={current?.asTyped ? 'dropdown-value as-typed' : 'dropdown-value'}>{current?.label}</span>
+        <span className={current?.asTyped ? 'dropdown-value as-typed' : 'dropdown-value'}>{current?.label ?? placeholder}</span>
         <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden className={open ? 'dropdown-caret up' : 'dropdown-caret'}>
           <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
