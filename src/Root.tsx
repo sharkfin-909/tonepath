@@ -17,7 +17,7 @@ import {
   renameProgression,
   restoreProgression,
 } from './library';
-import { LibraryScreen } from './library/LibraryScreen';
+import { LibraryScreen, type LibraryCurrent } from './library/LibraryScreen';
 import { Tooltips } from './Tooltips';
 import { countUnreadable, listProgressions, onSaveStatus, type StoredProgression } from './storage';
 import { backupAge, isSafari, shouldRemind } from './backup';
@@ -57,6 +57,8 @@ export function Root() {
   const onCarry = useCallback((c: Carried) => {
     carried.current = c;
   }, []);
+  const [currentEtude, setCurrentEtude] = useState<LibraryCurrent | null>(null);
+  const onEtudeDock = useCallback((dock: LibraryCurrent | null) => setCurrentEtude(dock), []);
   const [list, setList] = useState<StoredProgression[]>(() => listProgressions(localStorage));
   const [deleted, setDeleted] = useState<{ id: string; raw: string; title: string; n: number } | null>(null);
   const [unreadable, setUnreadable] = useState(() => countUnreadable(localStorage));
@@ -135,7 +137,7 @@ export function Root() {
     {banner}
     <Tooltips />
     {/* Keyed by id (and reloads): a fresh chart screen (and empty undo history) for every progression opened. */}
-    {chart && <App key={`${chart.progression.id}:${chart.n}`} initial={chart.progression} renameOnOpen={chart.rename} onLibrary={toLibrary} carried={carried.current} onCarry={onCarry} />}
+    {chart && <App key={`${chart.progression.id}:${chart.n}`} initial={chart.progression} renameOnOpen={chart.rename} onLibrary={toLibrary} carried={carried.current} onCarry={onCarry} onEtudeDock={onEtudeDock} />}
     {showLibrary && <LibraryScreen
       onClose={chart ? () => setLibraryOpen(false) : undefined}
       progressions={list}
@@ -179,6 +181,7 @@ export function Root() {
         refresh();
       }}
       onToastDone={onToastDone}
+      current={currentEtude}
     />}
     </>
   );

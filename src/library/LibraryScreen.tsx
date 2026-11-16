@@ -4,7 +4,21 @@
 // unreadable keys.
 import { useEffect, useRef, useState } from 'react';
 import { etudeSummary } from '../library';
+import type { Etude } from '../progression';
+import { EtudePicker } from '../rail/EtudePicker';
 import type { StoredProgression } from '../storage';
+
+/** The open chart, so the library can switch its etude without leaving the modal. */
+export interface LibraryCurrent {
+  title: string;
+  etudes: Etude[];
+  open: string;
+  onOpen: (id: string) => void;
+  onNew: () => void;
+  onDuplicate: () => void;
+  onRename: (text: string) => void;
+  onDelete: () => void;
+}
 
 export interface LibraryScreenProps {
   progressions: StoredProgression[];
@@ -29,6 +43,8 @@ export interface LibraryScreenProps {
   reminder: { age: string; safari: boolean; onDismiss: () => void } | null;
   /** Back to the open progression (×, Esc, the backdrop); absent when none is open. */
   onClose?: () => void;
+  /** The progression behind the modal, when one is open. */
+  current?: LibraryCurrent | null;
 }
 
 /** "just now", "5 min ago", "3 h ago", "yesterday", "4 days ago", else the date. */
@@ -47,7 +63,7 @@ export function lastEdited(iso: string, now = new Date()): string {
 }
 
 export function LibraryScreen(props: LibraryScreenProps) {
-  const { progressions, onOpen, onNew, deleted, onUndoDelete, onToastDone, onExportAll, onImport, imported, onImportDone, unreadable, reminder, onClose } = props;
+  const { progressions, onOpen, onNew, deleted, onUndoDelete, onToastDone, onExportAll, onImport, imported, onImportDone, unreadable, reminder, onClose, current } = props;
   const fileInput = useRef<HTMLInputElement>(null);
   const dialog = useRef<HTMLDivElement>(null);
 
@@ -84,7 +100,7 @@ export function LibraryScreen(props: LibraryScreenProps) {
       tabIndex={-1}
       onKeyDown={(e) => {
         e.stopPropagation(); // the chart's keys stay out of the library
-        if (e.key === 'Escape' && onClose && !(e.target instanceof HTMLInputElement)) {
+        if (e.key === 'Escape' && onClose && !(e.target instanceof HTMLInputElement) && !(e.target instanceof Element && e.target.closest('.dropdown'))) {
           e.preventDefault();
           onClose();
         }
@@ -126,6 +142,28 @@ export function LibraryScreen(props: LibraryScreenProps) {
           )}
         </span>
       </header>
+      {current && (
+        <div className="library-current">
+          <p className="library-current-seq">
+            <span className="library-current-label">current chord sequence:</span> <span className="library-current-title">{current.title}</span>
+          </p>
+          <span className="library-current-etude group">
+            <span className="rail-label">choose etude</span>
+            <EtudePicker
+              etudes={current.etudes}
+              open={current.open}
+              onOpen={(id) => {
+                current.onOpen(id);
+                onClose?.();
+              }}
+              onNew={current.onNew}
+              onDuplicate={current.onDuplicate}
+              onRename={current.onRename}
+              onDelete={current.onDelete}
+            />
+          </span>
+        </div>
+      )}
       {reminder && (
         <p className="backup-reminder" role="note">
           Last backup: {reminder.age} ·{' '}

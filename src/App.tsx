@@ -32,6 +32,7 @@ import { useTransport } from './useTransport';
 import { etudeOf } from './progression';
 import type { Carried } from './session';
 import { EtudePicker } from './rail/EtudePicker';
+import type { LibraryCurrent } from './library/LibraryScreen';
 import { HamburgerMenu } from './rail/HamburgerMenu';
 
 /** A CSS media query as React state (SPEC §3.6 responsive layout). */
@@ -60,10 +61,12 @@ export interface AppProps {
   carried?: Carried;
   /** The mode or clipboard changed (the caller carries them to the next progression opened). */
   onCarry?: (carried: Carried) => void;
+  /** The open progression and etude, for the library modal's top section. */
+  onEtudeDock?: (dock: LibraryCurrent | null) => void;
 }
 
 /** The chart screen (layout C, SPEC §3.1) for one progression. */
-export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry }: AppProps) {
+export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry, onEtudeDock }: AppProps) {
   const chart = useChartSession({ initial, onDeleted: onLibrary, onTransportRestart: () => transport.restart(), carried });
   const { doc, progression, view, session, dispatch } = chart;
   const { mode, running } = session;
@@ -71,6 +74,19 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
   useEffect(() => onCarry?.({ mode, clip: session.clip }), [mode, session.clip, onCarry]);
   /** The open etude: its melody (Write etude, Read etude) and its instrument (every mode). */
   const etude = etudeOf(progression, session.etude);
+  useEffect(() => {
+    onEtudeDock?.({
+      title: progression.title,
+      etudes: progression.etudes,
+      open: etude.id,
+      onOpen: (id) => dispatch({ type: 'etude-open', id }),
+      onNew: () => dispatch({ type: 'etude-new' }),
+      onDuplicate: () => dispatch({ type: 'etude-duplicate' }),
+      onRename: (text) => dispatch({ type: 'etude-rename', text }),
+      onDelete: () => dispatch({ type: 'etude-delete' }),
+    });
+    return () => onEtudeDock?.(null);
+  }, [onEtudeDock, progression, etude.id, dispatch]);
 
   /** The written pitch A would pick (the hovered hex cell or ♯ / ♭ button). */
   const hovered = useRef<number | null>(null);

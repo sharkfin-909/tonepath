@@ -1692,6 +1692,30 @@ button.dock-label {
   margin-bottom: 16px;
 }
 
+.library-current {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  margin: -4px 0 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+.library-current-seq {
+  margin: 0;
+  min-width: 0;
+  font-size: 13px;
+}
+.library-current-label {
+  color: var(--muted);
+}
+.library-current-title {
+  text-transform: none;
+}
+.library-current-etude {
+  flex: none;
+}
+
 .library-header h1 {
   margin: 0;
   font-family: 'Firjar', 'Outfit', system-ui, sans-serif;
@@ -2549,6 +2573,13 @@ select {
   grid-row: 2;
   grid-column: 3;
   justify-self: end;
+}
+/* Tablet and down: chord sequence and etude live in the library's top section. */
+@media (max-width: 1024px) {
+  .topbar .topbar-seq,
+  .topbar .topbar-file {
+    display: none;
+  }
 }
 /* The wordmark (SPEC §3.1), in Firjar. */
 .brand {
