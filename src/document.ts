@@ -29,6 +29,8 @@ export interface ProgressionDocument {
   external(key: string | null, value: string | null): 'deleted' | 'reloaded' | 'ignored';
   /** The safety save when the page hides: written as is, `updatedAt` kept. */
   flush(): void;
+  /** Remember the open etude: written as is (`updatedAt` kept), no undo step. Undo snapshots carry it. */
+  setOpenEtude(id: string): void;
 }
 
 export function openDocument(storage: Storage, initial: StoredProgression, now: () => Date = () => new Date()): ProgressionDocument {
@@ -75,5 +77,10 @@ export function openDocument(storage: Storage, initial: StoredProgression, now: 
       }
     },
     flush: () => writeProgression(storage, current),
+    setOpenEtude(id) {
+      if (current.openEtudeId === id) return;
+      current = { ...current, openEtudeId: id };
+      writeProgression(storage, current);
+    },
   };
 }

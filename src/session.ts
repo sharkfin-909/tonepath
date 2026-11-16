@@ -30,16 +30,20 @@ import {
   clearEverything,
   clearMelody,
   etudeOf,
+  freshEtudeId,
+  newEtude,
   setBarsPerRow,
   setChord,
   setConcertClef,
   setInstrument,
   setMelody,
   setScaleOverride,
+  withEtude,
   setTimeSignature,
   setTitle,
   type ChordCommit,
   type Duration,
+  type Etude,
   type MelodyEvent,
   type Progression,
 } from './progression';
@@ -150,8 +154,17 @@ export type Intent =
   | { type: 'clef'; clef: 'treble' | 'bass' }
   | { type: 'undo' }
   | { type: 'redo' }
-  /** After undo / redo (with the restored caret) or another tab's write (no caret). */
-  | { type: 'restored'; caret?: number }
+  /** The etude picker (SPEC §3.1), in every mode: open one, add an empty one, duplicate, rename, delete the open one. */
+  | { type: 'etude-open'; id: string }
+  | { type: 'etude-new' }
+  | { type: 'etude-duplicate' }
+  | { type: 'etude-rename'; text: string }
+  | { type: 'etude-delete' }
+  /**
+   * After undo / redo (with the restored caret, and the etude open when that snapshot was taken) or another tab's
+   * write (neither: the open etude stays, unless it is gone).
+   */
+  | { type: 'restored'; caret?: number; etude?: string }
   | { type: 'refusal-shown' }
   | { type: 'notice-done' };
 
@@ -213,6 +226,12 @@ export function loopStart(s: Pick<SessionState, 'selection'>, slots: readonly { 
   return sel ? (slots.find((x) => x.bar === sel.from)?.index ?? 0) : 0;
 }
 
+/** *Etude N* for the lowest N no etude is named. */
+export function nextEtudeName(etudes: readonly { name: string }[]): string {
+  const taken = new Set(etudes.map((e) => e.name));
+  for (let k = 1; ; k++) if (!taken.has(`Etude ${k}`)) return `Etude ${k}`;
+}
+
 /** *On arrival*: the sounds for a slot's concert harmony. */
 export function arrivalSounds(how: OnArrival, h: SlotHarmony): Effect[] {
   const out: Effect[] = [];
@@ -226,7 +245,21 @@ export function arrivalSounds(how: OnArrival, h: SlotHarmony): Effect[] {
 const CHROMATIC = new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
 
 /** Intents every mode lets through: the modes themselves, mute, the header's title / instrument / clef, bookkeeping. */
-const ANY_MODE: Intent['type'][] = ['mode', 'toggle-mute', 'title', 'instrument', 'clef', 'restored', 'refusal-shown', 'notice-done'];
+const ANY_MODE: Intent['type'][] = [
+  'mode',
+  'toggle-mute',
+  'title',
+  'instrument',
+  'clef',
+  'etude-open',
+  'etude-new',
+  'etude-duplicate',
+  'etude-rename',
+  'etude-delete',
+  'restored',
+  'refusal-shown',
+  'notice-done',
+];
 /** The melody (Write etude). */
 const MELODY_EDITS: Intent['type'][] = ['length', 'toggle-rest', 'delete', 'nudge', 'step-play', 'clear-notes', 'clear-all'];
 /** The form and its tonality (Write etude; Improvise while stopped). */
@@ -280,6 +313,9 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
     effects.push(...arrivalSounds(s.onArrival, slots[index].concert));
   };
   const say = (text: string) => set({ notice: { text, n: (s.notice?.n ?? 0) + 1 } });
+  /** Open an etude of `q`: the caret to its melody's end (within the form); the latches stay. */
+  const openEtude = (q: Progression, id: string) =>
+    set({ etude: id, caret: Math.min(melodyEnd(etudeOf(q, id).melody), view.end), halo: null, refusal: null });
 
   /** Write etude: insert a note (or rest) at the caret; past the end, writing continues from the start (SPEC §6.2). */
   const insert = (d: Duration, pitch: number | null) => {
@@ -573,14 +609,60 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
     case 'redo':
       effects.push({ type: 'history', dir: intent.type });
       return done();
-    case 'restored':
+    case 'etude-open': {
+      if (intent.id === s.etude || !p.etudes.some((e) => e.id === intent.id)) return done();
+      openEtude(p, intent.id);
+      return done();
+    }
+    case 'etude-new': {
+      const open = etudeOf(p, s.etude);
+      const e: Etude = { ...newEtude(open.instrument, nextEtudeName(p.etudes), freshEtudeId(p.etudes)), ...(open.concertClef ? { concertClef: open.concertClef } : {}) };
+      edit = { ...p, etudes: [...p.etudes, e] };
+      openEtude(edit, e.id);
+      return done();
+    }
+    case 'etude-duplicate': {
+      const open = etudeOf(p, s.etude);
+      const copy: Etude = { ...open, id: freshEtudeId(p.etudes), name: `${open.name} (copy)` };
+      const at = p.etudes.indexOf(open) + 1;
+      edit = { ...p, etudes: [...p.etudes.slice(0, at), copy, ...p.etudes.slice(at)] };
+      set({ etude: copy.id, halo: null, refusal: null }); // same notes: the caret stays
+      return done();
+    }
+    case 'etude-rename': {
+      const name = intent.text.trim();
+      const open = etudeOf(p, s.etude);
+      if (!name || name === open.name) return done();
+      edit = withEtude(p, open.id, (e) => ({ ...e, name }));
+      return done();
+    }
+    case 'etude-delete': {
+      const open = etudeOf(p, s.etude);
+      const i = p.etudes.indexOf(open);
+      if (p.etudes.length === 1) {
+        // The last one: a fresh, empty Etude 1 on the same instrument takes its place (a progression always has one).
+        const fresh: Etude = { ...newEtude(open.instrument, 'Etude 1', freshEtudeId(p.etudes)), ...(open.concertClef ? { concertClef: open.concertClef } : {}) };
+        edit = { ...p, etudes: [fresh] };
+        openEtude(edit, fresh.id);
+        return done();
+      }
+      edit = { ...p, etudes: p.etudes.filter((e) => e !== open) };
+      openEtude(edit, edit.etudes[Math.min(i, edit.etudes.length - 1)].id); // its neighbour: the next, else the one before
+      return done();
+    }
+    case 'restored': {
+      // The restored etude (undo / redo), else the open one — unless it's gone (another tab deleted it): the first.
+      const want = intent.etude ?? s.etude;
+      const etude = p.etudes.some((e) => e.id === want) ? want : p.etudes[0].id;
       set({
+        etude,
         selection: null,
         refusal: null,
-        ...(intent.caret !== undefined ? { caret: intent.caret } : {}),
+        ...(intent.caret !== undefined ? { caret: intent.caret } : etude !== s.etude ? { caret: melodyEnd(etudeOf(p, etude).melody) } : {}),
       });
       if (!writing) set({ slot: Math.min(s.slot, view.slots.length - 1) });
       return done();
+    }
     case 'refusal-shown':
       set({ refusal: null });
       return done();

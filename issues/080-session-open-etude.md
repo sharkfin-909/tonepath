@@ -2,9 +2,9 @@
 id: 80
 title: "The editing session's open etude"
 labels: [ready-for-agent]
-status: open
+status: closed
 blocked_by: [78, 79]
-assignee:
+assignee: claude
 ---
 
 ## Parent
@@ -35,13 +35,22 @@ The session (`session.ts`, run by `useChartSession`) works on one **open etude**
 
 ## Acceptance criteria
 
-- [ ] Session tests: each etude intent, in each mode; melody intents touch only the open etude
-- [ ] Deleting the only etude leaves one empty *Etude 1* on the same instrument, open
-- [ ] Switching etude switches the chart's transposition and the hex (a B♭ trumpet etude and a Concert etude)
-- [ ] Reopening a progression opens the etude last open there
-- [ ] Undo after new / duplicate / delete / rename restores the etudes and the open one
+- [x] Session tests: each etude intent, in each mode; melody intents touch only the open etude
+- [x] Deleting the only etude leaves one empty *Etude 1* on the same instrument, open
+- [x] Switching etude switches the chart's transposition and the hex (a B♭ trumpet etude and a Concert etude)
+- [x] Reopening a progression opens the etude last open there
+- [x] Undo after new / duplicate / delete / rename restores the etudes and the open one
 
 ## Blocked by
 
 - [078](078-schema-v3-etudes.md)
 - [079](079-bar-edits-carry-every-etude.md)
+
+## Resolution
+
+Built: `SessionState.etude`; the five etude intents in `session.ts` (allowed in every mode, transport running too);
+melody, Clear and instrument / clef intents act on the open etude; the instrument view is built from it.
+`openEtudeId` lives on the stored record (`storage.ts`), set by `ProgressionDocument.setOpenEtude` after each intent
+— written as is, no undo step — so each undo snapshot carries the etude open when it was taken, and `restored`
+reopens it. Deviation: *Etude N* takes the lowest free N among the names (not the count). The screen still has no
+picker: [081](081-etude-picker.md).

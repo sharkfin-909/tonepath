@@ -457,3 +457,79 @@ describe('edits outside the melody go through the mode too', () => {
     expect(r.per[2]).toEqual([{ type: 'device', patch: { lastInstrument: 'bb-trumpet' } }]);
   });
 });
+
+describe('the open etude (issue 080)', () => {
+  /** Two etudes: A (Concert) with one note, B (B♭ trumpet) with two. */
+  const two = (): Progression => ({
+    ...prog(),
+    etudes: [
+      { id: 'e1', name: 'A', instrument: 'concert', melody: [{ pitch: 60, d: 'q' }] },
+      { id: 'e2', name: 'B', instrument: 'bb-trumpet', melody: [{ pitch: 62, d: 'q' }, { pitch: 64, d: 'q' }] },
+    ],
+  });
+  const names = (p: Progression) => p.etudes.map((e) => `${e.id}:${e.name}:${e.instrument}:${e.melody.length}`);
+
+  it('opens on the given etude (missing → the first), the caret at its melody\'s end', () => {
+    expect(initialSession(two(), { onArrival: 'silent' }, 'e2')).toMatchObject({ etude: 'e2', caret: 2 * q });
+    expect(initialSession(two(), { onArrival: 'silent' }, 'gone')).toMatchObject({ etude: 'e1', caret: q });
+  });
+
+  it('melody intents touch only the open etude, in its instrument\'s written pitch', () => {
+    const r = run([pick(64)], { p: two(), state: { etude: 'e2', caret: 2 * q } }); // written E on B♭ trumpet = concert D
+    expect(r.p.etudes[0]).toEqual(two().etudes[0]);
+    expect(r.p.etudes[1].melody[2]).toEqual({ pitch: 62, d: 'q' });
+    const cleared = run([{ type: 'clear-all' }], { p: two(), state: { etude: 'e2' } }).p;
+    expect(cleared.etudes.map((e) => e.melody.length)).toEqual([1, 0]); // Clear all: chords + the open etude's notes
+  });
+
+  it('etude-open switches (caret to its end, halo and refusal cleared); an unknown id does nothing', () => {
+    const r = run([{ type: 'etude-open', id: 'e2' }], { p: two() });
+    expect(r.state).toMatchObject({ etude: 'e2', caret: 2 * q, halo: null, refusal: null });
+    expect(r.outcomes[0].edit).toBeUndefined(); // not an undo step
+    expect(run([{ type: 'etude-open', id: 'nope' }], { p: two() }).state.etude).toBe('e1');
+  });
+
+  it('every mode, the transport running too, lets the picker through', () => {
+    for (const state of [{ mode: 'tune' as const }, { mode: 'improvise' as const, running: true }, { mode: 'read' as const, running: true }, { mode: 'write' as const }]) {
+      expect(run([{ type: 'etude-open', id: 'e2' }], { p: two(), state }).state.etude).toBe('e2');
+    }
+  });
+
+  it('etude-new: an empty "Etude N" on the open etude\'s instrument, after the others, opened', () => {
+    const r = run([{ type: 'etude-new' }], { p: two(), state: { etude: 'e2' } });
+    expect(names(r.p)).toEqual(['e1:A:concert:1', 'e2:B:bb-trumpet:2', 'e3:Etude 1:bb-trumpet:0']);
+    expect(r.state).toMatchObject({ etude: 'e3', caret: 0 });
+    const again = run([{ type: 'etude-new' }, { type: 'etude-new' }]);
+    expect(again.p.etudes.map((e) => e.name)).toEqual(['Etude 1', 'Etude 2', 'Etude 3']);
+  });
+
+  it('etude-duplicate: a copy named "‹name› (copy)" straight after it, opened, caret kept', () => {
+    const r = run([{ type: 'etude-duplicate' }], { p: two(), state: { etude: 'e1', caret: 0 } });
+    expect(names(r.p)).toEqual(['e1:A:concert:1', 'e3:A (copy):concert:1', 'e2:B:bb-trumpet:2']);
+    expect(r.state).toMatchObject({ etude: 'e3', caret: 0 });
+  });
+
+  it('etude-rename: trimmed; blank or unchanged does nothing', () => {
+    expect(run([{ type: 'etude-rename', text: '  Lines ' }], { p: two() }).p.etudes[0].name).toBe('Lines');
+    expect(run([{ type: 'etude-rename', text: '  ' }], { p: two() }).outcomes[0].edit).toBeUndefined();
+    expect(run([{ type: 'etude-rename', text: 'A' }], { p: two() }).outcomes[0].edit).toBeUndefined();
+  });
+
+  it('etude-delete opens its neighbour; deleting the only one leaves a fresh empty Etude 1 on its instrument', () => {
+    const a = run([{ type: 'etude-delete' }], { p: two(), state: { etude: 'e1' } });
+    expect(names(a.p)).toEqual(['e2:B:bb-trumpet:2']);
+    expect(a.state).toMatchObject({ etude: 'e2', caret: 2 * q });
+    const b = run([{ type: 'etude-delete' }], { p: two(), state: { etude: 'e2' } });
+    expect(b.state.etude).toBe('e1'); // the last one: the one before it
+    const last = run([{ type: 'etude-delete' }, { type: 'etude-delete' }], { p: two(), state: { etude: 'e2' } });
+    expect(names(last.p)).toEqual(['e2:Etude 1:concert:0']);
+    expect(last.state).toMatchObject({ etude: 'e2', caret: 0 });
+  });
+
+  it('restored: the snapshot\'s etude; without one the open etude stays — unless it is gone', () => {
+    expect(run([{ type: 'restored', caret: 0, etude: 'e2' }], { p: two() }).state).toMatchObject({ etude: 'e2', caret: 0 });
+    expect(run([{ type: 'restored' }], { p: two(), state: { etude: 'e2' } }).state.etude).toBe('e2');
+    const gone = { ...two(), etudes: [two().etudes[1]] };
+    expect(run([{ type: 'restored' }], { p: gone, state: { etude: 'e1' } }).state).toMatchObject({ etude: 'e2', caret: 2 * q });
+  });
+});

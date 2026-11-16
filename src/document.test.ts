@@ -63,4 +63,20 @@ describe('progression document', () => {
     doc.flush();
     expect(stored(s).updatedAt).toBe(T0);
   });
+
+  it('the open etude is remembered as is (no undo step, updatedAt kept); an undo snapshot carries it', () => {
+    const s = new MemoryStorage();
+    const doc = openDocument(s, start(), clock());
+    doc.setOpenEtude('e1');
+    expect(stored(s)).toMatchObject({ openEtudeId: 'e1', updatedAt: T0 });
+    expect(doc.canUndo).toBe(false);
+    // Add an etude and open it; undo brings back the snapshot taken with e1 open.
+    doc.commit({ ...doc.progression, etudes: [...doc.progression.etudes, { id: 'e2', name: 'Etude 2', instrument: 'concert', melody: [] }] }, 0);
+    doc.setOpenEtude('e2');
+    doc.undo(0);
+    expect(doc.progression.openEtudeId).toBe('e1');
+    expect(doc.progression.etudes).toHaveLength(1);
+    doc.redo(0);
+    expect(doc.progression.openEtudeId).toBe('e2');
+  });
 });

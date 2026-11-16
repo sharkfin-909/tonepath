@@ -62,7 +62,8 @@ export function useChartSession(o: ChartSessionOptions): ChartSession {
   const progression = doc.progression;
   const [session, setSession] = useState<SessionState>(() => {
     const device = readDevice(localStorage);
-    return initialSession(doc.progression, { muted: device.muted, onArrival: onArrivalOf(device) });
+    // The etude last open in this progression (SPEC §3.0); missing → the first.
+    return initialSession(doc.progression, { muted: device.muted, onArrival: onArrivalOf(device) }, doc.progression.openEtudeId);
   });
   const view = useMemo(() => instrumentView(progression, session.etude), [progression, session.etude]);
   const sessionRef = useRef(session);
@@ -118,7 +119,8 @@ export function useChartSession(o: ChartSessionOptions): ChartSession {
           const caret = doc[e.dir](caretNow());
           if (caret !== null) {
             rerender();
-            dispatchRef.current({ type: 'restored', caret });
+            // The snapshot remembers the etude open when it was taken: undo reopens it.
+            dispatchRef.current({ type: 'restored', caret, etude: doc.progression.openEtudeId });
           }
           break;
         }
@@ -132,6 +134,8 @@ export function useChartSession(o: ChartSessionOptions): ChartSession {
     if (out.edit) commit(out.edit);
     sessionRef.current = out.state;
     setSession(out.state);
+    // Remember the open etude (no undo step); the next commit's snapshot carries it.
+    doc.setOpenEtude(out.state.etude);
     perform(out.effects);
     return out;
   };

@@ -10,6 +10,8 @@ export const PROGRESSION_PREFIX = 'tonepath:progression:';
 export interface StoredProgression extends Progression {
   id: string;
   updatedAt: string;
+  /** The etude last open here (SPEC §3.0): reopened next time. Storage only — never in files, not an undo step. */
+  openEtudeId?: string;
 }
 
 function isStored(x: unknown): x is StoredProgression {
