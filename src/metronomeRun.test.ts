@@ -77,7 +77,6 @@ describe('metronome run', () => {
     const m = setup();
     m.advance(2.5);
     expect(m.slots.map((s) => [s.index, +(s.t - LEAD_S).toFixed(3)])).toEqual([[0, 0], [1, 2]]);
-    expect(m.run.slot()).toBe(1);
   });
 
   it('Loop: wraps to the first slot and keeps the beat', () => {

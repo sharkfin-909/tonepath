@@ -109,8 +109,10 @@ body,
 
 .chart-area {
   overflow-y: auto;
-  /* No bottom padding: the stave's headroom under the staff (room for 3 ledger lines) is the gap above the hex. */
-  padding: 16px 24px 0 12px;
+  /* Top / bottom padding: set from zoom.ts (`chartArea`). No bottom padding but in Read etude: the stave's headroom
+     under the staff (room for 3 ledger lines) is the gap above the hex. */
+  padding-left: 12px;
+  padding-right: 24px;
   min-height: 0;
 }
 
@@ -297,14 +299,14 @@ button.dock-label {
   transform-origin: 0 0;
   /* The bar strip above the first row (the row gap above every row is its bar strip; chartHeight counts it), and
      the space under the last row's cards (--row-after: under every row, so a strip belongs to the bar below it). */
-  padding-top: var(--row-gap, 30px);
-  padding-bottom: var(--row-after, 14px);
+  padding-top: var(--row-gap);
+  padding-bottom: var(--row-after);
 }
 
 /* Each slot is a card (SPEC §3.1): --slot-gap between slots, --row-gap between rows (set from zoom.ts). */
 .chart-row {
   display: grid;
-  column-gap: var(--slot-gap, 10px);
+  column-gap: var(--slot-gap);
 }
 
 .slot {
@@ -315,7 +317,7 @@ button.dock-label {
   border: 1px solid rgba(29, 27, 25, 0.16);
   border-radius: 10px;
   /* A little room above the chord name (zoom.ts SLOT_PAD_TOP_PX; chartHeight counts it). */
-  padding-top: var(--slot-pad-top, 6px);
+  padding-top: var(--slot-pad-top);
 }
 
 /* The current slot in Improvise and Read etude (SPEC §3.3, §3.4): a solid highlight, distinct from Write etude's tint. */
@@ -352,7 +354,7 @@ button.dock-label {
   border-radius: 1em;
   border: 1px solid color-mix(in srgb, #ffdd57 70%, #1d1b19);
   background: color-mix(in srgb, #ffdd57 18%, transparent);
-  font-size: calc(var(--scale-px, 11px) * 1.1);
+  font-size: calc(var(--scale-px) * 1.1);
   font-weight: 600;
   line-height: 1.45;
   color: var(--muted);
@@ -384,7 +386,7 @@ button.dock-label {
   margin: 0;
   border-radius: 4px;
   font: inherit;
-  font-size: var(--chord-px, 17px);
+  font-size: var(--chord-px);
   font-weight: 600;
   color: var(--ink);
   cursor: text;
@@ -413,7 +415,7 @@ button.dock-label {
 .chord-field {
   width: 100%;
   font: inherit;
-  font-size: var(--chord-px, 17px);
+  font-size: var(--chord-px);
   font-weight: 600;
   padding: 1px 4px;
   margin: 0 -1px;
@@ -437,8 +439,8 @@ button.dock-label {
   position: absolute;
   top: 0;
   bottom: 0;
-  right: calc(-1px - var(--slot-gap, 10px) / 2 - 1.25px);
-  width: 2.5px;
+  right: calc(-1px - var(--slot-gap) / 2 - var(--bar-line) / 2);
+  width: var(--bar-line);
   background: var(--line);
   pointer-events: none;
 }
@@ -461,13 +463,13 @@ button.dock-label {
 }
 /* After a bar: slot-gap + bar line + slot-gap (column-gap is already one slot-gap). */
 .main.read .slot.bar-end {
-  margin-right: calc(var(--slot-gap, 10px) + 2.5px);
+  margin-right: calc(var(--slot-gap) + var(--bar-line));
 }
 .main.read .bar-line {
   top: var(--staff-top, 0);
   bottom: auto;
   height: calc(var(--staff-bottom, 100%) - var(--staff-top, 0px));
-  right: calc(-1 * (var(--slot-gap, 10px) + 2.5px));
+  right: calc(-1 * (var(--slot-gap) + var(--bar-line)));
   z-index: 0;
 }
 /* SVG staff bridges can spill into gaps; don’t clip them horizontally. */
@@ -657,7 +659,7 @@ button.dock-label {
   min-width: 0;
   max-width: calc(100% + 8px);
   /* Room for the label's line box + padding so glyph ink isn't clipped. */
-  min-height: calc(var(--scale-px, 11px) * 1.5 + 4px);
+  min-height: calc(var(--scale-px) * 1.5 + 4px);
   margin: 0 -4px;
 }
 
@@ -669,7 +671,7 @@ button.dock-label {
   margin: 0;
   border-radius: 3px;
   font: inherit;
-  font-size: var(--scale-px, 11px);
+  font-size: var(--scale-px);
   line-height: 1.5;
   color: color-mix(in srgb, var(--muted) 85%, var(--ink));
   cursor: pointer;
@@ -961,13 +963,13 @@ button.dock-label {
 .bar-handle {
   position: absolute;
   /* In the bar strip above the card (the row gap), at the start of the bar (SPEC §3.1): centred in the strip. */
-  top: calc(-1px - var(--row-gap, 30px) / 2 - 0.75em);
+  top: calc(-1px - var(--row-gap) / 2 - 0.75em);
   left: 2px;
   z-index: 5;
   display: inline-flex;
   align-items: center;
   gap: 1px;
-  font-size: var(--scale-px, 11px); /* zoom-aware, never below the 9px label minimum */
+  font-size: var(--scale-px); /* zoom-aware, never below the 9px label minimum */
 }
 
 .bar-number,
@@ -1016,7 +1018,7 @@ button.dock-label {
   border-bottom-right-radius: 0;
 }
 .slot.bar-second {
-  margin-left: calc(-1 * var(--slot-gap, 10px));
+  margin-left: calc(-1 * var(--slot-gap));
   border-left-width: 0;
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
@@ -1053,7 +1055,7 @@ button.dock-label {
   top: -2px;
   bottom: -2px;
   left: 100%;
-  width: var(--slot-gap, 10px);
+  width: var(--slot-gap);
   box-sizing: border-box;
   border-block: 2px solid var(--loop);
   background: rgba(47, 111, 219, 0.04);
@@ -1061,7 +1063,7 @@ button.dock-label {
 }
 /* Across a bar line the outside gap is slot-gap + line + slot-gap. */
 .slot.looped.bar-end:not(.loop-end):not(.row-end)::after {
-  width: calc(2 * var(--slot-gap, 10px) + 2.5px);
+  width: calc(2 * var(--slot-gap) + var(--bar-line));
 }
 .repeat-sign {
   position: absolute;
@@ -1091,7 +1093,7 @@ button.dock-label {
   transform: translateY(calc(-100% - 3px));
   display: grid;
   place-items: center;
-  font-size: var(--chord-px, 14px);
+  font-size: var(--chord-px);
   width: 1.1em;
   height: 1.1em;
   padding: 0;
@@ -1185,8 +1187,8 @@ button.dock-label {
   position: absolute;
   right: -1px;
   /* Centred in the row gap; sized with the chord label (zoom-proof), like the other small buttons. */
-  font-size: var(--chord-px, 14px);
-  top: calc(-1px - var(--row-gap, 30px) / 2 - 0.65em);
+  font-size: var(--chord-px);
+  top: calc(-1px - var(--row-gap) / 2 - 0.65em);
   z-index: 5;
   display: grid;
   place-items: center;
@@ -1221,7 +1223,7 @@ button.dock-label {
   place-items: center;
   flex: none;
   /* Sized with the chord label (its zoom-proof size), so it stays clickable on a zoomed-out chart. */
-  font-size: var(--chord-px, 14px);
+  font-size: var(--chord-px);
   width: 1em;
   height: 1em;
   margin-left: 0.1em;
@@ -1567,7 +1569,6 @@ button.dock-label {
 }
 .main.read > .chart-area {
   overflow: hidden;
-  padding-bottom: 16px;
 }
 
 /* Tuner (SPEC §3.8): the chart pane keeps its height, empty — the chart is laid out but never shown. */
@@ -2709,22 +2710,22 @@ select {
 }
 
 /* Improvise: the tuner bar sits between chart and hex, so the chart's scrollport ends at the bar (nothing scrolls
-   under it). Chart and hex still share the space evenly. (`improvise-listen` is set from App when Listen is on.) */
-.main.improvise-listen:not(.hex-hidden) {
+   under it). Chart and hex still share the space evenly. */
+.main.improvise:not(.hex-hidden) {
   grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr);
 }
-.main.improvise-listen.hex-hidden {
+.main.improvise.hex-hidden {
   grid-template-rows: minmax(0, 1fr) auto 0;
 }
-.main.improvise-listen > .chart-area {
+.main.improvise > .chart-area {
   grid-row: 1;
 }
-.main.improvise-listen > .listen-row {
+.main.improvise > .listen-row {
   grid-row: 2;
   transform: none;
   align-self: stretch;
 }
-.main.improvise-listen > .dock {
+.main.improvise > .dock {
   grid-row: 3;
 }
 .tuner-slot {

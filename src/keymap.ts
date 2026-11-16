@@ -4,6 +4,7 @@
 // The caller ignores keys while a text field has focus (native undo and typing there).
 
 import type { Duration } from './progression';
+import { modeProfile } from './modeProfile';
 import type { Intent, Mode } from './session';
 
 export interface KeyPress {
@@ -61,6 +62,7 @@ function shared(e: KeyPress, ctx: KeyContext): KeyResult | null {
 export function keyIntent(e: KeyPress, ctx: KeyContext): KeyResult {
   const plain = !e.metaKey && !e.ctrlKey && !e.altKey;
   const cmd = (e.metaKey || e.ctrlKey) && !e.altKey;
+  const m = modeProfile(ctx.mode, ctx.running);
 
   // Every mode: \ Write etude ↔ Read etude, [ / ] the previous / next mode (SPEC §11).
   if (plain && e.key === '\\') return handled({ type: 'mode', mode: 'toggle-read' });
@@ -79,11 +81,11 @@ export function keyIntent(e: KeyPress, ctx: KeyContext): KeyResult {
 
   if (ctx.mode === 'improvise' || ctx.mode === 'read') {
     // Improvise / Read etude: ← / → step slots (stopped); the shared keys; Esc: the whole form again (no looped bars).
-    if (cmd && (e.key === 'z' || e.key === 'Z')) return handled(ctx.mode === 'improvise' && !ctx.running ? { type: e.shiftKey ? 'redo' : 'undo' } : null);
+    if (cmd && (e.key === 'z' || e.key === 'Z')) return handled(m.editsForm ? { type: e.shiftKey ? 'redo' : 'undo' } : null);
     if (!plain) return NONE;
     if (e.key === 'Escape') return ctx.selection ? handled({ type: 'clear-selection' }) : NONE;
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') return handled(ctx.running ? null : { type: 'step', dir: e.key === 'ArrowLeft' ? -1 : 1 });
-    if (ctx.mode === 'read' && e.key.toLowerCase() === 'a') return handled(); // no hex in Read etude
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') return handled(m.movesByHand ? { type: 'step', dir: e.key === 'ArrowLeft' ? -1 : 1 } : null);
+    if (!m.hex && e.key.toLowerCase() === 'a') return handled(); // no hex in Read etude
     const r = shared(e, ctx);
     if (r) return r;
     if (e.key.startsWith('Arrow') || e.key === 'Backspace' || e.key === 'Delete') return handled();

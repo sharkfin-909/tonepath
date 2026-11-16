@@ -1,7 +1,7 @@
 // A metronome run (SPEC §3.7): from a slot, clicks every beat (scheduled ~120 ms ahead on the clock, so the beat stays
 // steady whatever the main thread does) and announces each slot as it starts; at the form's end it wraps (Loop, asked
 // each time round) or ends. Plain logic against a `Clock` seam: the app's adapter is the audio clock and timers
-// (`useMetronome`), the tests' a fake clock.
+// (`useTransport`), the tests' a fake clock.
 
 import type { Meter } from './form';
 import { metronomeEvents, secondsPerTick } from './metronome';
@@ -33,8 +33,6 @@ export interface MetronomeRunOptions {
 
 export interface MetronomeRun {
   stop(): void;
-  /** The slot it is on (the last announced). */
-  slot(): number;
 }
 
 export const LOOKAHEAD_S = 0.12;
@@ -44,9 +42,8 @@ export const LEAD_S = 0.06;
 
 export function startMetronomeRun(o: MetronomeRunOptions): MetronomeRun {
   const { clock, end } = o;
-  let current = o.startSlot;
   const events = metronomeEvents(o.meter, o.slots, end);
-  if (events.length === 0 || end <= 0) return { stop: () => {}, slot: () => current };
+  if (events.length === 0 || end <= 0) return { stop: () => {} };
   const spt = secondsPerTick(o.bpm, o.meter);
   const startTick = o.slots.find((s) => s.index === o.startSlot)?.start ?? 0;
   const t0 = clock.now() + LEAD_S; // the clock time of `startTick`
@@ -77,9 +74,7 @@ export function startMetronomeRun(o: MetronomeRunOptions): MetronomeRun {
         const slot = e.slot;
         cancels.push(
           clock.at(when, () => {
-            if (stopped) return;
-            current = slot;
-            o.onSlot(slot);
+            if (!stopped) o.onSlot(slot);
           }),
         );
       }
@@ -93,6 +88,5 @@ export function startMetronomeRun(o: MetronomeRunOptions): MetronomeRun {
       stopped = true;
       cancels.forEach((c) => c());
     },
-    slot: () => current,
   };
 }

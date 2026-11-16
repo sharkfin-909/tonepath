@@ -23,7 +23,24 @@ import { stepSlot } from './form';
 import { stepPitchClasses, type SlotHarmony } from './harmony';
 import { backspaceAt, caretFromClick, deleteAt, insertWrapping, melodyEnd, nudge, snapToEvent, stepCaret, timeline, type TimedEvent } from './melody';
 import type { OnArrival } from './device';
-import { clearEverything, clearMelody, setTimeSignature, type Duration, type MelodyEvent, type Progression } from './progression';
+import { enterChord } from './chordEntry';
+import type { ScaleId } from './harmony';
+import { modeProfile } from './modeProfile';
+import {
+  clearEverything,
+  clearMelody,
+  setBarsPerRow,
+  setChord,
+  setConcertClef,
+  setInstrument,
+  setScaleOverride,
+  setTimeSignature,
+  setTitle,
+  type ChordCommit,
+  type Duration,
+  type MelodyEvent,
+  type Progression,
+} from './progression';
 import { instrumentView, type ViewSlot } from './view';
 
 export interface Selection {
@@ -36,11 +53,7 @@ export interface Selection {
 export type Mode = 'tune' | 'improvise' | 'write' | 'read';
 export const MODES: readonly Mode[] = ['tune', 'improvise', 'write', 'read'];
 export const MODE_LABELS: Record<Mode, string> = { tune: 'Tune', improvise: 'Improvise', write: 'Write etude', read: 'Read etude' };
-
-/** The modes that listen to the mic (SPEC §3.0). */
-export const listens = (m: Mode): boolean => m === 'tune' || m === 'improvise';
-/** The modes with a transport (SPEC §3.7). */
-export const hasTransport = (m: Mode): boolean => m === 'improvise' || m === 'read';
+// What each mode shows and lets through: `modeProfile.ts`.
 
 export interface SessionState {
   /** The mode (SPEC §3.0). Every open starts in Tune. */
@@ -119,6 +132,18 @@ export type Intent =
   | { type: 'clear-notes' }
   | { type: 'clear-all' }
   | { type: 'time-signature'; text: string }
+  /** Bars per row (Write etude's editing pill, Improvise's form group). */
+  | { type: 'bars-per-row'; n: number }
+  /** Chord entry (SPEC §4.2): typed text for a slot; the outcome's `entry` says whether it was taken. */
+  | { type: 'chord-entry'; bar: number; part: number; text: string }
+  /** The × after a chord. */
+  | { type: 'chord-clear'; bar: number; part: number }
+  /** A slot's scale override, or null to clear it. */
+  | { type: 'scale-override'; bar: number; part: number; scale: ScaleId | null }
+  /** The header, in every mode: the title, the instrument (remembered on the device for new progressions), the clef. */
+  | { type: 'title'; text: string }
+  | { type: 'instrument'; id: string }
+  | { type: 'clef'; clef: 'treble' | 'bass' }
   | { type: 'undo' }
   | { type: 'redo' }
   /** After undo / redo (with the restored caret) or another tab's write (no caret). */
@@ -129,14 +154,20 @@ export type Intent =
 export type Effect =
   | { type: 'note'; midi: number }
   | { type: 'chord' | 'root' | 'bass' | 'scale'; harmony: SlotHarmony }
-  | { type: 'device'; patch: { muted?: boolean; playArrival?: OnArrival } }
-  | { type: 'history'; dir: 'undo' | 'redo' };
+  | { type: 'device'; patch: { muted?: boolean; playArrival?: OnArrival; lastInstrument?: string } }
+  | { type: 'history'; dir: 'undo' | 'redo' }
+  /** Write etude: a stepped (`) or clicked melody note lights its hex cells as if played (concert pitch). */
+  | { type: 'light'; midi: number }
+  /** The transport starts afresh from the current slot (start, or a rewind while it runs). */
+  | { type: 'transport-restart' };
 
 export interface Outcome {
   state: SessionState;
   /** An edit to commit as one undo step (with the caret before it), or undefined. */
   edit?: Progression;
   effects: Effect[];
+  /** `chord-entry` only: the entry's result (refused when the mode doesn't edit chords). */
+  entry?: ChordCommit;
 }
 
 export function initialSession(p: Progression, device: { muted?: boolean; onArrival: OnArrival }): SessionState {
@@ -188,26 +219,29 @@ export function arrivalSounds(how: OnArrival, h: SlotHarmony): Effect[] {
 /** Every pitch class: nudge steps by semitone in a slot without a chord. */
 const CHROMATIC = new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
 
-/** What each mode lets through (SPEC §3.2–3.4, §3.8): Write etude edits everything; the others much less. */
-const WRITE_ONLY: Intent['type'][] = ['length', 'toggle-rest', 'delete', 'nudge', 'step-play', 'clear-notes', 'clear-all'];
-/** Improvise edits the lead sheet's form, only while the transport is stopped. */
-const FORM_EDITS: Intent['type'][] = ['time-signature', 'undo', 'redo', 'append-bar'];
-/** Moves of the current slot by hand (Improvise, Read etude): only while stopped. */
+/** Intents every mode lets through: the modes themselves, mute, the header's title / instrument / clef, bookkeeping. */
+const ANY_MODE: Intent['type'][] = ['mode', 'toggle-mute', 'title', 'instrument', 'clef', 'restored', 'refusal-shown', 'notice-done'];
+/** The melody (Write etude). */
+const MELODY_EDITS: Intent['type'][] = ['length', 'toggle-rest', 'delete', 'nudge', 'step-play', 'clear-notes', 'clear-all'];
+/** The form and its tonality (Write etude; Improvise while stopped). */
+const FORM_EDITS: Intent['type'][] = ['time-signature', 'bars-per-row', 'undo', 'redo', 'append-bar', 'bar-action', 'chord-entry', 'chord-clear', 'scale-override'];
+const TRANSPORT: Intent['type'][] = ['transport', 'transport-chord', 'transport-end', 'rewind'];
+/** Moves of the caret (Write etude) or of the current slot by hand (Improvise, Read etude: only while stopped). */
 const SLOT_MOVES: Intent['type'][] = ['step', 'browse', 'event-click', 'time-click', 'slot-click'];
 
+/** What the mode lets through (SPEC §3.2–3.4, §3.8), by its profile. */
 function allowed(s: SessionState, intent: Intent): boolean {
   const t = intent.type;
-  if (s.mode === 'write') return t !== 'transport' && t !== 'transport-chord' && t !== 'transport-end' && t !== 'rewind' && t !== 'heard';
-  if (WRITE_ONLY.includes(t)) return false;
-  if (s.mode === 'tune') {
-    // Tune: the hex, mute, the modes; no chord to sound, no chart to click.
-    return t === 'pick' || t === 'heard' || t === 'mode' || t === 'toggle-mute' || t === 'restored' || t === 'refusal-shown' || t === 'notice-done';
-  }
-  if (SLOT_MOVES.includes(t)) return !s.running;
-  if (FORM_EDITS.includes(t)) return s.mode === 'improvise' && !s.running;
-  if (t === 'bar-action') return s.mode === 'improvise' && !s.running; // ⋯ menu and trash (SPEC §3.3)
-  if (t === 'bar-select' || t === 'clear-selection') return !(s.mode === 'read' && s.running); // Read etude running: chart clicks do nothing
-  if (t === 'pick') return s.mode === 'improvise';
+  const m = modeProfile(s.mode, s.running);
+  if (ANY_MODE.includes(t)) return true;
+  if (MELODY_EDITS.includes(t)) return m.editsMelody;
+  if (FORM_EDITS.includes(t)) return m.editsForm;
+  if (TRANSPORT.includes(t)) return m.transport;
+  if (t === 'pick') return m.hex;
+  if (t === 'heard') return m.listens;
+  if (m.chartEmpty) return false; // Tune: no chord to sound, no chart to click
+  if (SLOT_MOVES.includes(t)) return m.editsMelody || m.movesByHand;
+  if (t === 'bar-select' || t === 'clear-selection') return !m.chartInert;
   return true;
 }
 
@@ -290,7 +324,7 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
       const e = back
         ? ([...events].reverse().find((x) => x.start < caret) ?? events[events.length - 1])
         : (events.find((x) => caret >= x.start && caret < x.end) ?? events[0]);
-      if ('pitch' in e.ev) effects.push({ type: 'note', midi: e.ev.pitch });
+      if ('pitch' in e.ev) effects.push({ type: 'note', midi: e.ev.pitch }, { type: 'light', midi: e.ev.pitch });
       const slot = view.slotAt(e.start);
       if (slot.start === e.start) effects.push(...arrivalSounds(s.onArrival, slot.concert));
       set({ caret: back ? e.start : e.end, refusal: null });
@@ -331,6 +365,7 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
     case 'event-click': {
       const e = intent.event;
       if ('pitch' in e.ev) effects.push({ type: 'note', midi: e.ev.pitch });
+      if (writing && 'pitch' in e.ev) effects.push({ type: 'light', midi: e.ev.pitch });
       if (writing) set({ selection: null, caret: e.start });
       else {
         // Read etude: the note auditions and its slot becomes current (silently); nothing is edited.
@@ -369,7 +404,7 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
       let slot = writing ? active.index : current;
       if (to === 'write') {
         if (view.slotAt(caret).index !== slot) set({ caret: slots[slot].start }); // the caret to the current slot's start
-      } else if (hasTransport(to) && s.selection) {
+      } else if (modeProfile(to).transport && s.selection) {
         // Looped bars that don't hold the current slot: start on their first bar.
         const { from, to: last } = s.selection;
         if (slots[slot].bar < from || slots[slot].bar > last) slot = loopStart(s, slots);
@@ -384,6 +419,7 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
         const sel = s.selection;
         const slot = sel && (active.bar < sel.from || active.bar > sel.to) ? loopStart(s, slots) : current;
         set({ running: true, slot, arrival: null });
+        effects.push({ type: 'transport-restart' });
       } else set({ running: false, arrival: s.mode === 'improvise' ? current : null });
       return done();
     case 'transport-chord':
@@ -396,8 +432,10 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
       arrive(loopStart(s, slots));
       return done();
     case 'rewind':
-      if (s.running) set({ slot: loopStart(s, slots) });
-      else arrive(loopStart(s, slots));
+      if (s.running) {
+        set({ slot: loopStart(s, slots) });
+        effects.push({ type: 'transport-restart' });
+      } else arrive(loopStart(s, slots));
       return done();
     case 'sound':
       effects.push({
@@ -498,6 +536,30 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
       });
       return done();
     }
+    case 'bars-per-row':
+      edit = setBarsPerRow(p, intent.n);
+      return done();
+    case 'chord-entry': {
+      const r = enterChord(p, view, intent.bar, intent.part, intent.text);
+      if (r.ok) edit = r.progression;
+      return { ...done(), entry: r };
+    }
+    case 'chord-clear':
+      edit = setChord(p, intent.bar, intent.part, '');
+      return done();
+    case 'scale-override':
+      edit = setScaleOverride(p, intent.bar, intent.part, intent.scale);
+      return done();
+    case 'title':
+      edit = setTitle(p, intent.text);
+      return done();
+    case 'instrument':
+      edit = setInstrument(p, intent.id);
+      effects.push({ type: 'device', patch: { lastInstrument: edit.instrument } });
+      return done();
+    case 'clef':
+      edit = setConcertClef(p, intent.clef);
+      return done();
     case 'undo':
     case 'redo':
       effects.push({ type: 'history', dir: intent.type });

@@ -1,36 +1,33 @@
 // Chart screen (SPEC §3.1): the two-row control header over the chart, above the docked hex (which takes the height
 // the chart leaves). Modes (§3.0): Tune (§3.8) · Improvise (§3.3) · Write etude (§3.2) · Read etude (§3.4); the
-// transport (§3.7) and Listen (§9.2). The rules live in pure modules: the editing session (`session.ts`), the keyboard
-// table (`keymap.ts`), the progression document (`document.ts`: undo + saving), the instrument view (`view.ts`), chord
-// entry (`chordEntry.ts`), the transport (`transport.ts`, `metronomeRun.ts`) and the mic intake (`micIntake.ts`). This
-// file renders them and performs their effects (Web Audio, device settings, browser events, the mic).
-import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
+// transport (§3.7) and Listen (§9.2). The rules live in pure modules: what each mode shows and lets through
+// (`modeProfile.ts`), the editing session (`session.ts`, run by `useChartSession`), the keyboard table (`keymap.ts`),
+// the chart layout (`zoom.ts`), what lights the hex (`hexLighting.ts`), the instrument view (`view.ts`), the transport
+// (`transport.ts`, `metronomeRun.ts`, run by `useTransport`) and the mic intake (`micIntake.ts`). This file renders them.
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { LengthLatch } from './rail/LengthLatch';
 import { Chart } from './chart/Chart';
-import { setBarsPerRow, setChord, setConcertClef, setInstrument, setScaleOverride, setTitle, type Progression } from './progression';
 import { BarsPerRow, ClearMenu, TimeSignatureField, TitleField } from './rail/RailSettings';
 import { InstrumentPicker } from './rail/InstrumentPicker';
-import { playBass, playChord, playNote, playRoot, playScale, setMuted, unlockAudio } from './audio';
-import { onArrivalOf, ON_ARRIVAL_LABELS, readDevice, writeDevice, type OnArrival } from './device';
+import { unlockAudio } from './audio';
+import { ON_ARRIVAL_LABELS, type OnArrival } from './device';
 import { AudioControls } from './rail/AudioControls';
 import { DockedHex } from './hex/DockedHex';
 import type { StoredProgression } from './storage';
-import { openDocument, type ProgressionDocument } from './document';
-import { hasTransport, initialSession, listens, reduce, type Effect, type Intent, type SessionState } from './session';
-import { enterChord } from './chordEntry';
 import { HONEYCOMB, linearOctaves, type HexShape } from './hex';
 import { keyIntent } from './keymap';
 import { clickUnderPointer, trackPointer } from './pointerClick';
-import { instrumentView } from './view';
 import { ListenPill } from './listen/ListenPill';
 import { TransportBar } from './rail/TransportBar';
-import { HEX_HIDDEN, HEX_LINEAR, METRONOME_BPM, METRONOME_SOUND, TRANSPORT_LOOP } from './deviceSettings';
+import { HEX_HIDDEN, HEX_LINEAR } from './deviceSettings';
 import { useDeviceSetting } from './useDeviceSetting';
 import { ModePanel } from './rail/ModePanel';
 import { Dropdown } from './rail/Dropdown';
-import { NEW_INTAKE, appSounded, isPlayed, type MicIntake } from './micIntake';
-import { useMetronome } from './useMetronome';
-import { loopRange, transportForm, upcomingTargets } from './transport';
+import { modeProfile } from './modeProfile';
+import { hexLighting } from './hexLighting';
+import { chartArea } from './zoom';
+import { useChartSession } from './useChartSession';
+import { useTransport } from './useTransport';
 
 /** A CSS media query as React state (SPEC §3.6 responsive layout). */
 function useMediaQuery(query: string): boolean {
@@ -45,17 +42,6 @@ function useMediaQuery(query: string): boolean {
   return match;
 }
 
-/** `navigator.storage.persist()` once per session, on the first edit (SPEC §12.1). */
-let persistAsked = false;
-function askPersist() {
-  if (persistAsked) return;
-  persistAsked = true;
-  navigator.storage?.persist?.().catch(() => {});
-}
-
-/** The chart area's vertical padding (top + bottom), matching `.chart-area` in styles.css. */
-const CHART_PAD_Y = 16;
-
 const inTextField = (el: unknown) => el instanceof Element && !!el.closest('input, textarea, select, [contenteditable]');
 
 export interface AppProps {
@@ -69,26 +55,17 @@ export interface AppProps {
 
 /** The chart screen (layout C, SPEC §3.1) for one progression. */
 export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
-  const docRef = useRef<ProgressionDocument | null>(null);
-  docRef.current ??= openDocument(localStorage, initial);
-  const doc = docRef.current;
-  const [, rerender] = useReducer((n: number) => n + 1, 0);
-  const progression = doc.progression;
+  const chart = useChartSession({ initial, onDeleted: onLibrary, onTransportRestart: () => transport.restart() });
+  const { doc, progression, view, session, dispatch } = chart;
+  const { mode, running } = session;
+  const profile = modeProfile(mode, running);
 
-  const [session, setSession] = useState<SessionState>(() => {
-    const device = readDevice(localStorage);
-    return initialSession(doc.progression, { muted: device.muted, onArrival: onArrivalOf(device) });
-  });
-  const sessionRef = useRef(session);
   /** The written pitch A would pick (the hovered hex cell or ♯ / ♭ button). */
   const hovered = useRef<number | null>(null);
   /** The hex dock: focus returns here after every header click, so keys go to the grid, not the last control. */
   const dockRef = useRef<HTMLElement>(null);
   const focusHex = () => dockRef.current?.focus({ preventScroll: true });
-  /**
-   * The chart sizes to its rows (even padding above and below) within half the space under the header; the hex
-   * takes everything else.
-   */
+  /** The space under the header: the chart takes its share (`chartArea`), the hex the rest. */
   const mainRef = useRef<HTMLElement>(null);
   const [mainHeight, setMainHeight] = useState(0);
   useLayoutEffect(() => {
@@ -97,8 +74,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
     const ro = new ResizeObserver(([e]) => setMainHeight(Math.floor(e.contentRect.height)));
     ro.observe(el);
     return () => ro.disconnect();
-  }, [session.mode]);
-  /** Clicking an unparseable slot's dock label opens its chord field. */
+  }, [mode]);
   // Linear (SPEC §8.5): the dock as one row, switched by octave. The layout is a device setting; the octave isn't
   // saved (it starts mid-range and is kept within the instrument's range).
   const [linearSetting, setLinear] = useDeviceSetting(HEX_LINEAR);
@@ -112,24 +88,13 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
   const [heardConcert, setHeardConcert] = useState<number | null>(null);
   const [tunerSlot, setTunerSlot] = useState<HTMLDivElement | null>(null);
   const [levelsSlot, setLevelsSlot] = useState<HTMLDivElement | null>(null);
-  // The transport (SPEC §3.7): tempo, click sound and Loop are device settings shared by Improvise and Read etude;
-  // whether it runs is the session's. `restart` is bumped to start it afresh from the current slot (start, rewind).
-  const [loop, setLoop] = useDeviceSetting(TRANSPORT_LOOP);
-  const [metroBpm, setMetroBpm] = useDeviceSetting(METRONOME_BPM);
-  const [metroSound, setMetroSound] = useDeviceSetting(METRONOME_SOUND);
-  const [metroRestart, setMetroRestart] = useState(0);
   /** Read etude: scale names in the chart header (off by default). */
   const [showReadScales, setShowReadScales] = useState(false);
   useEffect(() => {
-    if (session.mode !== 'read') setShowReadScales(false);
-  }, [session.mode]);
-  /** Mic intake (SPEC §3.3): the echo guard over the app's own sounds. */
-  const intakeRef = useRef<MicIntake>(NEW_INTAKE);
-  /** Write etude: the last note sounded by ` (step-play) or a melody-note click, concert pitch; lights the hex (`n` replays). */
-  const [sounded, setSounded] = useState<{ midi: number; n: number } | null>(null);
+    if (mode !== 'read') setShowReadScales(false);
+  }, [mode]);
   const [editRequest, setEditRequest] = useState<{ bar: number; part: number; n: number } | null>(null);
 
-  const view = useMemo(() => instrumentView(progression), [progression]);
   const octaves = linearOctaves(view.range);
   const octave = Math.min(octaves.max, Math.max(octaves.min, octaveWanted ?? octaves.start));
   // Linear: a new octave slides in from the side it lies on — up from the right, down from the left.
@@ -144,81 +109,18 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
   }, [octave, linear]);
   const shape: HexShape = linear ? { kind: 'linear', octave } : HONEYCOMB;
   const caretAt = Math.min(session.caret, view.end); // the form can shrink under the caret
-  const { mode, running } = session;
   const writing = mode === 'write';
   const active = writing ? view.slotAt(caretAt) : view.slots[Math.min(session.slot, view.slots.length - 1)];
 
-  /** Commit an edit at the current caret: one undo step and one save (SPEC §6.3, §12.1). */
-  const commit = (next: Progression) => {
-    const s = sessionRef.current;
-    if (!doc.commit(next, Math.min(s.caret, instrumentView(doc.progression).end))) return false;
-    askPersist();
-    rerender();
-    return true;
-  };
-
-  const perform = (effects: Effect[]) => {
-    // Listening (Tune, Improvise): the mic will hear these sounds — guard against taking them for the player (SPEC §3.3).
-    if (listens(sessionRef.current.mode)) {
-      const sounds = effects.filter(
-        (e): e is Extract<Effect, { type: 'chord' | 'root' | 'bass' | 'note' }> =>
-          e.type === 'chord' || e.type === 'root' || e.type === 'bass' || e.type === 'note',
-      );
-      intakeRef.current = appSounded(intakeRef.current, sounds, performance.now());
-    }
-    for (const e of effects) {
-      switch (e.type) {
-        case 'note':
-          playNote(e.midi);
-          break;
-        case 'chord':
-          playChord(e.harmony);
-          break;
-        case 'root':
-          playRoot(e.harmony);
-          break;
-        case 'bass':
-          playBass(e.harmony);
-          break;
-        case 'scale':
-          playScale(e.harmony);
-          break;
-        case 'device':
-          writeDevice(localStorage, e.patch);
-          break;
-        case 'history': {
-          const s = sessionRef.current;
-          const caret = doc[e.dir](Math.min(s.caret, instrumentView(doc.progression).end));
-          if (caret !== null) {
-            rerender();
-            dispatch({ type: 'restored', caret });
-          }
-          break;
-        }
-      }
-    }
-  };
-
-  /** Run an intent through the session: commit its edit, keep its state, perform its effects. */
-  const dispatch = (intent: Intent) => {
-    const before = sessionRef.current;
-    const out = reduce(sessionRef.current, doc.progression, intent);
-    if (out.edit) commit(out.edit);
-    sessionRef.current = out.state;
-    setSession(out.state);
-    perform(out.effects);
-    // Write etude: a stepped (`) or selected melody note lights its hex cells as if played (a click lights its own).
-    if (before.mode === 'write' && (intent.type === 'step-play' || intent.type === 'event-click')) {
-      const note = out.effects.find((e): e is Extract<Effect, { type: 'note' }> => e.type === 'note');
-      if (note) setSounded((f) => ({ midi: note.midi, n: (f?.n ?? 0) + 1 }));
-    }
-    // Starting the transport, or rewinding it while it runs: afresh from the (new) current slot.
-    if ((intent.type === 'transport' && intent.run && !before.running && out.state.running) || (intent.type === 'rewind' && before.running)) {
-      setMetroRestart((n) => n + 1);
-    }
-  };
-  const dispatchRef = useRef(dispatch);
-  dispatchRef.current = dispatch;
+  // The transport (SPEC §3.7): over the looped bars (the selection) or the whole form, from the current slot.
+  const transport = useTransport({
+    view,
+    profile,
+    selection: session.selection,
+    slot: session.slot,
+    onSlot: (index) => dispatch({ type: 'transport-chord', index }),
+    onEnd: () => dispatch({ type: 'transport-end' }),
+  });
 
   // Groups (the header's pills, the hex panel's wells) flash when one of their controls is used: replay the CSS
   // animation on the group the click or change came from.
@@ -238,9 +140,6 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
     };
   }, []);
 
-  // Mute (SPEC §9): the audio module follows the session.
-  useEffect(() => setMuted(session.muted), [session.muted]);
-
   // AudioContext created / resumed on the first user gesture (SPEC §9).
   useEffect(() => {
     const unlock = () => {
@@ -253,36 +152,12 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
     return unlock;
   }, []);
 
-  // Another tab changed this progression (SPEC §12.1): reload it quietly unless a text field is open here; deleted
-  // elsewhere → library.
-  useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.storageArea !== localStorage) return;
-      if (e.newValue !== null && inTextField(document.activeElement)) return;
-      const r = doc.external(e.key, e.newValue);
-      if (r === 'deleted') onLibrary();
-      else if (r === 'reloaded') {
-        rerender();
-        dispatchRef.current({ type: 'restored' });
-      }
-    };
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
-  }, [doc, onLibrary]);
-
-  useEffect(() => {
-    const onHide = () => {
-      if (document.visibilityState === 'hidden') doc.flush(); // keeps updatedAt
-    };
-    document.addEventListener('visibilitychange', onHide);
-    return () => document.removeEventListener('visibilitychange', onHide);
-  }, [doc]);
-
   // Keyboard (SPEC §11): the keymap turns a key into an intent; ignored while a text field has focus.
+  const current = chart.current;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (inTextField(e.target)) return; // native undo and typing there
-      const s = sessionRef.current;
+      const s = current();
       const r = keyIntent(e, {
         mode: s.mode,
         running: s.running,
@@ -291,7 +166,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
       });
       if (r.handled) e.preventDefault(); // no page scroll, no button activation, no browser back
       if (r.click) clickUnderPointer();
-      if (r.intent) dispatchRef.current(r.intent);
+      if (r.intent) dispatch(r.intent);
     };
     window.addEventListener('keydown', onKey);
     const untrack = trackPointer();
@@ -299,65 +174,22 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
       window.removeEventListener('keydown', onKey);
       untrack();
     };
-  }, []);
+  }, [current, dispatch]);
 
-  useEffect(() => {
-    if (!session.notice) return;
-    const id = setTimeout(() => dispatchRef.current({ type: 'notice-done' }), 2500);
-    return () => clearTimeout(id);
-  }, [session.notice]);
+  const onRefusalShown = useCallback(() => dispatch({ type: 'refusal-shown' }), [dispatch]);
 
-  // An undo can shrink the form under a selection.
-  useEffect(() => {
-    if (session.selection && session.selection.to >= progression.bars.length) dispatchRef.current({ type: 'clear-selection' });
-  }, [session.selection, progression.bars.length]);
-
-  const onRefusalShown = useCallback(() => dispatchRef.current({ type: 'refusal-shown' }), []);
-
-  // Input in a non-Concert view is read as written (SPEC §5.3).
-  /** Chord entry (SPEC §4.2): one step — transposition, splitting, the key's mode — committed as one undo step. */
-  const onChordCommit = (bar: number, part: number, text: string) => {
-    const r = enterChord(doc.progression, view, bar, part, text);
-    if (r.ok) commit(r.progression);
-    return r;
-  };
-  const onScaleChange = (bar: number, part: number, scale: Parameters<typeof setScaleOverride>[3]) =>
-    commit(setScaleOverride(doc.progression, bar, part, scale));
-
-  /** Instrument switch: one undo step; the device remembers it for new progressions (SPEC §10). */
-  const onInstrument = (id: string) => {
-    commit(setInstrument(doc.progression, id));
-    writeDevice(localStorage, { lastInstrument: doc.progression.instrument });
-  };
-
-  const { halo } = session;
+  const { halo, muted } = session;
   const haloPitch = halo && halo.caret === caretAt && halo.melody === progression.melody ? halo.pitch : null;
-  const { muted } = session;
-
-  // The transport (SPEC §3.7): over the looped bars (the selection) or the whole form, from the current slot.
-  const range = useMemo(() => (hasTransport(mode) ? loopRange(view.slots, session.selection) : null), [mode, view.slots, session.selection]);
-  const form = useMemo(() => transportForm(view, range), [view, range]);
-  useMetronome({
-    running: running && hasTransport(mode),
-    bpm: metroBpm,
-    sound: metroSound,
-    meter: view.meter,
-    slots: form.slots,
-    end: form.end,
-    startSlot: session.slot,
-    loop,
-    restart: metroRestart,
-    onSlot: (index) => dispatchRef.current({ type: 'transport-chord', index }),
-    onEnd: () => dispatchRef.current({ type: 'transport-end' }),
+  const lighting = hexLighting({
+    profile,
+    view,
+    active: active.index,
+    range: transport.range,
+    heard: heardConcert,
+    sounded: chart.sounded,
+    halo: haloPitch,
   });
-  /** Improvise, running: the upcoming chord's tones, ringed on the hex. */
-  const targets = mode === 'improvise' && running ? upcomingTargets(view, range, active.index) : null;
-
-  /** A note start the mic heard (concert): in Improvise, the player's (not the app's own) brings a waiting sound. */
-  const onMicNote = useCallback((concert: number) => {
-    if (!isPlayed(intakeRef.current, concert, performance.now())) return;
-    if (sessionRef.current.mode === 'improvise') dispatchRef.current({ type: 'heard' });
-  }, []);
+  const area = chartArea(profile.chartBudget, profile.chart, mainHeight);
 
   // The mode panel (SPEC §3.1): Mode; after a choice, keys go back to the hex.
   const modeSwitch = (
@@ -388,7 +220,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
   const read = mode === 'read';
   const improvise = mode === 'improvise';
   /** Hide hex: Improvise only (SPEC §3.1); Read etude has no hex at all. */
-  const hideHex = improvise && hexHidden;
+  const hideHex = profile.hexHideable && hexHidden;
 
   return (
     <div className="layout-c">
@@ -416,7 +248,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
             onChord={() => dispatch({ type: 'sound', what: 'chord' })}
             onBass={() => dispatch({ type: 'sound', what: 'bass' })}
             onScale={() => dispatch({ type: 'sound', what: 'scale' })}
-            noChord={tune}
+            noChord={profile.noChord}
           />
           {/* In every mode (SPEC §3.0); Tune has no chord, so it is greyed there. */}
           <div className="rail-setting on-arrival">
@@ -424,7 +256,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
             <Dropdown
               value={session.onArrival}
               label="Audio on chord"
-              disabled={tune}
+              disabled={profile.noChord}
               options={(Object.keys(ON_ARRIVAL_LABELS) as OnArrival[]).map((v) => ({ value: v, label: ON_ARRIVAL_LABELS[v] }))}
               onChange={(how) => dispatch({ type: 'set-arrival', how })}
             />
@@ -445,32 +277,32 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
             {/* The title is the progression's one name (the stored etudeName is kept but not shown). */}
             <div className="title-stack">
               <h1 className="rail-heading">
-                <TitleField title={progression.title} editing={renameOnOpen} onRename={(t) => commit(setTitle(doc.progression, t))} />
+                <TitleField title={progression.title} editing={renameOnOpen} onRename={(text) => dispatch({ type: 'title', text })} />
               </h1>
             </div>
           </div>
           {/* Row 2, centred: the mode's own groups, side by side (SPEC §3.0) — none in Tune. */}
           <div className="mode-groups">
             {/* Improvise (SPEC §3.3): the lead sheet's form group — time, bars per row, undo / redo — while stopped. */}
-            {improvise && !running && (
+            {profile.formGroup && (
               <div className="edit-pill form-group group">
                 <TimeSignatureField value={progression.timeSignature} onChange={(text) => dispatch({ type: 'time-signature', text })} />
-                <BarsPerRow value={progression.barsPerRow} onChange={(n) => commit(setBarsPerRow(doc.progression, n))} />
+                <BarsPerRow value={progression.barsPerRow} onChange={(n) => dispatch({ type: 'bars-per-row', n })} />
                 {undoRedo}
               </div>
             )}
             {/* The transport (SPEC §3.7): Improvise and Read etude. */}
-            {(improvise || read) && (
+            {profile.transportBar && (
               <TransportBar
-                bpm={metroBpm}
-                onBpm={setMetroBpm}
-                sound={metroSound}
-                onSound={setMetroSound}
+                bpm={transport.bpm}
+                onBpm={transport.setBpm}
+                sound={transport.sound}
+                onSound={transport.setSound}
                 running={running}
                 onStartStop={() => dispatch({ type: 'transport', run: !running })}
                 onRewind={() => dispatch({ type: 'rewind' })}
-                loop={loop}
-                onLoop={setLoop}
+                loop={transport.loop}
+                onLoop={transport.setLoop}
                 bars={session.selection}
                 onAllBars={() => dispatch({ type: 'clear-selection' })}
                 showScales={read ? showReadScales : undefined}
@@ -478,7 +310,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
               />
             )}
             {/* The editing controls, in a pill: Write etude only (SPEC §3.2). */}
-            {writing && (
+            {profile.editPill && (
               <div className="edit-pill group">
                 <LengthLatch
                   value={session.length}
@@ -489,7 +321,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
                   onRefusalShown={onRefusalShown}
                 />
                 <TimeSignatureField value={progression.timeSignature} onChange={(text) => dispatch({ type: 'time-signature', text })} />
-                <BarsPerRow value={progression.barsPerRow} onChange={(n) => commit(setBarsPerRow(doc.progression, n))} />
+                <BarsPerRow value={progression.barsPerRow} onChange={(n) => dispatch({ type: 'bars-per-row', n })} />
                 {/* Nudge (SPEC §6.2): the note at the caret up / down a scale step (↑ / ↓); ⇧ a semitone, ⌥ an octave. */}
                 <div className="step-controls">
                   <button
@@ -559,8 +391,8 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
             <InstrumentPicker
               instrument={view.inst.id}
               concertClef={progression.concertClef === 'bass' ? 'bass' : 'treble'}
-              onInstrument={onInstrument}
-              onConcertClef={(clef) => commit(setConcertClef(doc.progression, clef))}
+              onInstrument={(id) => dispatch({ type: 'instrument', id })}
+              onConcertClef={(clef) => dispatch({ type: 'clef', clef })}
             />
           </span>
         </div>
@@ -572,7 +404,6 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
           read && 'read',
           tune && 'tuner-mode',
           improvise && 'improvise',
-          improvise && listens(mode) && 'improvise-listen',
           hideHex && 'hex-hidden',
         ]
           .filter(Boolean)
@@ -580,12 +411,9 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
       >
         <section
           className="chart-area"
-          style={{
-            // Improvise while listening: the grid gives the chart a 1fr row above the tuner bar — no half-height cap.
-            maxHeight: read || hideHex || (improvise && listens(mode)) ? undefined : mainHeight / 2 || undefined,
-          }}
+          style={{ paddingTop: area.padTop, paddingBottom: area.padBottom, maxHeight: area.maxHeight }}
         >
-          {tune ? (
+          {profile.chartEmpty ? (
             // Tune (SPEC §3.8): the chart pane stays, empty, at the chart's height — nothing moves between modes.
             <div className="chart-pane-empty" aria-hidden>
               <Chart
@@ -595,16 +423,16 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
                 onSlotClick={() => {}}
                 onEventClick={() => {}}
                 onTimeClick={() => {}}
-                onChordCommit={onChordCommit}
+                onChordCommit={chart.enterChord}
                 onScaleChange={() => {}}
                 selection={null}
                 onBarSelect={() => {}}
                 onBarAction={() => {}}
                 onAppendBar={() => {}}
                 canPaste={false}
-                mode="improvise"
+                profile={profile}
                 current={null}
-                maxHeight={mainHeight ? mainHeight / 2 - CHART_PAD_Y : undefined}
+                fitHeight={area.fitHeight}
               />
             </div>
           ) : (
@@ -615,9 +443,9 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
               onSlotClick={(slot) => dispatch({ type: 'slot-click', index: slot.index })}
               onEventClick={(event) => dispatch({ type: 'event-click', event })}
               onTimeClick={(t) => dispatch({ type: 'time-click', t })}
-              onChordCommit={onChordCommit}
-              onScaleChange={onScaleChange}
-              onChordClear={(bar, part) => commit(setChord(doc.progression, bar, part, ''))}
+              onChordCommit={chart.enterChord}
+              onScaleChange={(bar, part, scale) => dispatch({ type: 'scale-override', bar, part, scale })}
+              onChordClear={(bar, part) => dispatch({ type: 'chord-clear', bar, part })}
               editRequest={editRequest}
               selection={session.selection}
               onBarSelect={(bar, extend) => dispatch({ type: 'bar-select', bar, extend })}
@@ -625,17 +453,10 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
               onAppendBar={() => dispatch({ type: 'append-bar' })}
               onLoopClear={() => dispatch({ type: 'clear-selection' })}
               canPaste={!!session.clip}
-              mode={mode}
+              profile={profile}
               current={writing ? null : active.index}
-              running={running}
-              showReadScales={read && showReadScales}
-              maxHeight={
-                mainHeight
-                  ? improvise && listens(mode)
-                    ? undefined // parent chart-area height (above the tuner bar) drives the zoom
-                    : (read || hideHex ? mainHeight : mainHeight / 2) - CHART_PAD_Y
-                  : undefined
-              }
+              scales={read && showReadScales}
+              fitHeight={area.fitHeight}
             />
           )}
         </section>
@@ -648,13 +469,13 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
         <ListenPill
           onHeard={setHeardConcert}
           nameOf={(m) => (tune ? view.plainName(m) : view.name(m, active))}
-          onNote={onMicNote}
-          auto={listens(mode)}
+          onNote={chart.heardNote}
+          auto={profile.listens}
           tunerSlot={tunerSlot}
           levelsSlot={levelsSlot}
           concertLowMidi={view.inst.range ? view.toConcert(view.inst.range.lo) : null}
         />
-        {!read && (
+        {profile.hex && (
           <section ref={dockRef} className={linear ? 'dock linear' : 'dock'} aria-label="Docked hex" tabIndex={-1}>
             {/* Grid on = the 3-row honeycomb; off = Linear (one row, by octave). SPEC §8.5. Not on phones (always Linear).
                 Absolutely positioned at the panel's bottom left. */}
@@ -689,7 +510,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
               </div>
             )}
             <DockedHex
-              dock={tune ? view.tunerDock(shape) : view.dock(active.index, shape)}
+              dock={profile.noChord ? view.tunerDock(shape) : view.dock(active.index, shape)}
               onLabelClick={() =>
                 setEditRequest((r) => ({
                   bar: active.bar,
@@ -701,25 +522,20 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
               onHoverPitch={(p) => {
                 hovered.current = p;
               }}
-              halo={writing && haloPitch !== null ? view.toWritten(haloPitch) : null}
-              // Heard notes light the hex in Tune, and in Improvise while the transport is stopped (SPEC §3.3, §3.8).
-              heard={heardConcert !== null && (tune || (improvise && !running)) ? view.toWritten(heardConcert) : null}
-              targets={targets && { pcs: targets, midi: null }}
-              sounded={writing && sounded ? { midi: view.toWritten(sounded.midi), n: sounded.n } : null}
-              still={improvise && running}
+              {...lighting}
             />
           </section>
         )}
         {/* While listening (Listen, §9.2): Tune — a row on the hex panel's top edge, overlaying the chart. Improvise —
             between chart and hex so the chart scrolls above it. Tuner centred; input level at the left. */}
-        {listens(mode) && (
+        {profile.listens && (
           <div className="listen-row">
             <div className="tuner-slot" ref={setTunerSlot} />
             <div className="levels-slot" ref={setLevelsSlot} />
           </div>
         )}
         {/* Hide / show the hex panel (SPEC §3.1): Improvise only; the screen's bottom right corner, remembered on the device. */}
-        {improvise && (
+        {profile.hexHideable && (
           <button
             type="button"
             className="hex-hide-toggle"

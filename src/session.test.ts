@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { TICKS } from './melody';
 import { newProgression, type Progression } from './progression';
-import { activeIndex, initialSession, reduce, type Effect, type Intent, type SessionState } from './session';
+import { activeIndex, initialSession, reduce, type Effect, type Intent, type Outcome, type SessionState } from './session';
 import type { OnArrival } from './device';
 
 const q = TICKS.q;
@@ -15,20 +15,28 @@ const prog = (): Progression => ({
   melody: [],
 });
 
-/** Apply intents in order, committing edits; collects every effect. */
+/** The effects the screen performs besides sounds and device writes: tested on their own (`signals`). */
+const SIGNALS: Effect['type'][] = ['light', 'transport-restart'];
+
+/** Apply intents in order, committing edits; collects every effect (`signals` apart). */
 function run(intents: Intent[], opts: { p?: Progression; onArrival?: OnArrival; state?: Partial<SessionState> } = {}) {
   let p = opts.p ?? prog();
   let state: SessionState = { ...initialSession(p, { onArrival: opts.onArrival ?? 'silent' }), mode: 'write', ...opts.state };
   const effects: Effect[] = [];
   const per: Effect[][] = [];
+  const signals: Effect[][] = [];
+  const outcomes: Outcome[] = [];
   for (const intent of intents) {
     const out = reduce(state, p, intent);
     if (out.edit) p = out.edit;
     state = out.state;
-    effects.push(...out.effects);
-    per.push(out.effects);
+    const sounds = out.effects.filter((e) => !SIGNALS.includes(e.type));
+    effects.push(...sounds);
+    per.push(sounds);
+    signals.push(out.effects.filter((e) => SIGNALS.includes(e.type)));
+    outcomes.push(out);
   }
-  return { p, state, effects, per };
+  return { p, state, effects, per, signals, outcomes };
 }
 
 /** Effects as short strings: `note 62`, `chord D`. */
@@ -378,5 +386,74 @@ describe('deselecting', () => {
   it('Improvise: a plain click on any looped bar goes back to the whole form', () => {
     const r = run([{ type: 'mode', mode: 'improvise' }, { type: 'bar-select', bar: 1, extend: false }, { type: 'bar-select', bar: 3, extend: true }, { type: 'bar-select', bar: 3, extend: false }], { state: { caret: 0 } });
     expect(r.state.selection).toBeNull();
+  });
+});
+
+describe('the screen\'s signals', () => {
+  const melody = { ...prog(), melody: [{ pitch: 62, d: 'h' as const }, { d: 'h' as const }, { pitch: 67, d: 'w' as const }] };
+
+  it('Write etude: a stepped or clicked melody note lights the hex (a rest does not)', () => {
+    const r = run([{ type: 'step-play' }, { type: 'step-play' }, { type: 'event-click', event: { ev: melody.melody[2], i: 2, start: W, end: 2 * W } }], { p: melody });
+    expect(r.signals).toEqual([[{ type: 'light', midi: 62 }], [], [{ type: 'light', midi: 67 }]]);
+  });
+
+  it('Read etude: a clicked note auditions but lights nothing', () => {
+    const r = run([{ type: 'event-click', event: { ev: melody.melody[0], i: 0, start: 0, end: W / 2 } }], { p: melody, state: { mode: 'read' } });
+    expect(show(r.per[0])).toEqual(['note 62']);
+    expect(r.signals[0]).toEqual([]);
+  });
+
+  it('the transport restarts on start and on a rewind while running — not on a rewind while stopped, nor on stop', () => {
+    const r = run([{ type: 'rewind' }, { type: 'transport', run: true }, { type: 'rewind' }, { type: 'transport', run: false }], { state: { mode: 'improvise' } });
+    expect(r.signals.map((x) => x.length)).toEqual([0, 1, 1, 0]);
+  });
+});
+
+describe('edits outside the melody go through the mode too', () => {
+  it('Write etude, and Improvise while stopped: chords, scales, bars per row', () => {
+    for (const mode of ['write', 'improvise'] as const) {
+      const r = run(
+        [
+          { type: 'chord-entry', bar: 0, part: 0, text: 'Em7' },
+          { type: 'scale-override', bar: 1, part: 0, scale: 'lydian-dominant' },
+          { type: 'chord-clear', bar: 2, part: 0 },
+          { type: 'bars-per-row', n: 2 },
+        ],
+        { state: { mode } },
+      );
+      expect(r.outcomes[0].entry).toMatchObject({ ok: true });
+      expect(r.p.bars[0][0].chord).toBe('Em7');
+      expect(r.p.bars[1][0].scale).toBeDefined();
+      expect(r.p.bars[2][0].chord).toBe('');
+      expect(r.p.barsPerRow).toBe(2);
+    }
+  });
+
+  it('nowhere else: Improvise running, Read etude, Tune refuse them', () => {
+    for (const state of [{ mode: 'improvise' as const, running: true }, { mode: 'read' as const }, { mode: 'tune' as const }]) {
+      const r = run(
+        [
+          { type: 'chord-entry', bar: 0, part: 0, text: 'Em7' },
+          { type: 'chord-clear', bar: 1, part: 0 },
+          { type: 'bars-per-row', n: 2 },
+        ],
+        { state },
+      );
+      expect(r.outcomes[0].entry).toBeUndefined();
+      expect(r.p).toEqual(prog());
+    }
+  });
+
+  it('the header, in every mode: title, clef and instrument (remembered on the device)', () => {
+    const r = run(
+      [
+        { type: 'title', text: 'Blues' },
+        { type: 'clef', clef: 'bass' },
+        { type: 'instrument', id: 'bb-trumpet' },
+      ],
+      { state: { mode: 'read', running: true } },
+    );
+    expect(r.p).toMatchObject({ title: 'Blues', concertClef: 'bass', instrument: 'bb-trumpet' });
+    expect(r.per[2]).toEqual([{ type: 'device', patch: { lastInstrument: 'bb-trumpet' } }]);
   });
 });

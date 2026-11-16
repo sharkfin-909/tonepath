@@ -38,8 +38,8 @@ export function transportForm(view: Pick<InstrumentView, 'slots' | 'end'>, range
  * Improvise, transport running: the hex rings the upcoming chord's chord tones (written pitch classes) — at the last
  * chord (of the looped bars), the first chord's. Null when the upcoming slot has no chord.
  */
-export function upcomingTargets(view: Pick<InstrumentView, 'slots' | 'inst'>, range: SlotRange | null, slot: number): Set<number> | null {
+export function upcomingTargets(view: Pick<InstrumentView, 'slots' | 'toWritten'>, range: SlotRange | null, slot: number): Set<number> | null {
   const next = view.slots[upcomingSlot(view.slots.length, range, slot)];
   if (next.concert.kind !== 'chord') return null;
-  return new Set([...next.concert.chordTones].map((pc) => (pc + view.inst.semitones + 120) % 12));
+  return new Set([...next.concert.chordTones].map((pc) => (((view.toWritten(pc) % 12) + 12) % 12)));
 }

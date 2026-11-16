@@ -15,24 +15,8 @@ import { LeadTones } from './LeadTones';
 import { keyName, keyOf, sameKey } from '../key';
 import { prettyName } from '../spelling';
 
-import {
-  CHORD_PX,
-  MIN_CHORD_PX,
-  MIN_SCALE_PX,
-  ROW_AFTER_PX,
-  ROW_GAP_PX,
-  ROW_GAP_READ_PX,
-  SCALE_PX,
-  SLOT_GAP_PX,
-  SLOT_PAD_TOP_PX,
-  ZOOM_CAP,
-  chartHeight,
-  fitZoom,
-  headerPx,
-  labelPx,
-} from '../zoom';
-
-const GUTTER_WIDTH = 46;
+import type { ModeProfile } from '../modeProfile';
+import { BAR_LINE_PX, GUTTER_PX, ROW_AFTER_PX, SLOT_GAP_PX, SLOT_PAD_TOP_PX, chartLayout } from '../zoom';
 
 export interface ChartProps {
   progression: Progression;
@@ -64,22 +48,19 @@ export interface ChartProps {
   onLoopClear?: () => void;
   canPaste: boolean;
   /**
-   * The chart's mode (SPEC §3.0): Write etude (the caret, the bar menu); Improvise (a lead sheet — empty staves,
-   * chords, scales and the form editable while stopped; bar numbers pick the looped bars); Read etude (the etude,
-   * fitted to the page with no zoom floor; nothing edits; bar numbers pick the looped bars).
+   * The mode's profile (SPEC §3.0): the chart's kind — Write etude's cards (the caret, the bar menu), Improvise's lead
+   * sheet, Read etude's fitted page — and what edits or answers a click.
    */
-  mode?: 'improvise' | 'write' | 'read';
+  profile: ModeProfile;
   /** Improvise / Read etude: the current slot (the playhead), highlighted. */
   current?: number | null;
-  /** The transport is running: nothing on the chart edits; in Read etude nothing is clickable. */
-  running?: boolean;
   /**
    * Height budget (rendered px) to fit the rows into, when the chart's own area sizes to its content (the chart
    * screen: the hex takes whatever the chart leaves). Without it the chart fits its parent's height.
    */
-  maxHeight?: number;
+  fitHeight?: number;
   /** Read etude: scale names in the slot header (off by default). */
-  showReadScales?: boolean;
+  scales?: boolean;
 }
 
 function useWidth<T extends HTMLElement>() {
@@ -127,22 +108,23 @@ export function Chart({
   onAppendBar,
   onLoopClear,
   canPaste,
-  mode = 'write',
+  profile,
   current = null,
-  running = false,
-  maxHeight,
-  showReadScales = false,
+  fitHeight,
+  scales = false,
 }: ChartProps) {
-  const writing = mode === 'write';
-  const read = mode === 'read';
+  const kind = profile.chart;
+  const writing = kind === 'write';
+  const read = kind === 'read';
+  const lead = kind === 'lead';
   /** Read etude while running: nothing on the chart answers a click. */
-  const inert = read && running;
+  const inert = profile.chartInert;
   /** Chords, scales, "+" and the trash cans: Write etude, and Improvise while stopped. */
-  const editsForm = writing || (mode === 'improvise' && !running);
+  const editsForm = profile.editsForm;
   const { bars, barsPerRow } = progression;
   const [fitRef, area] = useParentSize<HTMLDivElement>();
   const chartRef = useRef<HTMLDivElement>(null);
-  const { slots, meter: layout, clef, usedChords } = view;
+  const { slots, meter: meterLayout, clef, usedChords } = view;
   const activeSlot = writing ? view.slotAt(caret).index : (current ?? -1);
   const [editing, setEditing] = useState<{ bar: number; part: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -154,25 +136,15 @@ export function Chart({
   const rows: ViewSlot[][] = [];
   for (const s of slots) (rows[Math.floor(s.bar / barsPerRow)] ??= []).push(s);
 
-  // Chart zoom (SPEC §3.1): lay out at logical width area/z, scale by z. Fit every row, capped at 1.4×, floor 0.5.
+  // Chart zoom (SPEC §3.1): lay out at logical width area/z, scale by z. Every size comes from the layout (`zoom.ts`).
   const staveHeight = staveMetrics().height;
-  const { zoom, scrolls } = fitZoom(rows.length, staveHeight, maxHeight ?? area.height, read ? 0 : undefined, ZOOM_CAP, read, showReadScales);
-  const header = headerPx(zoom, read, showReadScales);
-  // Improvise's 3-row slot (SPEC §3.3): [bar number · key pill] [hex] [chord · scale]. The hex gets what the two label
-  // rows leave of the usual slot height (header + stave), so rows keep their size and the zoom is unchanged.
-  const chordPx = labelPx(CHORD_PX, MIN_CHORD_PX, zoom);
-  const scalePx = labelPx(SCALE_PX, MIN_SCALE_PX, zoom);
-  const leadHexHeight = Math.max(24, header + staveHeight - (1.595 * scalePx + 6) - (1.25 * chordPx + 8));
+  const layout = chartLayout(rows.length, staveHeight, fitHeight ?? area.height, { kind, scales });
+  const { zoom, scrolls, header } = layout;
   const zoomStyle = {
     width: area.width / zoom,
     transform: `scale(${zoom})`,
-    gap: (read ? ROW_GAP_READ_PX : ROW_GAP_PX) + ROW_AFTER_PX,
-    '--row-gap': `${read ? ROW_GAP_READ_PX : ROW_GAP_PX}px`,
-    '--row-after': `${ROW_AFTER_PX}px`,
-    '--slot-gap': `${SLOT_GAP_PX}px`,
-    '--slot-pad-top': `${SLOT_PAD_TOP_PX}px`,
-    '--chord-px': `${labelPx(CHORD_PX, MIN_CHORD_PX, zoom)}px`,
-    '--scale-px': `${labelPx(SCALE_PX, MIN_SCALE_PX, zoom)}px`,
+    gap: layout.rowGap + ROW_AFTER_PX,
+    ...layout.vars,
   } as CSSProperties;
 
   // Below the floor the chart scrolls, keeping the caret's row in view.
@@ -209,19 +181,17 @@ export function Chart({
   };
 
   return (
-    <div ref={fitRef} className="chart-fit" style={{ height: chartHeight(rows.length, staveHeight, zoom, read, showReadScales) }} data-zoom={zoom.toFixed(3)}>
+    <div ref={fitRef} className="chart-fit" style={{ height: layout.height }} data-zoom={zoom.toFixed(3)}>
     <div ref={chartRef} className="chart" aria-label="Chart" style={area.width ? zoomStyle : { visibility: 'hidden' }}>
       {rows.map((row, r) => (
         <div
           className="chart-row"
           key={r}
-          style={{ gridTemplateColumns: `${GUTTER_WIDTH}px repeat(${barsPerRow * 2}, minmax(0, 1fr))` }}
+          style={{ gridTemplateColumns: `${GUTTER_PX}px repeat(${barsPerRow * 2}, minmax(0, 1fr))` }}
         >
           <div className="clef-gutter" style={{ paddingTop: header }}>
             {/* Improvise's lead sheet has no stave, so no clef (SPEC §3.3). */}
-            {mode !== 'improvise' && (
-              <ClefGutter width={GUTTER_WIDTH} clef={clef} extendRight={read ? SLOT_GAP_PX : 0} />
-            )}
+            {profile.clef && <ClefGutter width={GUTTER_PX} clef={clef} extendRight={read ? SLOT_GAP_PX : 0} />}
           </div>
           {row.map((slot, si) => (
             <SlotView
@@ -235,19 +205,20 @@ export function Chart({
               caret={writing && slot.index === activeSlot ? caret : undefined}
               playing={!writing}
               // Read etude (§3.4): only chord + scale above the stave — no key pills.
-              keyLabel={read ? null : keys[slot.index] && keyName(keys[slot.index]!)}
-              keyMate={!read && slot.index !== activeSlot && sameKey(keys[slot.index], activeKey)}
-              hideMelody={mode === 'improvise'}
-              leadHexHeight={leadHexHeight}
+              keyLabel={profile.keyPills ? keys[slot.index] && keyName(keys[slot.index]!) : null}
+              keyMate={profile.keyPills && slot.index !== activeSlot && sameKey(keys[slot.index], activeKey)}
+              hideMelody={lead}
+              leadHexHeight={layout.leadHexHeight}
+              slotHeight={layout.slotHeight}
               onEventClick={inert ? undefined : onEventClick}
               onTimeClick={inert ? undefined : onTimeClick}
               span={2 / bars[slot.bar].length}
               // Write etude / Read etude: one card per bar — a split bar's two slots join (SPEC §3.1). Improvise: a card per slot.
-              barCard={mode !== 'improvise' && bars[slot.bar].length === 2 ? (slot.part === 0 ? 'first' : 'second') : null}
+              barCard={!lead && bars[slot.bar].length === 2 ? (slot.part === 0 ? 'first' : 'second') : null}
               rowEnd={si === row.length - 1}
               readEtude={read}
-              readShowScales={showReadScales}
-              layout={layout}
+              readShowScales={scales}
+              layout={meterLayout}
               header={header}
               showTimeSignature={slot.index === 0}
               barTools={
@@ -316,8 +287,9 @@ interface SlotViewProps {
   keyMate: boolean;
   /** Improvise: the lead sheet — the slot's chord and scale tones in place of the stave. */
   hideMelody: boolean;
-  /** Improvise: the hex's height in the 3-row slot. */
+  /** Improvise: the hex's height in the 3-row slot, and the slot's height (it keeps the usual one). */
   leadHexHeight: number;
+  slotHeight: number;
   onEventClick?: (e: TimedEvent) => void;
   onTimeClick?: (t: number) => void;
   span: number;
@@ -356,12 +328,12 @@ interface SlotViewProps {
   onScaleChange?: (scale: ScaleId | null) => void;
 }
 
-function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing, keyLabel, keyMate, hideMelody, leadHexHeight, onEventClick, onTimeClick, span, layout, header, barTools, inSelection, barCard, rowEnd, readEtude, readShowScales, loop, onShiftSelect, onDeleteBar, onAppend, showTimeSignature, editing, error, usedChords, onEdit, onCommit, onClear, onScaleChange }: SlotViewProps) {
+function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing, keyLabel, keyMate, hideMelody, leadHexHeight, slotHeight, onEventClick, onTimeClick, span, layout, header, barTools, inSelection, barCard, rowEnd, readEtude, readShowScales, loop, onShiftSelect, onDeleteBar, onAppend, showTimeSignature, editing, error, usedChords, onEdit, onCommit, onClear, onScaleChange }: SlotViewProps) {
   // Everything shown runs against the written chord; the stored melody stays concert (SPEC §5.3, §10).
   const { chord, harmony } = slot;
   const spell = (midi: number) => view.name(midi, slot);
   const [ref, width] = useWidth<HTMLDivElement>();
-  const { staffTop, staffBottom, height: staveHeight } = staveMetrics();
+  const { staffTop, staffBottom } = staveMetrics();
   // Unparseable time signatures are shown in the header as typed; the stave shows (and beams by) the layout meter.
   const meter = showTimeSignature ? layout : undefined;
   // The key pill (SPEC §3.1): the key this slot's scale belongs to; lit on the current slot and its key mates (only the pill).
@@ -382,7 +354,7 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
         gridColumn: `span ${span}`,
         ['--staff-top' as string]: `${SLOT_PAD_TOP_PX + header + staffTop}px`,
         ...(readEtude ? { ['--staff-bottom' as string]: `${SLOT_PAD_TOP_PX + header + staffBottom}px` } : {}),
-        ...(hideMelody ? { minHeight: header + staveHeight + SLOT_PAD_TOP_PX + 2 } : {}),
+        ...(hideMelody ? { minHeight: slotHeight } : {}),
       }}
       data-slot={slot.index}
       // ⇧-click (Write): extend the bar selection to this bar — caught before notes, the stave or the chord see it.
@@ -452,7 +424,7 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
           extendRight={
             readEtude && !rowEnd
               ? slot.barEnd
-                ? SLOT_GAP_PX + 2.5 + SLOT_GAP_PX
+                ? SLOT_GAP_PX + BAR_LINE_PX + SLOT_GAP_PX
                 : SLOT_GAP_PX
               : 0
           }

@@ -1,6 +1,6 @@
 // Pure `metronome` module (SPEC §3.7): the transport — the form moves on in time instead of by the notes
 // played. The beat is the time signature's (a quarter in 4/4, an eighth in 6/8); the tempo counts those beats.
-// The scheduling itself (audio clock, timers) is `useMetronome`.
+// The scheduling itself (audio clock, timers) is `useTransport`.
 
 import { TICKS_PER_WHOLE, barTicks, type Meter } from './form';
 import type { ClickSound } from './audio';
