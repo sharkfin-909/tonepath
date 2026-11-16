@@ -3,7 +3,7 @@
 A static web app for writing **practice etudes over chord changes** and **practising improvisation** on them.
 Type chord symbols into a bar grid; each slot gets a scale and a fragment of one continuous melody, entered on the
 **docked hex** — a honeycomb of the slot's scale where right is the next step and up-left a third, coloured by
-degree. Four modes: **Tuner** (the hex lights whatever you play into the microphone), **Improvise** (play over a lead
+degree. Four modes: **Tune** (the hex lights whatever you play into the microphone), **Improvise** (play over a lead
 sheet with a click and the hex showing the chords), **Write etude** (note entry) and **Read etude** (the etude on one
 page, with a click and playhead).
 
@@ -20,7 +20,7 @@ npm run typecheck
 npm run build      # typecheck + static build into dist/
 ```
 
-The microphone (Listen: Tuner and Improvise) works on `localhost` and over HTTPS.
+The microphone (Listen: Tune and Improvise) works on `localhost` and over HTTPS.
 
 ## Where things are
 
@@ -41,7 +41,7 @@ The microphone (Listen: Tuner and Improvise) works on `localhost` and over HTTPS
   metronome; looping selected bars), a hideable hex panel, responsive header, generated reverb.
 - **Not built / known limits**: Listen is one note at a time (no chords); very low notes (below ~E2) are slower to
   detect; nothing is recorded from the mic.
-- **Next: the mode menu** — [Mode menu](issues/068-mode-menu.md) (SPEC §3): Tuner · Improvise · Write etude ·
+- **Next: the mode menu** — [Mode menu](issues/068-mode-menu.md) (SPEC §3): Tune · Improvise · Write etude ·
   Read etude replace the modes above and the Audio input switch; Practice's note-driven rules and Explore are dropped,
   and the metronome becomes the transport of Improvise and Read etude. Code identifiers are renamed in the same change.
   The old *Listen and Practice* map (061) is closed as superseded.
