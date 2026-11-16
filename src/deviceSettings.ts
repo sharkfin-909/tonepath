@@ -20,3 +20,16 @@ export const TRANSPORT_LOOP: DeviceSetting<boolean> = { key: 'practiceLoop', rea
 /** The transport's tempo (30–300, default 100) and click sound (default Click), shared by both modes. */
 export const METRONOME_BPM: DeviceSetting<number> = { key: 'metronomeBpm', read: clampBpm };
 export const METRONOME_SOUND: DeviceSetting<ClickSound> = { key: 'metronomeSound', read: clickSoundOf };
+
+export const CHORD_BUMP_NOTES_OPTIONS = [1, 2, 4, 8, 16, 32] as const;
+export type ChordBumpNotes = (typeof CHORD_BUMP_NOTES_OPTIONS)[number];
+
+/** Improvise: after this many hex picks in a slot, advance to the next chord (hex input only). */
+export const CHORD_BUMP: DeviceSetting<boolean> = { key: 'chordBump', read: (raw) => raw === true };
+export const CHORD_BUMP_NOTES: DeviceSetting<ChordBumpNotes> = {
+  key: 'chordBumpNotes',
+  read: (raw) => {
+    const n = typeof raw === 'number' ? raw : 4;
+    return CHORD_BUMP_NOTES_OPTIONS.includes(n as ChordBumpNotes) ? (n as ChordBumpNotes) : 4;
+  },
+};

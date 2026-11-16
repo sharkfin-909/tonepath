@@ -17,6 +17,7 @@ import type { StoredProgression } from './storage';
 import { HONEYCOMB, linearOctaves, type HexShape } from './hex';
 import { keyIntent } from './keymap';
 import { clickUnderPointer, trackPointer } from './pointerClick';
+import { ChordBumpControls } from './listen/ChordBumpControls';
 import { ListenPill } from './listen/ListenPill';
 import { TransportBar } from './rail/TransportBar';
 import { HEX_HIDDEN, HEX_LINEAR } from './deviceSettings';
@@ -99,6 +100,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
   const [heardConcert, setHeardConcert] = useState<number | null>(null);
   const [tunerSlot, setTunerSlot] = useState<HTMLDivElement | null>(null);
   const [levelsSlot, setLevelsSlot] = useState<HTMLDivElement | null>(null);
+  const [bumpSlot, setBumpSlot] = useState<HTMLDivElement | null>(null);
   /** Read etude: scale names in the chart header (off by default). */
   const [showReadScales, setShowReadScales] = useState(false);
   useEffect(() => {
@@ -549,9 +551,19 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
             between chart and hex so the chart scrolls above it. Tuner centred; input level at the left. */}
         {profile.listens && (
           <div className="listen-row">
-            <div className="tuner-slot" ref={setTunerSlot} />
             <div className="levels-slot" ref={setLevelsSlot} />
+            <div className="tuner-slot" ref={setTunerSlot} />
+            {improvise && <div className="bump-slot" ref={setBumpSlot} />}
           </div>
+        )}
+        {improvise && profile.listens && (
+          <ChordBumpControls
+            slot={bumpSlot}
+            on={session.chordBump}
+            notes={session.chordBumpNotes}
+            onToggle={(on) => dispatch({ type: 'set-chord-bump', on })}
+            onNotes={(notes) => dispatch({ type: 'set-chord-bump-notes', notes })}
+          />
         )}
         {/* Hide / show the hex panel (SPEC §3.1): Improvise only; the screen's bottom right corner, remembered on the device. */}
         {profile.hexHideable && (

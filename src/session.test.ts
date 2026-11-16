@@ -160,12 +160,24 @@ describe('Write etude: On arrival sounds with the first entry of a slot', () => 
 });
 
 describe('Improvise (stopped)', () => {
-  const improvise = (more: Intent[], onArrival: OnArrival = 'chord') => run([{ type: 'mode', mode: 'improvise' }, ...more], { onArrival });
+  const improvise = (more: Intent[], opts: { onArrival?: OnArrival; state?: Partial<SessionState> } | OnArrival = 'chord') =>
+    run(
+      [{ type: 'mode', mode: 'improvise' }, ...more],
+      typeof opts === 'string' ? { onArrival: opts } : { onArrival: opts.onArrival ?? 'chord', state: opts.state },
+    );
 
   it('arriving is silent; the first note played there (hex or mic) brings the arrival sound, later ones play alone', () => {
     const r = improvise([{ type: 'browse', dir: 1 }, pick(67), pick(71)]);
     expect(r.per.map(show)).toEqual([[], [], ['note 67', 'chord G'], ['note 71']]);
-    expect(improvise([{ type: 'heard' }, { type: 'heard' }]).per.map(show)).toEqual([[], ['chord D'], []]);
+    expect(improvise([{ type: 'heard' }, { type: 'heard' }], 'chord').per.map(show)).toEqual([[], ['chord D'], []]);
+  });
+
+  it('chord bump: hex picks in a slot advance the form after N notes; the mic does not count', () => {
+    const on = { chordBump: true as const, chordBumpNotes: 2 as const, bumpCount: 0 };
+    expect(improvise([pick(62)], { state: on }).state).toMatchObject({ slot: 0, bumpCount: 1 });
+    expect(improvise([pick(62), pick(64)], { state: on }).state).toMatchObject({ slot: 1, bumpCount: 0, arrival: 1 });
+    expect(improvise([{ type: 'heard' }, { type: 'heard' }], { state: on }).state.slot).toBe(0);
+    expect(improvise([{ type: 'set-chord-bump', on: false }, pick(62), pick(64)]).state.slot).toBe(0);
   });
 
   it('← / → and < > step slots, wrapping; clicking a slot makes it current', () => {

@@ -2851,7 +2851,7 @@ select {
   /* A black inner glow round the whole row, and a soft shadow up onto the chart. */
   box-shadow: inset 0 0 14px 2px rgba(0, 0, 0, 0.7), 0 -4px 12px rgba(0, 0, 0, 0.18);
 }
-.listen-row:not(:has(.tuner, .listen-levels)) {
+.listen-row:not(:has(.tuner, .listen-levels, .chord-bump)) {
   display: none;
 }
 
@@ -2882,6 +2882,45 @@ select {
   grid-column: 1;
   grid-row: 1;
   justify-self: start;
+}
+.bump-slot {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+}
+/* Improvise: chord bump at the listen row's right — hex picks per slot before advancing. */
+.chord-bump {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  color: #f3eee6;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.chord-bump-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+.chord-bump-label {
+  font-weight: 100;
+}
+.chord-bump-toggle.on .switch-track {
+  background: var(--ink);
+}
+.chord-bump-toggle.on .switch-knob {
+  transform: translateX(12px);
+  background: var(--dock-bg);
+}
+.chord-bump .chord-bump-notes .dropdown-trigger {
+  font-size: 12px;
 }
 
 /* The big tuner (SPEC §9.2): note, a ±50 ¢ scale with a needle, the cents off. */

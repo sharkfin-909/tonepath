@@ -20,6 +20,7 @@ import {
   type BarClip,
   type BarEdit,
 } from './bars';
+import type { ChordBumpNotes } from './deviceSettings';
 import { stepSlot } from './form';
 import { stepPitchClasses, type SlotHarmony } from './harmony';
 import { backspaceAt, caretFromClick, deleteAt, insertWrapping, melodyEnd, nudge, snapToEvent, stepCaret, timeline, type TimedEvent } from './melody';
@@ -95,6 +96,10 @@ export interface SessionState {
   /** Device settings (SPEC §9, §12.5). */
   muted: boolean;
   onArrival: OnArrival;
+  /** Improvise: hex picks in the current slot toward auto-advance when chord bump is on. */
+  bumpCount: number;
+  chordBump: boolean;
+  chordBumpNotes: ChordBumpNotes;
 }
 
 export type Intent =
@@ -132,6 +137,8 @@ export type Intent =
   | { type: 'sound'; what: 'chord' | 'bass' | 'scale' }
   | { type: 'toggle-mute' }
   | { type: 'set-arrival'; how: OnArrival }
+  | { type: 'set-chord-bump'; on: boolean }
+  | { type: 'set-chord-bump-notes'; notes: ChordBumpNotes }
   | { type: 'bar-select'; bar: number; extend: boolean }
   | { type: 'bar-action'; bar: number; action: BarAction }
   | { type: 'append-bar' }
@@ -174,7 +181,16 @@ export type Intent =
 export type Effect =
   | { type: 'note'; midi: number }
   | { type: 'chord' | 'root' | 'bass' | 'scale'; harmony: SlotHarmony }
-  | { type: 'device'; patch: { muted?: boolean; playArrival?: OnArrival; lastInstrument?: string } }
+  | {
+      type: 'device';
+      patch: {
+        muted?: boolean;
+        playArrival?: OnArrival;
+        lastInstrument?: string;
+        chordBump?: boolean;
+        chordBumpNotes?: ChordBumpNotes;
+      };
+    }
   | { type: 'history'; dir: 'undo' | 'redo' }
   /** Write etude: a stepped (`) or clicked melody note lights its hex cells as if played (concert pitch). */
   | { type: 'light'; midi: number }
@@ -197,7 +213,12 @@ export type Carried = Pick<SessionState, 'mode' | 'clip'>;
  * A session for a progression just opened: on its etude (missing → the first), the caret at the melody's end; in
  * Tune with an empty clipboard on launch and reload — switching progressions carries the mode and the clipboard.
  */
-export function initialSession(p: Progression, device: { muted?: boolean; onArrival: OnArrival }, etude?: string | null, carried?: Carried): SessionState {
+export function initialSession(
+  p: Progression,
+  device: { muted?: boolean; onArrival: OnArrival; chordBump?: boolean; chordBumpNotes?: ChordBumpNotes },
+  etude?: string | null,
+  carried?: Carried,
+): SessionState {
   const mode = carried?.mode ?? 'tune';
   const open = etudeOf(p, etude).id;
   const caret = melodyEnd(etudeOf(p, open).melody); // opens at the melody's end; not saved
@@ -218,6 +239,9 @@ export function initialSession(p: Progression, device: { muted?: boolean; onArri
     notice: null,
     muted: device.muted === true,
     onArrival: device.onArrival,
+    bumpCount: 0,
+    chordBump: device.chordBump === true,
+    chordBumpNotes: device.chordBumpNotes ?? 4,
   };
 }
 
@@ -271,6 +295,8 @@ const ANY_MODE: Intent['type'][] = [
   'restored',
   'refusal-shown',
   'notice-done',
+  'set-chord-bump',
+  'set-chord-bump-notes',
 ];
 /** The melody (Write etude). */
 const MELODY_EDITS: Intent['type'][] = ['length', 'toggle-rest', 'delete', 'nudge', 'step-play', 'clear-notes', 'clear-all'];
@@ -317,7 +343,8 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
    * Improvise / Read etude: reach a slot by hand. In Improvise its *On arrival* sound waits for the first note played
    * there; Read etude's arrival is silent (nothing is played there).
    */
-  const arrive = (index: number) => set({ slot: index, arrival: s.mode === 'improvise' ? index : null });
+  const arrive = (index: number) =>
+    set({ slot: index, arrival: s.mode === 'improvise' ? index : null, bumpCount: 0 });
   /** Improvise: a note was played in the current slot; the first one after arriving brings the arrival sound. */
   const playedIn = (index: number) => {
     if (s.arrival !== index) return;
@@ -365,7 +392,16 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
       if (writing) {
         set({ rest: false });
         insert(s.length, midi);
-      } else if (s.mode === 'improvise' && !s.running) playedIn(current); // audition only, never recorded
+      } else if (s.mode === 'improvise' && !s.running) {
+        playedIn(current); // audition only, never recorded
+        if (s.chordBump) {
+          const nextCount = s.bumpCount + 1;
+          if (nextCount >= s.chordBumpNotes) {
+            set({ bumpCount: 0 });
+            arrive(stepSlot(current, 1, slots.length));
+          } else set({ bumpCount: nextCount });
+        }
+      }
       return done();
     }
     case 'heard':
@@ -507,6 +543,14 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
     case 'set-arrival':
       set({ onArrival: intent.how });
       effects.push({ type: 'device', patch: { playArrival: intent.how } });
+      return done();
+    case 'set-chord-bump':
+      set({ chordBump: intent.on, bumpCount: 0 });
+      effects.push({ type: 'device', patch: { chordBump: intent.on } });
+      return done();
+    case 'set-chord-bump-notes':
+      set({ chordBumpNotes: intent.notes, bumpCount: 0 });
+      effects.push({ type: 'device', patch: { chordBumpNotes: intent.notes } });
       return done();
     case 'bar-select': {
       const bar = intent.bar;

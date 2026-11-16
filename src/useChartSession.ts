@@ -5,7 +5,8 @@
 // etude's lit note, and restarting the transport. Nothing else in the screen edits the progression.
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { playBass, playChord, playNote, playRoot, playScale, setMuted } from './audio';
-import { onArrivalOf, readDevice, writeDevice } from './device';
+import { onArrivalOf, readDevice, readSetting, writeDevice } from './device';
+import { CHORD_BUMP, CHORD_BUMP_NOTES } from './deviceSettings';
 import { openDocument, type ProgressionDocument } from './document';
 import { NEW_INTAKE, appSounded, isPlayed, type MicIntake } from './micIntake';
 import { modeProfile } from './modeProfile';
@@ -65,7 +66,17 @@ export function useChartSession(o: ChartSessionOptions): ChartSession {
   const [session, setSession] = useState<SessionState>(() => {
     const device = readDevice(localStorage);
     // The etude last open in this progression (SPEC §3.0); missing → the first.
-    return initialSession(doc.progression, { muted: device.muted, onArrival: onArrivalOf(device) }, doc.progression.openEtudeId, o.carried);
+    return initialSession(
+      doc.progression,
+      {
+        muted: device.muted,
+        onArrival: onArrivalOf(device),
+        chordBump: readSetting(localStorage, CHORD_BUMP),
+        chordBumpNotes: readSetting(localStorage, CHORD_BUMP_NOTES),
+      },
+      doc.progression.openEtudeId,
+      o.carried,
+    );
   });
   const view = useMemo(() => instrumentView(progression, session.etude), [progression, session.etude]);
   const sessionRef = useRef(session);
