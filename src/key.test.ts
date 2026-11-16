@@ -76,9 +76,9 @@ describe('the key pill\'s name', () => {
     expect(name('Cm(maj7)')).toBe('C mel');
     expect(name('G7b9b13')).toBe('C harm'); // G Phrygian dominant
   });
-  it('whole-tone and diminished: no tonic', () => {
-    expect(name('C7#5')).toBe('whole-tone');
-    expect(name('C7b9')).toBe('dim'); // C half-whole
+  it('whole-tone and diminished are not modes of a key: no pill', () => {
+    expect(name('C7#5')).toBeNull(); // whole-tone
+    expect(name('C7b9')).toBeNull(); // C half-whole
   });
   it('no scale: no key', () => {
     expect(name('N.C.')).toBeNull();

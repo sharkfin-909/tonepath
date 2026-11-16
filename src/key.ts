@@ -33,9 +33,10 @@ const MELODIC_STEPS = [0, 2, 3, 5, 7, 9, 11];
 const HARMONIC_STEPS = [0, 2, 3, 5, 7, 8, 11];
 
 /**
- * The key pill's name (SPEC §3.1): the parent scale the notes come from. A mode of a major key → its tonic (`C`,
- * `Bb`); a mode of melodic or harmonic minor → its tonic and a tag (`Ab mel`, `C harm`); whole-tone and diminished,
- * which have no tonic → `whole-tone`, `dim`. The tonic is spelled as the slot's scale spells it. Null for anything else.
+ * The key pill's name (SPEC §3.1): the parent scale the notes come from — only for a scale that is a mode of one. A
+ * mode of a major key → its tonic (`C`, `Bb`); a mode of melodic or harmonic minor → its tonic and a tag (`Ab mel`,
+ * `C harm`). The tonic is spelled as the slot's scale spells it. Null for anything else: whole-tone and diminished
+ * (symmetric, no tonic), and no scale.
  */
 export function keyName(key: Key): string | null {
   const nameOf = (pc: number) => key.names[key.pcs.indexOf(pc)];
@@ -45,8 +46,6 @@ export function keyName(key: Key): string | null {
   if (mel !== undefined) return `${nameOf(mel)} mel`;
   const harm = parent(HARMONIC_STEPS);
   if (harm !== undefined) return `${nameOf(harm)} harm`;
-  if (key.pcs.length === 6) return 'whole-tone';
-  if (key.pcs.length === 8) return 'dim';
   return null;
 }
 

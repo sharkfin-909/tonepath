@@ -1584,6 +1584,17 @@ button.dock-label {
 .main.improvise > .chart-area {
   background: #ece5c3;
 }
+/* …and the lead sheet's cards keep the original white paper on it. Drawn under the card (the chart's transform makes
+   it the stacking context), so the current slot's highlight, the tint and the loop band still sit on top. */
+.main.improvise .slot.lead::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: var(--bg);
+  z-index: -1;
+  pointer-events: none;
+}
 
 .chord-label:disabled {
   color: var(--ink);
