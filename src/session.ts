@@ -10,6 +10,7 @@ import {
   appendBar,
   copyBars,
   deleteBars,
+  deleteSlot,
   duplicateBars,
   insertBars,
   mergeBar,
@@ -134,6 +135,8 @@ export type Intent =
   | { type: 'bar-select'; bar: number; extend: boolean }
   | { type: 'bar-action'; bar: number; action: BarAction }
   | { type: 'append-bar' }
+  /** A slot's trash (a split bar): the other slot fills the bar. */
+  | { type: 'slot-delete'; bar: number; part: number }
   /** Esc, or the looped bars' ×: no selection (the whole form). */
   | { type: 'clear-selection' }
   /** Clear ▾ (SPEC §6.2 item 10): the notes only; or everything — chords, scales and notes (confirmed in the menu). */
@@ -263,7 +266,7 @@ const ANY_MODE: Intent['type'][] = [
 /** The melody (Write etude). */
 const MELODY_EDITS: Intent['type'][] = ['length', 'toggle-rest', 'delete', 'nudge', 'step-play', 'clear-notes', 'clear-all'];
 /** The form and its tonality (Write etude; Improvise while stopped). */
-const FORM_EDITS: Intent['type'][] = ['time-signature', 'bars-per-row', 'undo', 'redo', 'append-bar', 'bar-action', 'chord-entry', 'chord-clear', 'scale-override'];
+const FORM_EDITS: Intent['type'][] = ['time-signature', 'bars-per-row', 'undo', 'redo', 'append-bar', 'bar-action', 'slot-delete', 'chord-entry', 'chord-clear', 'scale-override'];
 const TRANSPORT: Intent['type'][] = ['transport', 'transport-chord', 'transport-end', 'rewind'];
 /** Moves of the caret (Write etude) or of the current slot by hand (Improvise, Read etude: only while stopped). */
 const SLOT_MOVES: Intent['type'][] = ['step', 'browse', 'event-click', 'time-click', 'slot-click'];
@@ -560,6 +563,9 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
     }
     case 'append-bar':
       barEdit(appendBar(p, caret));
+      return done();
+    case 'slot-delete':
+      barEdit(deleteSlot(p, intent.bar, intent.part, caret));
       return done();
     case 'clear-selection':
       set({ selection: null });

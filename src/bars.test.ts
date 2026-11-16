@@ -1,7 +1,7 @@
 // Test table 8 (SPEC §14.8): bar editing.
 import { describe, expect, it } from 'vitest';
 import { melodyOf, withFlat } from './test-progression';
-import { appendBar, copyBars, deleteBars, duplicateBars, insertBars, mergeBar, pasteBars, splitBar, type BarEdit } from './bars';
+import { appendBar, copyBars, deleteBars, deleteSlot, duplicateBars, insertBars, mergeBar, pasteBars, splitBar, type BarEdit } from './bars';
 import { TICKS } from './melody';
 import { newProgression, setTimeSignature, type MelodyEvent, type Progression } from './progression';
 
@@ -162,5 +162,16 @@ describe('bar edits carry every etude (issue 079)', () => {
     const p = setTimeSignature(two(), '3/4');
     expect(p.etudes.every((e) => e.melody.every((ev) => ev.d !== 'w'))).toBe(true); // no whole notes fit a 3/4 bar
     expect(p.etudes).toHaveLength(2);
+  });
+});
+
+describe("a slot's trash (Improvise)", () => {
+  const split = (): Progression => ({ ...prog(), bars: [[{ chord: 'Dm7', scale: 'aeolian' }, { chord: 'G7', scale: 'lydian-dominant' }], [{ chord: 'C' }]] });
+  it('deleting either slot of a split bar leaves the other (chord and override) filling the bar', () => {
+    expect(ok(deleteSlot(split(), 0, 0, 0)).progression.bars[0]).toEqual([{ chord: 'G7', scale: 'lydian-dominant' }]);
+    expect(ok(deleteSlot(split(), 0, 1, 0)).progression.bars[0]).toEqual([{ chord: 'Dm7', scale: 'aeolian' }]);
+  });
+  it('a one-chord bar has no slot to delete', () => {
+    expect(deleteSlot(split(), 1, 0, 0)).toEqual({ ok: false, message: 'the bar has only one chord' });
   });
 });

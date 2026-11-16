@@ -47,6 +47,8 @@ export interface ChartProps {
   onBarAction: (bar: number, action: BarAction) => void;
   /** Improvise / Read etude: remove the loop (the × at its end repeat) — back to the whole form. */
   onLoopClear?: () => void;
+  /** A slot's trash (Improvise, a split bar): delete that chord; the other fills the bar. */
+  onDeleteSlot?: (bar: number, part: number) => void;
   canPaste: boolean;
   /**
    * The mode's profile (SPEC §3.0): the chart's kind — Write etude's cards (the caret, the bar menu), Improvise's lead
@@ -108,6 +110,7 @@ export function Chart({
   onBarSelect,
   onBarAction,
   onLoopClear,
+  onDeleteSlot,
   canPaste,
   profile,
   current = null,
@@ -249,6 +252,7 @@ export function Chart({
               onShiftSelect={!inert ? () => onBarSelect(slot.bar, true) : undefined}
               onDeleteBar={editsForm && slot.barEnd && bars.length > 1 ? () => onBarAction(slot.bar, 'delete') : undefined}
               onInsertBar={editsForm && slot.barEnd ? () => onBarAction(slot.bar, 'insert-after') : undefined}
+              onDeleteSlot={editsForm && lead && bars[slot.bar].length === 2 ? () => onDeleteSlot?.(slot.bar, slot.part) : undefined}
               onAddChord={
                 editsForm && bars[slot.bar].length === 1
                   ? () => {
@@ -328,6 +332,8 @@ interface SlotViewProps {
   onInsertBar?: () => void;
   /** On a one-chord bar: the "+" in the slot that adds a second chord (splits the bar). */
   onAddChord?: () => void;
+  /** Improvise, a split bar: the slot's trash (bottom left, on hover) — the other slot fills the bar. */
+  onDeleteSlot?: () => void;
   /** The first slot carries the time signature. */
   showTimeSignature: boolean;
   editing: boolean;
@@ -340,7 +346,7 @@ interface SlotViewProps {
   onScaleChange?: (scale: ScaleId | null) => void;
 }
 
-function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing, keyLabel, keyMate, hideMelody, leadHexHeight, slotHeight, onEventClick, onTimeClick, span, layout, header, barTools, inSelection, barCard, rowEnd, readEtude, readShowScales, loop, onShiftSelect, onDeleteBar, onInsertBar, onAddChord, showTimeSignature, editing, error, usedChords, onEdit, onCommit, onClear, onScaleChange }: SlotViewProps) {
+function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing, keyLabel, keyMate, hideMelody, leadHexHeight, slotHeight, onEventClick, onTimeClick, span, layout, header, barTools, inSelection, barCard, rowEnd, readEtude, readShowScales, loop, onShiftSelect, onDeleteBar, onInsertBar, onAddChord, onDeleteSlot, showTimeSignature, editing, error, usedChords, onEdit, onCommit, onClear, onScaleChange }: SlotViewProps) {
   // Everything shown runs against the written chord; the stored melody stays concert (SPEC §5.3, §10).
   const { chord, harmony } = slot;
   const spell = (midi: number) => view.name(midi, slot);
@@ -443,6 +449,13 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
         />
         )}
       </div>
+      {onDeleteSlot && (
+        <button type="button" className="delete-slot" title="Delete this chord (the other fills the bar)" aria-label={`Delete chord ${chord || 'slot'}, bar ${slot.bar + 1}`} onClick={onDeleteSlot}>
+          <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden>
+            <path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.5h6.6L12 4M6.6 6.5v5M9.4 6.5v5" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      )}
       {onInsertBar && (
         <button
           type="button"

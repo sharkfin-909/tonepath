@@ -1535,12 +1535,17 @@ button.dock-label {
   grid-template-rows: auto 1fr auto;
   align-items: center;
 }
+/* Improvise's 3-row card: [chord · scale] on top, the hex, [slot trash · key pill (· add-chord "+")] at the bottom. */
 .slot.lead > .key-pill {
-  grid-row: 1;
+  grid-row: 3;
   grid-column: 1;
   justify-self: end;
   max-width: 60%;
-  margin: 0 6px 0 0;
+  margin: 0 6px 5px 0;
+}
+.slot.lead > .add-chord {
+  top: auto;
+  bottom: 4px;
 }
 .slot.lead > .key-pill.beside-append {
   margin-right: 26px;
@@ -1551,7 +1556,7 @@ button.dock-label {
   justify-self: center;
 }
 .slot.lead > .slot-header {
-  grid-row: 3;
+  grid-row: 1;
   grid-column: 1;
   flex-direction: row;
   justify-content: space-between;
@@ -2660,10 +2665,13 @@ select {
   background: #f3eee6;
   transition: transform 120ms ease;
 }
-.transport-loop.on .switch-track {
-  background: var(--grid-glow);
+/* On: the header's light tone (not the grid glow's yellow), the knob dark. Loop and Read etude's scales alike. */
+.transport-loop.on .switch-track,
+.transport-scales.on .switch-track {
+  background: var(--ink);
 }
-.transport-loop.on .switch-knob {
+.transport-loop.on .switch-knob,
+.transport-scales.on .switch-knob {
   transform: translateX(12px);
   background: var(--dock-bg);
 }
@@ -2962,4 +2970,36 @@ select {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* The slot's trash (Improvise, a split bar): bottom left of the card, shown on hover; the other chord fills the bar. */
+.delete-slot {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  font-size: var(--scale-px);
+  width: 1.8em;
+  height: 1.8em;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--muted);
+  opacity: 0;
+  cursor: pointer;
+}
+.delete-slot svg {
+  width: 1.2em;
+  height: 1.2em;
+}
+.slot:hover > .delete-slot,
+.delete-slot:focus-visible {
+  opacity: 1;
+}
+.delete-slot:hover {
+  background: rgba(0, 0, 0, 0.07);
+  color: #b3261e;
 }

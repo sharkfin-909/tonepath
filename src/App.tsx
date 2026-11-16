@@ -468,6 +468,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
               onBarSelect={(bar, extend) => dispatch({ type: 'bar-select', bar, extend })}
               onBarAction={(bar, action) => dispatch({ type: 'bar-action', bar, action })}
               onLoopClear={() => dispatch({ type: 'clear-selection' })}
+              onDeleteSlot={(bar, part) => dispatch({ type: 'slot-delete', bar, part })}
               canPaste={!!session.clip}
               profile={profile}
               current={writing ? null : active.index}

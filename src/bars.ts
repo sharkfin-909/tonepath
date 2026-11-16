@@ -159,6 +159,17 @@ export function splitBar(p: Progression, bar: number, caret: number, second: Bar
   return { ok: true, progression: { ...p, bars, etudes }, caret };
 }
 
+/**
+ * Delete one slot of a split bar: the other slot (its chord and override) fills the bar; the melodies are untouched.
+ * A one-slot bar has no slot to delete (the bar's own trash deletes it).
+ */
+export function deleteSlot(p: Progression, bar: number, part: number, caret: number): BarEdit {
+  const b = p.bars[bar];
+  if (!b || b.length !== 2 || (part !== 0 && part !== 1)) return { ok: false, message: 'the bar has only one chord' };
+  const bars = p.bars.map((x, i) => (i === bar ? [withValidOverride(b[1 - part])] : x));
+  return { ok: true, progression: { ...p, bars }, caret };
+}
+
 /** Merge a split bar: keeps the first slot's chord and override; the melodies are untouched. */
 export function mergeBar(p: Progression, bar: number, caret: number): BarEdit {
   if (p.bars[bar].length !== 2) return { ok: false, message: 'the bar is not split' };
