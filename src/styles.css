@@ -307,13 +307,48 @@ button.dock-label {
 }
 
 /* The current slot in Improvise and Read etude (SPEC §3.3, §3.4): a solid highlight, distinct from Write etude's tint. */
-.slot.active.playing {
+.slot.active.playing,
+.slot.key-mate.playing {
   background: rgba(255, 190, 40, 0.32);
 }
 
-/* Active slot (drives the docked hex): a light tint across the slot. */
-.slot.active {
+/* Active slot (drives the docked hex): a light tint across the slot — and the same on every slot sharing its key. */
+.slot.active,
+.slot.key-mate {
   background: rgba(47, 111, 219, 0.08);
+}
+
+/* The key pill (SPEC §3.1): top right of each slot, the key its scale belongs to (C, B♭, A♭ mel, dim…). Sized with the
+   scale label so it stays readable at any zoom; filled on the current slot and its key mates. */
+.key-pill {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  z-index: 4;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 0.5em;
+  border-radius: 1em;
+  border: 1px solid rgba(29, 27, 25, 0.22);
+  font-size: var(--scale-px, 11px);
+  line-height: 1.5;
+  color: var(--muted);
+  pointer-events: auto;
+}
+.key-pill.beside-append {
+  right: 26px;
+}
+.slot.active .key-pill,
+.slot.key-mate .key-pill {
+  border-color: rgba(47, 111, 219, 0.45);
+  background: rgba(47, 111, 219, 0.14);
+  color: var(--ink);
+}
+.slot.playing .key-pill {
+  border-color: rgba(200, 140, 10, 0.6);
+  background: rgba(255, 190, 40, 0.38);
 }
 
 .slot-header {

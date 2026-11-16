@@ -1,6 +1,6 @@
 // The chart (SPEC §3.1): rows of `barsPerRow` bars, a clef gutter per row, slots at time-proportional width.
 import type { Clef } from '../instruments';
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { FormSlot, Meter } from '../form';
 import { eventsForSlot, type TimedEvent } from '../melody';
 import { parseChord, interpretation } from '../chords';
@@ -12,6 +12,8 @@ import { ChordField } from './ChordField';
 import { ScaleLabel } from './ScaleLabel';
 import { BarHandle, type BarAction } from './BarHandle';
 import { LeadTones } from './LeadTones';
+import { keyName, keyOf, sameKey } from '../key';
+import { prettyName } from '../spelling';
 
 import { CHORD_PX, MIN_CHORD_PX, MIN_SCALE_PX, ROW_GAP_PX, SCALE_PX, chartHeight, fitZoom, headerPx, labelPx } from '../zoom';
 
@@ -104,6 +106,10 @@ export function Chart({ progression, view, caret, onSlotClick, onEventClick, onT
   const [editing, setEditing] = useState<{ bar: number; part: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // The key pill on each slot (SPEC §3.1), and the slots sharing the current slot's key — highlighted like it.
+  const keys = useMemo(() => slots.map((s) => keyOf(s.harmony)), [slots]);
+  const activeKey = activeSlot >= 0 ? keys[activeSlot] : null;
+
   const rows: ViewSlot[][] = [];
   for (const s of slots) (rows[Math.floor(s.bar / barsPerRow)] ??= []).push(s);
 
@@ -176,6 +182,8 @@ export function Chart({ progression, view, caret, onSlotClick, onEventClick, onT
               melody={progression.melody}
               caret={writing && slot.index === activeSlot ? caret : undefined}
               playing={!writing}
+              keyLabel={keys[slot.index] && keyName(keys[slot.index]!)}
+              keyMate={slot.index !== activeSlot && sameKey(keys[slot.index], activeKey)}
               hideMelody={mode === 'improvise'}
               onEventClick={inert ? undefined : onEventClick}
               onTimeClick={inert ? undefined : onTimeClick}
@@ -233,6 +241,10 @@ interface SlotViewProps {
   caret?: number;
   /** Improvise / Read etude: the active slot gets the solid "current slot" highlight. */
   playing: boolean;
+  /** The key pill's text (the parent scale's name), or null (no scale). */
+  keyLabel: string | null;
+  /** Shares the current slot's key: highlighted like it. */
+  keyMate: boolean;
   /** Improvise: the lead sheet — the slot's chord and scale tones in place of the stave. */
   hideMelody: boolean;
   onEventClick?: (e: TimedEvent) => void;
@@ -263,7 +275,7 @@ interface SlotViewProps {
   onScaleChange?: (scale: ScaleId | null) => void;
 }
 
-function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing, hideMelody, onEventClick, onTimeClick, span, layout, header, barTools, inSelection, onShiftSelect, onDeleteBar, onAppend, showTimeSignature, editing, error, usedChords, onEdit, onCommit, onClear, onScaleChange }: SlotViewProps) {
+function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing, keyLabel, keyMate, hideMelody, onEventClick, onTimeClick, span, layout, header, barTools, inSelection, onShiftSelect, onDeleteBar, onAppend, showTimeSignature, editing, error, usedChords, onEdit, onCommit, onClear, onScaleChange }: SlotViewProps) {
   // Everything shown runs against the written chord; the stored melody stays concert (SPEC §5.3, §10).
   const { chord, harmony } = slot;
   const spell = (midi: number) => view.name(midi, slot);
@@ -276,7 +288,7 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
 
   return (
     <div
-      className={['slot', active && 'active', active && playing && 'playing', inSelection && 'bar-selected'].filter(Boolean).join(' ')}
+      className={['slot', active && 'active', keyMate && 'key-mate', (active || keyMate) && playing && 'playing', inSelection && 'bar-selected'].filter(Boolean).join(' ')}
       // --staff-top: where the stave's top line sits in the slot; the bar number sits just above it (CSS .bar-handle).
       style={{ gridColumn: `span ${span}`, ['--staff-top' as string]: `${header + staffTop}px` }}
       data-slot={slot.index}
@@ -306,6 +318,12 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
         <button type="button" className="append-bar" title="Add a bar" aria-label="Add a bar" onClick={onAppend}>
           +
         </button>
+      )}
+      {keyLabel && (
+        // The key pill (SPEC §3.1): the key this slot's scale belongs to; lit on the current slot and its key mates.
+        <span className={['key-pill', onAppend && 'beside-append'].filter(Boolean).join(' ')} title={`Key: ${prettyName(keyLabel)}`}>
+          {prettyName(keyLabel)}
+        </span>
       )}
       <div className="slot-header" style={{ height: header }}>
         {editing ? (
