@@ -331,7 +331,8 @@ button.dock-label {
   white-space: nowrap;
   padding: 0 0.5em;
   border-radius: 1em;
-  border: 1px solid rgba(29, 27, 25, 0.22);
+  border: 1px solid color-mix(in srgb, #12eaea 70%, #1d1b19);
+  background: color-mix(in srgb, #12eaea 12%, transparent);
   font-size: calc(var(--scale-px, 11px) * 1.3);
   font-weight: 600;
   line-height: 1.45;
@@ -341,17 +342,12 @@ button.dock-label {
 .key-pill.beside-append {
   right: 26px;
 }
-/* Lit (the current slot and its key mates): a solid, darker tone of the current slot's colour. */
+/* Lit (the current slot and its key mates): solid in degree 1's colour (the hex's tonic cyan), dark ink — every mode. */
 .slot.active .key-pill,
 .slot.key-mate .key-pill {
-  border-color: #2f6fdb;
-  background: #2f6fdb;
-  color: #fff;
-}
-.slot.playing .key-pill {
-  border-color: #b9800a;
-  background: #b9800a;
-  color: #fff;
+  border-color: #12eaea;
+  background: #12eaea;
+  color: #1d1b19;
 }
 
 .slot-header {
