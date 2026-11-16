@@ -2416,6 +2416,7 @@ select {
   .topbar .topbar-row > .topbar-file {
     grid-column: 1;
     justify-self: start;
+    max-width: 100%; /* stays in its column: the title shortens rather than run under the mode's groups */
   }
   .topbar .ins-group {
     grid-column: 3;
@@ -2870,4 +2871,63 @@ select {
     font-size: 20px;
     width: 46px;
   }
+}
+
+/* The etude picker (SPEC §3.1): a pill after the title, in every mode. Etude names are shown as typed. */
+.etude-group {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+.etude-picker {
+  display: inline-flex;
+  min-width: 0;
+}
+.etude-select .dropdown-trigger {
+  max-width: 180px;
+}
+.etude-select .dropdown-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.group .as-typed,
+.dropdown-option.as-typed .dropdown-option-name {
+  text-transform: none;
+}
+.dropdown-option-hint {
+  margin-left: 8px;
+  opacity: 0.55;
+}
+.dropdown-option.divider {
+  margin-top: 5px;
+  position: relative;
+}
+.dropdown-option.divider::before {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: 6px;
+  right: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+.etude-picker .inline-field {
+  width: 160px;
+  text-transform: none;
+}
+/* Row 2's left end holds ← Library, the title and the etude picker: none of them wraps; the title shortens first. */
+.topbar-file > .rail-link {
+  white-space: nowrap;
+  flex: none;
+}
+.topbar-file > .title-stack {
+  flex: 0 1 auto;
+  overflow: hidden;
+}
+.topbar-file .rail-title {
+  display: block;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

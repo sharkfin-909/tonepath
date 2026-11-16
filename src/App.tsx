@@ -29,6 +29,7 @@ import { chartArea } from './zoom';
 import { useChartSession } from './useChartSession';
 import { useTransport } from './useTransport';
 import { etudeOf } from './progression';
+import { EtudePicker } from './rail/EtudePicker';
 
 /** A CSS media query as React state (SPEC §3.6 responsive layout). */
 function useMediaQuery(query: string): boolean {
@@ -277,12 +278,24 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
             >
               ← Library
             </button>
-            {/* The title is the progression's one name (the stored etudeName is kept but not shown). */}
+            {/* The title is the progression's name; each etude has its own (the picker). */}
             <div className="title-stack">
               <h1 className="rail-heading">
                 <TitleField title={progression.title} editing={renameOnOpen} onRename={(text) => dispatch({ type: 'title', text })} />
               </h1>
             </div>
+            {/* The etude picker (SPEC §3.1): every mode — the open etude also sets the instrument. */}
+            <span className="etude-group group">
+              <EtudePicker
+                etudes={progression.etudes}
+                open={etude.id}
+                onOpen={(id) => dispatch({ type: 'etude-open', id })}
+                onNew={() => dispatch({ type: 'etude-new' })}
+                onDuplicate={() => dispatch({ type: 'etude-duplicate' })}
+                onRename={(text) => dispatch({ type: 'etude-rename', text })}
+                onDelete={() => dispatch({ type: 'etude-delete' })}
+              />
+            </span>
           </div>
           {/* Row 2, centred: the mode's own groups, side by side (SPEC §3.0) — none in Tune. */}
           <div className="mode-groups">

@@ -8,7 +8,7 @@ import { BARS_PER_ROW } from '../progression';
  * Text shown as a button; click to edit in place. Enter / blur commits, Esc cancels. While it is open, the app's
  * shortcuts are ignored (it is a text field, SPEC §11).
  */
-function InlineField({
+export function InlineField({
   value,
   label,
   className,
@@ -16,6 +16,7 @@ function InlineField({
   startEditing = false,
   placeholder,
   display,
+  onDone,
 }: {
   value: string;
   label: string;
@@ -27,6 +28,8 @@ function InlineField({
   placeholder?: string;
   /** Shown when not editing; defaults to value (e.g. a truncated title). */
   display?: string;
+  /** Editing ended (committed or cancelled). */
+  onDone?: () => void;
 }) {
   const [editing, setEditing] = useState(startEditing);
   const done = useRef(false);
@@ -51,6 +54,7 @@ function InlineField({
     done.current = true;
     setEditing(false);
     if (text !== null) onCommit(text);
+    onDone?.();
   };
   return (
     <input

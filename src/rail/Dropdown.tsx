@@ -13,6 +13,12 @@ export interface DropdownOption<T extends string | number> {
   description?: string;
   /** Rich layout: small tags after the label. */
   tags?: string[];
+  /** Muted text after the label (compact layout too), e.g. an etude's instrument. */
+  hint?: string;
+  /** A line above this option: it starts a new section (e.g. the etude picker's actions). */
+  divider?: boolean;
+  /** Its label is shown as typed (not lowercased with the group). */
+  asTyped?: boolean;
 }
 
 export interface DropdownProps<T extends string | number> {
@@ -121,7 +127,7 @@ export function Dropdown<T extends string | number>({ value, options, onChange, 
         onClick={() => setOpen((o) => !o)}
       >
         {prefix && <span className="dropdown-prefix">{prefix}</span>}
-        <span className="dropdown-value">{current?.label}</span>
+        <span className={current?.asTyped ? 'dropdown-value as-typed' : 'dropdown-value'}>{current?.label}</span>
         <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden className={open ? 'dropdown-caret up' : 'dropdown-caret'}>
           <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
@@ -135,12 +141,13 @@ export function Dropdown<T extends string | number>({ value, options, onChange, 
                 id={`${id}-${i}`}
                 role="option"
                 aria-selected={o.value === value}
-                className={['dropdown-option', i === active && 'active', o.value === value && 'current'].filter(Boolean).join(' ')}
+                className={['dropdown-option', i === active && 'active', o.value === value && 'current', o.divider && 'divider', o.asTyped && 'as-typed'].filter(Boolean).join(' ')}
                 onPointerEnter={() => setActive(i)}
                 onClick={() => choose(i)}
               >
                 <span className="dropdown-option-head">
                   <span className="dropdown-option-name">{o.label}</span>
+                  {o.hint && <span className="dropdown-option-hint">{o.hint}</span>}
                   {o.tags?.map((t) => (
                     <span key={t} className="dropdown-tag">
                       {t}
