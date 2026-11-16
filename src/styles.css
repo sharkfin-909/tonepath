@@ -318,16 +318,21 @@ button.dock-label {
   border-radius: 10px;
   /* A little room above the chord name (zoom.ts SLOT_PAD_TOP_PX; chartHeight counts it). */
   padding-top: var(--slot-pad-top);
+  /* Two layers: the card's paper (--slot-paper; none but in Improvise) and a highlight tint over it (--slot-tint: the
+     current slot, the active slot, the loop band). States set the variables, never `background` itself. */
+  --slot-tint: transparent;
+  background-color: var(--slot-paper, transparent);
+  background-image: linear-gradient(var(--slot-tint), var(--slot-tint));
 }
 
 /* The current slot in Improvise and Read etude (SPEC §3.3, §3.4): a solid highlight, distinct from Write etude's tint. */
 .slot.active.playing {
-  background: rgba(255, 190, 40, 0.32);
+  --slot-tint: rgba(255, 190, 40, 0.32);
 }
 
 /* Active slot (drives the docked hex): a light tint across the slot. Its key mates light only their key pills. */
 .slot.active {
-  background: rgba(47, 111, 219, 0.08);
+  --slot-tint: rgba(47, 111, 219, 0.08);
 }
 
 /* The key pill (SPEC §3.1): top right of each slot, the key its scale belongs to (C, B♭, A♭ mel, dim…). Sized with the
@@ -1038,7 +1043,7 @@ button.dock-label {
   border-radius: 0;
 }
 .slot.looped:not(.active) {
-  background: rgba(47, 111, 219, 0.04);
+  --slot-tint: rgba(47, 111, 219, 0.04);
 }
 .slot.looped.loop-start {
   border-left-width: 2px;
@@ -1623,18 +1628,11 @@ button.dock-label {
 .main.improvise > .chart-area {
   background: #f7f3e5; /* #ECE5C3, lightened */
 }
-/* …and the lead sheet's cards keep the original white paper on it. Drawn under the card (the chart's transform makes
-   it the stacking context), so the current slot's highlight, the tint and the loop band still sit on top. */
-.main.improvise .slot.lead::before {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  background: var(--bg);
-  /* A light shadow lifts each card off the paper. */
+/* …and the lead sheet's cards keep the original white paper on it (their highlights tint over it), lifted off the
+   background by a light shadow. */
+.main.improvise .slot.lead {
+  --slot-paper: var(--bg);
   box-shadow: 0 1px 2px rgba(29, 27, 25, 0.06), 0 2px 8px rgba(29, 27, 25, 0.08);
-  z-index: -1;
-  pointer-events: none;
 }
 
 .chord-label:disabled {
