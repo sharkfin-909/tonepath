@@ -85,9 +85,26 @@ export function TransportBar({ bpm, onBpm, sound, onSound, running, onStartStop,
           {running ? icon('M3 3h6v6H3z') : icon('M3.5 2v8L10 6z')}
         </button>
       </span>
-      <label className="transport-loop" title={bars ? 'Loop: round the looped bars again at their end' : 'Loop: round the form again at its end (click bar numbers to loop just them)'}>
-        <input type="checkbox" checked={loop} onChange={(e) => onLoop(e.target.checked)} /> Loop
-      </label>
+      {/* Loop: a switch with a loop icon — on, the form (or the looped bars) goes round again; off, it stops at the end. */}
+      <button
+        type="button"
+        role="switch"
+        aria-checked={loop}
+        aria-label="Loop"
+        className={loop ? 'transport-loop on' : 'transport-loop'}
+        title={bars ? 'Loop: round the looped bars again at their end' : 'Loop: round the form again at its end (click bar numbers to loop just them)'}
+        onClick={() => onLoop(!loop)}
+      >
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden className="transport-loop-icon">
+          <path d="M3 7.5V6a2 2 0 0 1 2-2h7" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          <path d="M10 2l2.2 2L10 6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M13 8.5V10a2 2 0 0 1-2 2H4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          <path d="M6 14l-2.2-2L6 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <span className="switch-track" aria-hidden>
+          <span className="switch-knob" />
+        </span>
+      </button>
       {/* The loop status: always there at a fixed width, so the bar never changes length — "whole form", or the looped
           bars with × (back to the whole form). */}
       <span className={bars ? 'transport-bars looping' : 'transport-bars'} role="status">

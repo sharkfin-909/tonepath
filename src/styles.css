@@ -2457,11 +2457,60 @@ select {
   color: inherit;
   text-align: center;
 }
+/* Loop (SPEC §3.7): a switch — the loop icon, then a small track whose knob slides right when on. */
 .transport-loop {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
+  padding: 2px 4px;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  color: inherit;
   cursor: pointer;
+}
+.transport-loop:focus-visible {
+  outline: 2px solid var(--grid-glow);
+  outline-offset: 1px;
+}
+.transport-loop-icon {
+  opacity: 0.55;
+  transition: opacity 120ms ease;
+}
+.transport-loop.on .transport-loop-icon {
+  opacity: 1;
+}
+.switch-track {
+  position: relative;
+  width: 26px;
+  height: 14px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.22);
+  transition: background 120ms ease;
+}
+.switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #f3eee6;
+  transition: transform 120ms ease;
+}
+.transport-loop.on .switch-track {
+  background: var(--grid-glow);
+}
+.transport-loop.on .switch-knob {
+  transform: translateX(12px);
+  background: var(--dock-bg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .switch-track,
+  .switch-knob,
+  .transport-loop-icon {
+    transition: none;
+  }
 }
 /* The looped bars: a chip after Loop, × back to the whole form. */
 .transport-bars {
