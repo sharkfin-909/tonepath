@@ -35,12 +35,27 @@ export interface PracticeContext {
   rule: AdvanceRule;
   /** The note count target per slot (the practice panel's number; at least 1). */
   count: number;
+  /** Looping selected bars: the first and last slot practised (null: the whole form). */
+  range?: SlotRange | null;
+}
+
+/** A run of slots (form indices, inclusive). */
+export interface SlotRange {
+  first: number;
+  last: number;
 }
 
 export const startPractice = (slot: number): PracticeState => ({ slot, count: 0, follow: 0, lastFollowPc: null });
 
 const mod12 = (n: number) => ((n % 12) + 12) % 12;
-const next = (view: InstrumentView, slot: number) => (slot + 1) % view.slots.length;
+/** The slot after `slot`: the next in the form, wrapping at its end — or, looping selected bars, at the range's end. */
+export function nextSlot(c: Pick<PracticeContext, 'view' | 'range'>, slot: number): number {
+  const r = c.range;
+  if (r) return slot >= r.first && slot < r.last ? slot + 1 : r.first;
+  return (slot + 1) % c.view.slots.length;
+}
+/** Where the form (or the looped bars) starts. */
+export const firstSlot = (c: Pick<PracticeContext, 'range'>): number => c.range?.first ?? 0;
 
 /** The note counts the practice panel offers. */
 export const PRACTICE_COUNTS = [1, 2, 4, 8, 16, 32] as const;
@@ -82,7 +97,7 @@ export interface PracticeTargets {
 
 /** What the player is aiming for in the current state (shown on the hex and in the practice panel). */
 export function practiceTargets(s: PracticeState, c: PracticeContext): PracticeTargets {
-  const nxt = c.view.slots[next(c.view, s.slot)];
+  const nxt = c.view.slots[nextSlot(c, s.slot)];
   const need = practiceCount(c.count);
   switch (c.rule) {
     case 'guide':
@@ -126,13 +141,13 @@ export function practiceNote(s: PracticeState, heard: number, c: PracticeContext
   const need = practiceCount(c.count);
   /** Landed on the next chord: this note is its first. */
   const advance = (): PracticeStep => ({
-    state: { slot: next(c.view, s.slot), count: 1, follow: 0, lastFollowPc: mod12(heard) },
+    state: { slot: nextSlot(c, s.slot), count: 1, follow: 0, lastFollowPc: mod12(heard) },
     advanced: true,
     landed: true,
   });
   /** Finished this slot: the next slot starts empty. */
   const finish = (patch: Partial<PracticeStep> = {}): PracticeStep => ({
-    state: { slot: next(c.view, s.slot), count: 0, follow: 0, lastFollowPc: mod12(heard) },
+    state: { slot: nextSlot(c, s.slot), count: 0, follow: 0, lastFollowPc: mod12(heard) },
     advanced: true,
     landed: false,
     ...patch,

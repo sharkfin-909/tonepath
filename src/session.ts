@@ -1,6 +1,6 @@
 // Pure `session` module: the **editing session** of the chart screen (SPEC §3.3, §6.2, §9, §11).
 // One function, `reduce(state, progression, intent)`, holds every Write / Play rule: the caret and latches, entry
-// with wrap-around, the modes (Write / Play / Practice; Read is `stand`), stepwise playback, browsing slots,
+// with wrap-around, the modes (Write / Play / Practice / Explore; Etude view is `stand`), stepwise playback, browsing slots,
 // *On arrival*, the bar selection and clipboard, Clear notes / Clear all. Practice's note counting is `practice.ts`.
 // It returns the next state, an edit to commit (the caller records undo and saves), and effects to perform
 // (sounds, device settings, undo / redo). Nothing here touches React, storage or Web Audio.
@@ -44,7 +44,12 @@ export interface SessionState {
   playIndex: number | null;
   /** Practice (SPEC §3.7): Play driven by the mic — the notes you play move the form on. Only with playIndex. */
   practice: boolean;
-  /** Read mode (SPEC §3.4; `stand` in code): a read-only page view over Write or Play. */
+  /**
+   * Practice over selected bars (SPEC §3.7): the bars selected when Practice started, or picked in Practice by their
+   * numbers (inclusive); the run loops over them. Null: the whole form. Leaving Practice gives them back as the selection.
+   */
+  practiceBars: Selection | null;
+  /** Etude view (SPEC §3.4; `stand` in code): a read-only page view over Write or Play. */
   stand: boolean;
   /** Play: the slot whose *On arrival* sound waits for its first played note (null = nothing waiting). */
   arrival: number | null;
@@ -68,7 +73,11 @@ export interface SessionState {
 
 export type Intent =
   /** Hex cell (or its ♯ / ♭) clicked or picked with Space / A — written pitch. Write: insert; Play: audition. */
-  | { type: 'pick'; written: number; /** Mic insert in Write: skip speaker while Listen is on. */ silent?: boolean }
+  | {
+      type: 'pick';
+      written: number;
+      /** Mic insert in Write: skip speaker while Listen is on. */ silent?: boolean;
+    }
   | { type: 'length'; d: Duration }
   | { type: 'toggle-rest' }
   | { type: 'delete'; back: boolean }
@@ -77,7 +86,10 @@ export type Intent =
   /** ← / → : Write moves the caret by event; Play steps slots. */
   | { type: 'step'; dir: -1 | 1 }
   /** ` (or ~), Write: stepwise playback — play the event at the caret and move past it, wrapping at the end. */
-  | { type: 'step-play'; /** -1: step back — to the event before the caret, and play it. Default forward. */ dir?: -1 | 1 }
+  | {
+      type: 'step-play';
+      /** -1: step back — to the event before the caret, and play it. Default forward. */ dir?: -1 | 1;
+    }
   /** < > (or , .): previous / next slot, wrapping. */
   | { type: 'browse'; dir: -1 | 1 }
   | { type: 'event-click'; event: TimedEvent }
@@ -98,6 +110,8 @@ export type Intent =
   | { type: 'bar-action'; bar: number; action: BarAction }
   | { type: 'append-bar' }
   | { type: 'clear-selection' }
+  /** Practice: stop looping the selected bars (the whole form again). */
+  | { type: 'practice-all-bars' }
   /** Clear ▾ (SPEC §6.2 item 10): the notes only; or everything — chords, scales and notes (confirmed in the menu). */
   | { type: 'clear-notes' }
   | { type: 'clear-all' }
@@ -130,6 +144,7 @@ export function initialSession(p: Progression, device: { muted?: boolean; onArri
     rest: false,
     playIndex: null,
     practice: false,
+    practiceBars: null,
     stand: false,
     arrival: null,
     selection: null,
@@ -223,7 +238,11 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
   switch (intent.type) {
     case 'pick': {
       const midi = view.toConcert(intent.written);
-      effects.push({ type: 'note', midi, pick: !playing && intent.silent === true });
+      effects.push({
+        type: 'note',
+        midi,
+        pick: !playing && intent.silent === true,
+      });
       // audition, even when the insert is refused (hex pick always sounds; mic uses `silent`)
       if (playing) playedIn(active.index); // Play: audition only, never recorded
       else if (!s.explore) {
@@ -315,10 +334,23 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
         return done();
       }
       if (toPlay) {
-        set({ selection: null, practice });
-        const at = view.slotAt(caret).index;
+        // Practice from a bar selection loops those bars, starting at the first (SPEC §3.7).
+        const sel = practice ? s.selection : null;
+        const bars = sel ? { ...sel } : null;
+        set({ selection: null, practice, practiceBars: bars });
+        const at = bars ? slots.find((x) => x.bar === bars.from)!.index : view.slotAt(caret).index;
         arrive(at); // entering Play / Practice is an arrival: silent until the first note played there
-      } else set({ caret: active.start, playIndex: null, arrival: null, practice: false });
+      } else {
+        const bars = s.practiceBars;
+        set({
+          caret: active.start,
+          playIndex: null,
+          arrival: null,
+          practice: false,
+          practiceBars: null,
+        });
+        if (bars && bars.to < p.bars.length) set({ selection: bars }); // the selection back
+      }
       return done();
     }
     case 'practice-advance':
@@ -338,7 +370,10 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
       set({ stand: intent.on === 'toggle' ? !s.stand : intent.on });
       return done();
     case 'sound':
-      effects.push({ type: intent.what === 'bass' ? 'root' : intent.what, harmony: active.concert });
+      effects.push({
+        type: intent.what === 'bass' ? 'root' : intent.what,
+        harmony: active.concert,
+      });
       return done();
     case 'input':
       set({ input: intent.how });
@@ -352,15 +387,36 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
       effects.push({ type: 'device', patch: { playArrival: intent.how } });
       return done();
     case 'bar-select': {
-      const sel = s.selection;
       const bar = intent.bar;
+      if (s.practice) {
+        // Practice: bar numbers pick the bars to loop (⇧ extends; a looped one again: the whole form). Moving off the
+        // current slot's bar goes to the first picked bar.
+        const cur = s.practiceBars;
+        const bars: Selection | null = intent.extend
+          ? (({ anchor }) => ({
+              anchor,
+              from: Math.min(anchor, bar),
+              to: Math.max(anchor, bar),
+            }))(cur ?? { anchor: active.bar })
+          : cur && bar >= cur.from && bar <= cur.to
+            ? null // a looped bar again: the whole form
+            : { anchor: bar, from: bar, to: bar };
+        set({ practiceBars: bars });
+        if (bars && (active.bar < bars.from || active.bar > bars.to)) arrive(slots.find((x) => x.bar === bars.from)!.index);
+        return done();
+      }
+      const sel = s.selection;
       set({
-        selection:
-          intent.extend && sel
-            ? { anchor: sel.anchor, from: Math.min(sel.anchor, bar), to: Math.max(sel.anchor, bar) }
-            : sel && !intent.extend && sel.from === bar && sel.to === bar
-              ? null // clicking the only selected bar again deselects it
-              : { anchor: bar, from: bar, to: bar },
+        selection: intent.extend
+          ? // ⇧: a run from the selection's anchor — or, with nothing selected, from the caret's bar
+            (({ anchor }) => ({
+              anchor,
+              from: Math.min(anchor, bar),
+              to: Math.max(anchor, bar),
+            }))(sel ?? { anchor: active.bar })
+          : sel && bar >= sel.from && bar <= sel.to
+            ? null // clicking a selected bar again deselects
+            : { anchor: bar, from: bar, to: bar },
       });
       return done();
     }
@@ -410,6 +466,9 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
     case 'clear-selection':
       set({ selection: null });
       return done();
+    case 'practice-all-bars':
+      set({ practiceBars: null });
+      return done();
     case 'clear-notes':
       edit = clearMelody(p); // one undo step, no confirm (SPEC §6.2 item 10)
       set({ caret: 0 });
@@ -422,7 +481,9 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
       const next = setTimeSignature(p, intent.text);
       if (next === p) return done();
       edit = next; // bars resize, the melody is re-fitted; the caret keeps its time, snapped to an event start
-      set({ caret: snapToEvent(next.melody, Math.min(caret, instrumentView(next).end)) });
+      set({
+        caret: snapToEvent(next.melody, Math.min(caret, instrumentView(next).end)),
+      });
       return done();
     }
     case 'undo':
@@ -430,7 +491,11 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
       effects.push({ type: 'history', dir: intent.type });
       return done();
     case 'restored':
-      set({ selection: null, refusal: null, ...(intent.caret !== undefined ? { caret: intent.caret } : {}) });
+      set({
+        selection: null,
+        refusal: null,
+        ...(intent.caret !== undefined ? { caret: intent.caret } : {}),
+      });
       return done();
     case 'refusal-shown':
       set({ refusal: null });
@@ -439,4 +504,21 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
       set({ notice: null });
       return done();
   }
+}
+
+/** The Mode dropdown's choices (SPEC §3.1). Play has no entry of its own: it is Practice's machinery. */
+export type Mode = 'explore' | 'practice' | 'write' | 'read';
+
+/** The mode the session is in, as the dropdown shows it (Play, unreachable from the UI, shows as Write). */
+export function modeOf(s: SessionState): Mode {
+  if (s.stand) return 'read';
+  if (s.practice) return 'practice';
+  if (s.playIndex !== null) return 'write';
+  return s.explore ? 'explore' : 'write';
+}
+
+/** Choosing a mode in the dropdown: the intents that get there (leaving Etude view first when needed). */
+export function chooseMode(s: SessionState, m: Mode): Intent[] {
+  if (m === 'read') return [{ type: 'stand', on: true }];
+  return [...(s.stand ? [{ type: 'stand', on: false } as Intent] : []), { type: 'mode', mode: m }];
 }

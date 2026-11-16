@@ -1,4 +1,5 @@
-// The docked hex (SPEC §8): React SVG for the active slot. Click = pick; a nudged pitch gets a dashed halo.
+// The docked hex (SPEC §8): React SVG for the active slot. Click = pick; a nudged pitch gets a dashed halo; Practice's
+// targets get dashed rings; `still` (the metronome) skips the slot-change motion.
 // Slots without a scale (§8.4): the unchecked hex (no chord) or the chord-tones hex, each with a dock label.
 // Geometry and the travel plan come from `hexLayout`; colours from the CSS theme tokens (styles.css :root).
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -61,9 +62,11 @@ export interface DockedHexProps {
   targets?: { pcs: Set<number> | null; midi: number | null } | null;
   /** A note sounded elsewhere (Write: stepped with ` or a melody note selected): its cells light as if clicked. `n` replays. */
   sounded?: { midi: number; n: number } | null;
+  /** No slot-change motion (Practice's metronome, SPEC §3.7): no travel, no colour / ball / socket transitions. */
+  still?: boolean;
 }
 
-export function DockedHex({ dock, onPick, halo, onLabelClick, onHoverPitch, heard = null, targets = null, sounded = null }: DockedHexProps) {
+export function DockedHex({ dock, onPick, halo, onLabelClick, onHoverPitch, heard = null, targets = null, sounded = null, still = false }: DockedHexProps) {
   const [ref, { width, height }] = useSize<HTMLDivElement>();
   const { hex, mode, label, labelEditsChord } = dock;
   const layout: HexLayout | null = width > 0 && height > 0 ? layoutHex(hex, width, height, T.borderButtonGap) : null;
@@ -134,7 +137,7 @@ export function DockedHex({ dock, onPick, halo, onLabelClick, onHoverPitch, hear
     const prev = prevDock.current;
     prevDock.current = dock;
     const steps = travelSteps(prev, dock);
-    if (steps === null || !layout || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (steps === null || !layout || still || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const dx = -steps * layout.cellWidth; // each ball starts where its degree was
     slideIn(ballsRef.current, dx);
     travelTimers.current.forEach((t) => window.clearTimeout(t));
@@ -153,7 +156,7 @@ export function DockedHex({ dock, onPick, halo, onLabelClick, onHoverPitch, hear
   const plain = !!travel && !travel.settled;
 
   return (
-    <div ref={ref} className="docked-hex" data-mode={mode}>
+    <div ref={ref} className={still ? 'docked-hex still' : 'docked-hex'} data-mode={mode}>
       {layout && (
         <svg width={width} height={height} role="img" aria-label={`Docked hex: ${hex.cells.length} cells`}>
           <NoteDefs R={layout.size.rx} />

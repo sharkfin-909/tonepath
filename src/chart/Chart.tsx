@@ -43,11 +43,13 @@ export interface ChartProps {
   canPaste: boolean;
   /** Practice, Follow the etude (SPEC §3.7): show the written melody in Play after all, the notes already played green. */
   follow?: { played: ReadonlySet<number> } | null;
+  /** Practice: bar numbers (no menu) pick the bars to loop; `selection` is those bars. */
+  practiceBars?: boolean;
   /** Play mode (SPEC §3.3): the current slot. The caret, bar handles and "+" are hidden; chords and scales stay editable. */
   playIndex?: number | null;
   /** Explore (SPEC §3.2): empty staves like Play, and no caret, bar handles or "+"; chords and scales stay editable. */
   explore?: boolean;
-  /** Read mode (SPEC §3.4; `stand` in code): read-only, nothing highlighted or clickable, fit the page with no zoom floor. */
+  /** Etude view (SPEC §3.4; `stand` in code): read-only, nothing highlighted or clickable, fit the page with no zoom floor. */
   stand?: boolean;
   /**
    * Height budget (rendered px) to fit the rows into, when the chart's own area sizes to its content (the chart
@@ -84,9 +86,9 @@ function useParentSize<T extends HTMLElement>() {
   return [ref, size] as const;
 }
 
-export function Chart({ progression, view, caret, onSlotClick, onEventClick, onTimeClick, onChordCommit, onScaleChange, editRequest, selection, onBarSelect, onBarAction, onAppendBar, canPaste, playIndex = null, explore = false, stand = false, maxHeight, follow = null }: ChartProps) {
+export function Chart({ progression, view, caret, onSlotClick, onEventClick, onTimeClick, onChordCommit, onScaleChange, editRequest, selection, onBarSelect, onBarAction, onAppendBar, canPaste, playIndex = null, explore = false, stand = false, maxHeight, follow = null, practiceBars = false }: ChartProps) {
   const playing = playIndex !== null;
-  /** Play and Read both hide the caret, bar handles and "+" (Play keeps chord and scale entry). */
+  /** Play, Explore and Etude view hide the caret, bar handles, trash cans and "+" (Play keeps chord and scale entry; Practice keeps bar numbers, to pick bars to loop). */
   const readOnly = playing || stand || explore;
   const { bars, barsPerRow } = progression;
   const [fitRef, area] = useParentSize<HTMLDivElement>();
@@ -175,8 +177,9 @@ export function Chart({ progression, view, caret, onSlotClick, onEventClick, onT
               header={header}
               showTimeSignature={slot.index === 0}
               barTools={
-                !readOnly && slot.part === 0
+                (!readOnly || practiceBars) && slot.part === 0
                   ? {
+                      menu: !readOnly,
                       selected: !!selection && slot.bar >= selection.from && slot.bar <= selection.to,
                       split: bars[slot.bar].length === 2,
                       canPaste,
@@ -187,6 +190,8 @@ export function Chart({ progression, view, caret, onSlotClick, onEventClick, onT
                   : null
               }
               inSelection={!!selection && slot.bar >= selection.from && slot.bar <= selection.to}
+              onShiftSelect={!readOnly || practiceBars ? () => onBarSelect(slot.bar, true) : undefined}
+              onDeleteBar={!readOnly && slot.barEnd && bars.length > 1 ? () => onBarAction(slot.bar, 'delete') : undefined}
               onAppend={!readOnly && slot.index === slots.length - 1 ? onAppendBar : undefined}
               editing={editing?.bar === slot.bar && editing.part === slot.part}
               error={error}
@@ -229,8 +234,12 @@ interface SlotViewProps {
   /** Logical header height (grows as the zoom shrinks, for the label minimums). */
   header: number;
   /** Bar number + ⋯ handle, on the bar's first slot. */
-  barTools: { selected: boolean; split: boolean; canPaste: boolean; canDelete: boolean; onSelect: (bar: number, extend: boolean) => void; onAction: (bar: number, action: BarAction) => void } | null;
+  barTools: { menu: boolean; selected: boolean; split: boolean; canPaste: boolean; canDelete: boolean; onSelect: (bar: number, extend: boolean) => void; onAction: (bar: number, action: BarAction) => void } | null;
   inSelection: boolean;
+  /** Write: ⇧-click anywhere in the bar extends the bar selection to it (instead of moving the caret). */
+  onShiftSelect?: () => void;
+  /** On a bar's last slot: the trash can at its bottom right that deletes the bar (the selection, if it's in one). */
+  onDeleteBar?: () => void;
   /** On the last slot: the "+" that appends a bar. */
   onAppend?: () => void;
   /** The first slot carries the time signature. */
@@ -245,7 +254,7 @@ interface SlotViewProps {
 
 const NO_EVENTS: TimedEvent[] = [];
 
-function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing, follow, onEventClick, onTimeClick, span, layout, header, barTools, inSelection, onAppend, showTimeSignature, editing, error, usedChords, onEdit, onCommit, onScaleChange }: SlotViewProps) {
+function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing, follow, onEventClick, onTimeClick, span, layout, header, barTools, inSelection, onShiftSelect, onDeleteBar, onAppend, showTimeSignature, editing, error, usedChords, onEdit, onCommit, onScaleChange }: SlotViewProps) {
   // Everything shown runs against the written chord; the stored melody stays concert (SPEC §5.3, §10).
   const { chord, harmony } = slot;
   const spell = (midi: number) => view.name(midi, slot);
@@ -262,6 +271,22 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
       // --staff-top: where the stave's top line sits in the slot; the bar number sits just above it (CSS .bar-handle).
       style={{ gridColumn: `span ${span}`, ['--staff-top' as string]: `${header + staffTop}px` }}
       data-slot={slot.index}
+      // ⇧-click (Write): extend the bar selection to this bar — caught before notes, the stave or the chord see it.
+      onClickCapture={(e) => {
+        if (!e.shiftKey || !onShiftSelect || (e.target as Element).closest('.bar-menu, input')) return;
+        e.stopPropagation();
+        e.preventDefault();
+        onShiftSelect();
+      }}
+      // …and its press is kept from the stave (which moves the caret on pointerdown) and from text selection.
+      onPointerDownCapture={(e) => {
+        if (e.shiftKey && onShiftSelect && !(e.target as Element).closest('.bar-menu, input')) e.stopPropagation();
+      }}
+      onMouseDownCapture={(e) => {
+        if (!e.shiftKey || !onShiftSelect || (e.target as Element).closest('.bar-menu, input')) return;
+        e.stopPropagation();
+        e.preventDefault();
+      }}
       onPointerDown={(e) => {
         // Notes handle their own click (a redraw here would remove the note before its click fires).
         if (!(e.target as Element).closest('button, input, .scale-menu, .melody-event, .chord-suggest')) onActivate();
@@ -299,6 +324,26 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
           markOf={markOf}
         />
       </div>
+      {onDeleteBar && (
+        <button
+          type="button"
+          className="delete-bar"
+          title={inSelection ? 'Delete the selected bars' : 'Delete this bar'}
+          aria-label={inSelection ? 'Delete the selected bars' : 'Delete this bar'}
+          onClick={onDeleteBar}
+        >
+          <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden>
+            <path
+              d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.5h6.6L12 4M6.6 6.5v5M9.4 6.5v5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+      )}
       {/* A bar line at the end of each bar; nothing between two chords in a bar (a chord change, not a bar). */}
       {slot.barEnd && <div className="bar-line" style={{ top: header + staffTop, height: staffBottom - staffTop }} />}
     </div>

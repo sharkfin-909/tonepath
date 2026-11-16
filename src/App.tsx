@@ -1,5 +1,5 @@
 // Chart screen (SPEC §3.1): the two-row control header over the chart, above the docked hex (which takes the height
-// the chart leaves). Modes: Play | Practice | Write | Read (§3.3–3.4, §3.7); Listen and Practice (§9.2, §3.7).
+// the chart leaves). Modes: Explore | Practice | Write | Etude view (`stand`) (§3.2–3.4, §3.7); Listen and Practice (§9.2, §3.7).
 // The rules live in pure modules: the editing session (`session.ts`), the keyboard table (`keymap.ts`), the
 // progression document (`document.ts`: undo + saving), the instrument view (`view.ts`), chord entry
 // (`chordEntry.ts`) and practice (`practice.ts`). This file renders them and performs their effects (Web Audio,
@@ -16,16 +16,20 @@ import { AudioControls } from './rail/AudioControls';
 import { DockedHex } from './hex/DockedHex';
 import type { StoredProgression } from './storage';
 import { openDocument, type ProgressionDocument } from './document';
-import { initialSession, reduce, type Effect, type Intent, type SessionState } from './session';
+import { chooseMode, initialSession, modeOf, reduce, type Effect, type Intent, type SessionState } from './session';
 import { enterChord } from './chordEntry';
 import { HONEYCOMB, linearOctaves, type HexShape } from './hex';
 import { keyIntent } from './keymap';
 import { clickUnderPointer, trackPointer } from './pointerClick';
 import { instrumentView } from './view';
-import { prettyName } from './spelling';
 import { ListenPill } from './listen/ListenPill';
 import { PracticePanel } from './listen/PracticePanel';
-import { ADVANCE_RULES, echoGuard, isEcho, practiceCount, practiceNote, practiceTargets, startPractice, type AdvanceRule, type EchoGuard, type PracticeState } from './practice';
+import { HEX_HIDDEN, HEX_LINEAR, METRONOME_BPM, METRONOME_SOUND, PRACTICE_COUNT, PRACTICE_LOOP, PRACTICE_RULE } from './deviceSettings';
+import { useDeviceSetting } from './useDeviceSetting';
+import { ModePanel } from './rail/ModePanel';
+import { NEW_INTAKE, appSounded, heard, micStopped, type MicIntake } from './micIntake';
+import { useMetronome } from './useMetronome';
+import { followSlot, metronomeChord, metronomeEnd, restartSlot, runNote, runTargets, type PracticeRun, type RunContext } from './practiceRun';
 
 /** A CSS media query as React state (SPEC §3.6 responsive layout). */
 function useMediaQuery(query: string): boolean {
@@ -96,36 +100,40 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
   /** Clicking an unparseable slot's dock label opens its chord field. */
   // Linear (SPEC §8.5): the dock as one row, switched by octave. The layout is a device setting; the octave isn't
   // saved (it starts mid-range and is kept within the instrument's range).
-  const [linearSetting, setLinear] = useState(() => readDevice(localStorage).hexShape === 'linear');
+  const [linearSetting, setLinear] = useDeviceSetting(HEX_LINEAR);
+  const [hexHidden, setHexHidden] = useDeviceSetting(HEX_HIDDEN);
   // Phones (SPEC §3.6): the honeycomb is too small there, so the dock is always Linear; the saved setting is kept.
   const narrow = useMediaQuery('(max-width: 640px)');
   const linear = linearSetting || narrow;
   const [octaveWanted, setOctave] = useState<number | null>(null);
-  const toggleLinear = () =>
-    setLinear((on) => {
-      writeDevice(localStorage, { hexShape: on ? 'honeycomb' : 'linear' });
-      return !on;
-    });
+  const toggleLinear = () => setLinear(!linearSetting);
   /** Listen (SPEC §9.2): the concert note the mic hears, or null. */
   const [heardConcert, setHeardConcert] = useState<number | null>(null);
   const [tunerSlot, setTunerSlot] = useState<HTMLDivElement | null>(null);
   const [levelsSlot, setLevelsSlot] = useState<HTMLDivElement | null>(null);
   // Practice (SPEC §3.7): which slot is being practised and how many notes were played in it; the rule and loop are
   // device settings.
-  const [practice, setPractice] = useState<PracticeState | null>(null);
-  const [practiceRule, setPracticeRule] = useState<AdvanceRule>(() => {
-    const r = readDevice(localStorage).practiceRule;
-    return ADVANCE_RULES.some((x) => x.id === r) ? (r as AdvanceRule) : 'guide';
-  });
-  const [practiceLoop, setPracticeLoop] = useState(() => readDevice(localStorage).practiceLoop !== false);
-  const [practiceCountN, setPracticeCountN] = useState(() => practiceCount(readDevice(localStorage).practiceCount));
-  const [practiceAdvances, setPracticeAdvances] = useState(0);
-  /** The app's own sounds the mic may hear while practising (On arrival). */
-  const echoRef = useRef<EchoGuard | null>(null);
+  const runRef = useRef<PracticeRun | null>(null);
+  const [run, setRunState] = useState<PracticeRun | null>(null);
+  /** The Practice run, kept in a ref too, so notes arriving between renders build on the latest. */
+  const setRun = (r: PracticeRun | null) => {
+    runRef.current = r;
+    setRunState(r);
+  };
+  const [practiceRule, setPracticeRule] = useDeviceSetting(PRACTICE_RULE);
+  const [practiceLoop, setPracticeLoop] = useDeviceSetting(PRACTICE_LOOP);
+  const [practiceCountN, setPracticeCountN] = useDeviceSetting(PRACTICE_COUNT);
+  // Practice's metronome (SPEC §3.7): on = the form moves on in time; tempo and sound are device settings.
+  const [metroOn, setMetroOn] = useState(true); // on by default (not saved)
+  const [metroRunning, setMetroRunning] = useState(false);
+  const [metroBpm, setMetroBpm] = useDeviceSetting(METRONOME_BPM);
+  const [metroSound, setMetroSound] = useDeviceSetting(METRONOME_SOUND);
+  const [metroStart, setMetroStart] = useState(0);
+  const [metroRestart, setMetroRestart] = useState(0);
+  /** Mic intake (write / count / ignore each heard note): its echo guard and last written note. */
+  const intakeRef = useRef<MicIntake>(NEW_INTAKE);
   /** Write + Listen: skip note audition so the speaker does not re-trigger the mic. */
   const listeningRef = useRef(false);
-  /** Last mic write (for dedupe while Listen is on in Write). */
-  const lastMicWriteRef = useRef<{ written: number; at: number } | null>(null);
   /** Write: the last note sounded by ` (step-play) or a melody-note click, concert pitch; lights the hex (`n` replays). */
   const [sounded, setSounded] = useState<{ midi: number; n: number } | null>(null);
   const [editRequest, setEditRequest] = useState<{ bar: number; part: number; n: number } | null>(null);
@@ -161,12 +169,11 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
     // Practice: the mic will hear these sounds — guard against counting them as played notes (SPEC §3.7).
     // That includes a hex pick's audition: hex picks count in Practice even with Audio input enabled.
     if (sessionRef.current.practice) {
-      const sounds = effects.filter((e): e is Extract<Effect, { type: 'chord' | 'root' | 'bass' | 'note' }> => e.type === 'chord' || e.type === 'root' || e.type === 'bass' || e.type === 'note');
-      const now = performance.now();
-      const g = echoGuard(sounds, now);
-      const old = echoRef.current;
-      // Still ringing: keep guarding the earlier sounds too (a pick mustn't drop a chord's guard).
-      if (g) echoRef.current = old && now < old.until ? { start: g.start, until: Math.max(g.until, old.until), midis: new Set([...old.midis, ...g.midis]) } : g;
+      const sounds = effects.filter(
+        (e): e is Extract<Effect, { type: 'chord' | 'root' | 'bass' | 'note' }> =>
+          e.type === 'chord' || e.type === 'root' || e.type === 'bass' || e.type === 'note',
+      );
+      intakeRef.current = appSounded(intakeRef.current, sounds, performance.now());
     }
     for (const e of effects) {
       switch (e.type) {
@@ -343,138 +350,104 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
   const haloPitch = halo && halo.caret === caretAt && halo.melody === progression.melody ? halo.pitch : null;
   const { muted } = session;
 
-  // Practice: start (or restart) on the current slot whenever Practice begins or the slot changes by hand.
+  // Practice (SPEC §3.7): the run follows the session's slot — fresh when Practice starts or the slot changes by hand
+  // or by the metronome; kept when the run itself moved the form on.
   const practiceSlot = session.practice ? session.playIndex : null;
-  // Follow (SPEC §3.7): the written notes played correctly this time through, marked on the staves.
-  const [played, setPlayed] = useState<ReadonlySet<number>>(() => new Set());
+  useEffect(() => setRun(followSlot(runRef.current, practiceSlot)), [practiceSlot]);
+  // Looping selected bars (SPEC §3.7): their slots, and the metronome's form rebased to start at the first.
+  const bars = session.practice ? session.practiceBars : null;
+  const range = useMemo(() => {
+    if (!bars) return null;
+    const inRange = view.slots.filter((x) => x.bar >= bars.from && x.bar <= bars.to);
+    return inRange.length ? { first: inRange[0].index, last: inRange[inRange.length - 1].index } : null;
+  }, [bars, view.slots]);
+  const metroForm = useMemo(() => {
+    if (!range) return { slots: view.slots, end: view.end };
+    const base = view.slots[range.first].start;
+    return {
+      slots: view.slots.slice(range.first, range.last + 1).map((x) => ({ index: x.index, start: x.start - base })),
+      end: view.slots[range.last].end - base,
+    };
+  }, [range, view.slots, view.end]);
+  const first = range?.first ?? 0;
+  const runCtx: RunContext = {
+    view,
+    melody: progression.melody,
+    rule: practiceRule,
+    count: practiceCountN,
+    loop: practiceLoop,
+    metronome: metroOn,
+    range,
+  };
+  // The metronome runs only in Practice with it switched on; leaving either stops it.
   useEffect(() => {
-    if (practiceSlot !== null && practice && practice.slot === practiceSlot) return; // the mic moved the form on: keep going
-    setPractice(practiceSlot === null ? null : startPractice(practiceSlot)); // started, stopped or moved by hand
-    setPlayed(new Set());
-  }, [practiceSlot]);
-  const practiceCtx = { view, melody: progression.melody, rule: practiceRule, count: practiceCountN };
-  const practiceTarget = practice ? practiceTargets(practice, practiceCtx) : null;
-  /** Mic note starts: Practice advances the form; Write inserts like a hex pick. */
+    if (!session.practice || !metroOn) setMetroRunning(false);
+  }, [session.practice, metroOn]);
+  useMetronome({
+    running: metroRunning && session.practice && metroOn,
+    bpm: metroBpm,
+    sound: metroSound,
+    meter: view.meter,
+    slots: metroForm.slots,
+    end: metroForm.end,
+    startSlot: metroStart,
+    loop: practiceLoop,
+    restart: metroRestart,
+    onSlot: (index) => metronomeChord(index).forEach((i) => dispatchRef.current(i)),
+    onEnd: () => {
+      setMetroRunning(false);
+      metronomeEnd(first).forEach((i) => dispatchRef.current(i));
+    },
+  });
+  /** Mic note starts: Write writes them (Audio input), Practice counts them. */
   const micNoteRef = useRef({
-    practice,
-    practiceCtx,
-    practiceLoop,
+    runCtx,
     practiceOn: session.practice,
     view,
-    writeOn: !playing && !session.practice && !session.stand && !session.explore && session.input === 'instrument',
+    writeOn: false,
   });
   micNoteRef.current = {
-    practice,
-    practiceCtx,
-    practiceLoop,
+    runCtx,
     practiceOn: session.practice,
     view,
     writeOn: !playing && !session.practice && !session.stand && !session.explore && session.input === 'instrument',
   };
-  const onMicNote = useCallback((heard: number, fromOnset: boolean) => {
+  const onMicNote = useCallback((concert: number, fromOnset: boolean) => {
     const { practiceOn, view: v, writeOn } = micNoteRef.current;
-    if (isEcho(echoRef.current, heard, performance.now())) return; // the app's own On arrival sound
-    if (writeOn && !practiceOn) {
-      const written = v.toWritten(heard);
-      const now = performance.now();
-      const last = lastMicWriteRef.current;
-      if (last) {
-        const dt = now - last.at;
-        const diff = Math.abs(written - last.written);
-        if (written === last.written && dt < 220) return;
-        if (!fromOnset) {
-          if (diff <= 2 && dt < 130) return;
-          if (diff < 2 && dt < 150) return;
-        }
-      }
-      lastMicWriteRef.current = { written, at: now };
-      dispatchRef.current({ type: 'pick', written, silent: true });
-      return;
-    }
-    practicePlayedRef.current(heard, fromOnset);
+    const r = heard(intakeRef.current, { concert, written: v.toWritten(concert), fromOnset }, performance.now(), writeOn && !practiceOn);
+    intakeRef.current = r.intake;
+    if (r.action.kind === 'write')
+      dispatchRef.current({
+        type: 'pick',
+        written: r.action.written,
+        silent: true,
+      });
+    else if (r.action.kind === 'count') practicePlayedRef.current(concert, fromOnset);
   }, []);
-  /** Practice: a note played (concert) — from the mic, or a hex pick: count it; the right one
-   * moves the form on (or ends it, without Loop). */
-  const practicePlayed = (heard: number, fromOnset: boolean) => {
-    const { practice: p, practiceCtx: c, practiceLoop: loop, practiceOn } = micNoteRef.current;
-    if (!practiceOn || !p) return;
-    // This note is played in the current slot: a waiting On arrival sound (the slot was reached by finishing the one
-    // before) sounds with it.
-    dispatchRef.current({ type: 'practice-note' });
-    const step = practiceNote(p, heard, c, fromOnset);
-    if (step.hit !== undefined) {
-      const hit = step.hit;
-      // A new time through the form (it wrapped to the start) clears the marks.
-      setPlayed((prev) => (step.advanced && step.state.slot < p.slot ? new Set() : new Set(prev).add(hit)));
-    }
-    if (step.advanced && step.state.slot === 0 && !loop) {
-      dispatchRef.current({ type: 'mode', mode: 'write' }); // the end of the form, no loop: practice stops (back to Write)
-      return;
-    }
-    setPractice(step.state);
-    if (step.advanced) {
-      setPracticeAdvances((n) => n + 1);
-      dispatchRef.current({ type: 'practice-advance', index: step.state.slot, landed: step.landed === true });
-    }
+  /** Practice: a note played (concert) — from the mic, or a hex pick — goes through the run; its intents go to the session. */
+  practicePlayedRef.current = (concert: number, fromOnset: boolean) => {
+    const run = runRef.current;
+    if (!run || !micNoteRef.current.practiceOn) return;
+    const r = runNote(run, concert, fromOnset, micNoteRef.current.runCtx);
+    setRun(r.run);
+    r.intents.forEach((i) => dispatchRef.current(i));
   };
-  practicePlayedRef.current = practicePlayed;
-  // On the hex, in written pitch: the notes that move the form on now (a pitch class), or Follow's next note.
-  const practiceHexTargets =
-    practiceTarget === null
-      ? null
-      : { pcs: practiceTarget.pcs && new Set([...practiceTarget.pcs].map((pc) => (pc + view.inst.semitones) % 12)), midi: practiceTarget.midi === null ? null : view.toWritten(practiceTarget.midi) };
-  const practiceTargetNames =
-    practiceTarget === null
-      ? ''
-      : practiceTarget.midi !== null
-        ? prettyName(view.name(practiceTarget.midi, active))
-        : practiceTarget.pcs
-          ? [...practiceTarget.pcs].map((pc) => prettyName(view.name(60 + pc, view.slots[(active.index + 1) % view.slots.length]).replace(/-?\d+$/, ''))).join(' · ')
-          : '';
+  const targets = run ? runTargets(run, runCtx, active) : null;
 
-  // The Mode dropdown's value (SPEC §3.1): Explore · Practice · Write · Read (Read = the read-only page view).
-  const mode: 'play' | 'practice' | 'explore' | 'write' | 'read' = session.stand ? 'read' : session.practice ? 'practice' : playing ? 'play' : session.explore ? 'explore' : 'write';
-  // The mode panel (SPEC §3.1): two labelled dropdowns, always visible — Audio input (the mic on / off) and Mode.
+  // The mode panel (SPEC §3.1): Audio input and Mode; after a choice, keys go back to the hex.
   const modeSwitch = (
-    <div className="mode-panel group">
-      <label className="mode-field">
-        <span className="ins-label">Audio input</span>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={session.input === 'instrument'}
-          aria-label="Audio input"
-          className={session.input === 'instrument' ? 'switch on' : 'switch'}
-          title="Audio input: hear your instrument through the mic (hex picks always work too)"
-          onClick={() => {
-            dispatch({ type: 'input', how: session.input === 'instrument' ? 'hex' : 'instrument' });
-            focusHex();
-          }}
-        >
-          <span className="switch-knob" />
-        </button>
-      </label>
-      <label className="mode-field">
-        <span className="ins-label">Mode:</span>
-        <select
-          className="mode-select"
-          value={mode}
-          title="Mode: Explore (nothing written) · Practice (the right notes move the form on; P back to Write) · Write (notes entered at the caret) · Read (read-only page; \ in and out)"
-          onChange={(e) => {
-            const m = e.target.value as 'explore' | 'practice' | 'write' | 'read';
-            if (m === 'read') return dispatch({ type: 'stand', on: true });
-            if (session.stand) dispatch({ type: 'stand', on: false });
-            dispatch({ type: 'mode', mode: m });
-            focusHex();
-          }}
-        >
-          <option value="explore">Explore</option>
-          <option value="practice">Practice</option>
-          <option value="write">Write</option>
-          <option value="read">Read</option>
-        </select>
-      </label>
-    </div>
+    <ModePanel
+      input={session.input}
+      mode={modeOf(session)}
+      onInput={(how) => {
+        dispatch({ type: 'input', how });
+        focusHex();
+      }}
+      onMode={(m) => {
+        chooseMode(session, m).forEach(dispatch);
+        if (m !== 'read') focusHex();
+      }}
+    />
   );
 
   if (session.stand) {
@@ -544,7 +517,12 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
               className="rail-select"
               aria-label="Audio on chord"
               value={session.onArrival}
-              onChange={(e) => dispatch({ type: 'set-arrival', how: e.target.value as OnArrival })}
+              onChange={(e) =>
+                dispatch({
+                  type: 'set-arrival',
+                  how: e.target.value as OnArrival,
+                })
+              }
             >
               {(Object.keys(ON_ARRIVAL_LABELS) as OnArrival[]).map((v) => (
                 <option key={v} value={v}>
@@ -574,28 +552,48 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
             </div>
           </div>
           {/* Practice (SPEC §3.7): its panel, bottom left of the header (where Write's note lengths sit). */}
-          {session.practice && practice && (
+          {session.practice && run && targets && (
             <PracticePanel
               rule={practiceRule}
               onRule={(r) => {
                 setPracticeRule(r);
-                writeDevice(localStorage, { practiceRule: r });
-                setPractice(startPractice(practice.slot));
+                setRun(restartSlot(run));
               }}
               loop={practiceLoop}
-              onLoop={(on) => {
-                setPracticeLoop(on);
-                writeDevice(localStorage, { practiceLoop: on });
-              }}
-              count={practice.count}
-              need={practiceTarget!.need}
-              targetNames={practiceTargetNames}
-              advanced={practiceAdvances}
+              onLoop={setPracticeLoop}
+              bars={bars}
+              onAllBars={() => dispatch({ type: 'practice-all-bars' })}
+              count={run.state.count}
+              need={targets.need}
+              targetNames={targets.names}
+              advanced={run.advances}
               notesPerChord={practiceCountN}
-              onNotesPerChord={(n) => {
-                const c = practiceCount(n);
-                setPracticeCountN(c);
-                writeDevice(localStorage, { practiceCount: c });
+              onNotesPerChord={setPracticeCountN}
+              metronome={{
+                on: metroOn,
+                onToggle: () => setMetroOn((on) => !on),
+                bpm: metroBpm,
+                onBpm: setMetroBpm,
+                sound: metroSound,
+                onSound: setMetroSound,
+                running: metroRunning,
+                onStartStop: () => {
+                  if (metroRunning) return setMetroRunning(false);
+                  setMetroStart(range && (active.index < range.first || active.index > range.last) ? range.first : active.index);
+                  setMetroRestart((n) => n + 1);
+                  setMetroRunning(true);
+                },
+                onRewind: () => {
+                  if (metroRunning) {
+                    setMetroStart(first);
+                    setMetroRestart((n) => n + 1);
+                  } else
+                    dispatch({
+                      type: 'practice-advance',
+                      index: first,
+                      landed: false,
+                    });
+                },
               }}
             />
           )}
@@ -615,12 +613,38 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
               <BarsPerRow value={progression.barsPerRow} onChange={(n) => commit(setBarsPerRow(doc.progression, n))} />
               {/* Nudge (SPEC §6.2): the note at the caret up / down a scale step (↑ / ↓); ⇧ a semitone, ⌥ an octave. */}
               <div className="step-controls">
-                <button type="button" className="rail-button icon-button" title="Nudge the note at the caret down a scale step (↓) · ⇧-click / ⇧↓ a semitone · ⌥↓ an octave" aria-label="Nudge down" onClick={(e) => dispatch({ type: 'nudge', dir: -1, octave: false, scale: !e.shiftKey })}>
+                <button
+                  type="button"
+                  className="rail-button icon-button"
+                  title="Nudge the note at the caret down a scale step (↓) · ⇧-click / ⇧↓ a semitone · ⌥↓ an octave"
+                  aria-label="Nudge down"
+                  onClick={(e) =>
+                    dispatch({
+                      type: 'nudge',
+                      dir: -1,
+                      octave: false,
+                      scale: !e.shiftKey,
+                    })
+                  }
+                >
                   <svg viewBox="0 0 12 12" width="16" height="16" aria-hidden>
                     <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </button>
-                <button type="button" className="rail-button icon-button" title="Nudge the note at the caret up a scale step (↑) · ⇧-click / ⇧↑ a semitone · ⌥↑ an octave" aria-label="Nudge up" onClick={(e) => dispatch({ type: 'nudge', dir: 1, octave: false, scale: !e.shiftKey })}>
+                <button
+                  type="button"
+                  className="rail-button icon-button"
+                  title="Nudge the note at the caret up a scale step (↑) · ⇧-click / ⇧↑ a semitone · ⌥↑ an octave"
+                  aria-label="Nudge up"
+                  onClick={(e) =>
+                    dispatch({
+                      type: 'nudge',
+                      dir: 1,
+                      octave: false,
+                      scale: !e.shiftKey,
+                    })
+                  }
+                >
                   <svg viewBox="0 0 12 12" width="16" height="16" aria-hidden>
                     <path d="M2.5 7.5 6 4l3.5 3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
@@ -672,8 +696,13 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
           </span>
         </div>
       </header>
-      <main ref={mainRef} className="main">
-        <section className="chart-area" style={{ maxHeight: mainHeight / 2 || undefined }}>
+      <main ref={mainRef} className={hexHidden ? 'main hex-hidden' : 'main'}>
+        <section
+          className="chart-area"
+          style={{
+            maxHeight: hexHidden ? undefined : mainHeight / 2 || undefined,
+          }}
+        >
           <Chart
             progression={progression}
             view={view}
@@ -684,15 +713,16 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
             onChordCommit={onChordCommit}
             onScaleChange={onScaleChange}
             editRequest={editRequest}
-            selection={session.selection}
+            selection={session.practice ? session.practiceBars : session.selection}
+            practiceBars={session.practice}
             onBarSelect={(bar, extend) => dispatch({ type: 'bar-select', bar, extend })}
             onBarAction={(bar, action) => dispatch({ type: 'bar-action', bar, action })}
             onAppendBar={() => dispatch({ type: 'append-bar' })}
             canPaste={!!session.clip}
             playIndex={playing ? active.index : null}
             explore={session.explore && !playing}
-            follow={session.practice && practiceRule === 'follow' ? { played } : null}
-            maxHeight={mainHeight ? mainHeight / 2 - CHART_PAD_Y : undefined}
+            follow={session.practice && practiceRule === 'follow' && run ? { played: run.played } : null}
+            maxHeight={mainHeight ? (hexHidden ? mainHeight : mainHeight / 2) - CHART_PAD_Y : undefined}
           />
         </section>
         {session.notice && (
@@ -725,7 +755,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
             onNote={onMicNote}
             onListening={(on) => {
               listeningRef.current = on;
-              if (!on) lastMicWriteRef.current = null;
+              if (!on) intakeRef.current = micStopped(intakeRef.current);
             }}
             auto={session.input === 'instrument' && !session.stand}
             tunerSlot={tunerSlot}
@@ -750,15 +780,22 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
           )}
           <DockedHex
             dock={view.dock(active.index, shape)}
-            onLabelClick={() => setEditRequest((r) => ({ bar: active.bar, part: active.part, n: (r?.n ?? 0) + 1 }))}
+            onLabelClick={() =>
+              setEditRequest((r) => ({
+                bar: active.bar,
+                part: active.part,
+                n: (r?.n ?? 0) + 1,
+              }))
+            }
             onPick={(written) => dispatch({ type: 'pick', written })}
             onHoverPitch={(p) => {
               hovered.current = p;
             }}
             halo={haloPitch === null ? null : view.toWritten(haloPitch)}
             heard={heardConcert === null ? null : view.toWritten(heardConcert)}
-            targets={practiceHexTargets}
+            targets={targets?.hex ?? null}
             sounded={sounded && { midi: view.toWritten(sounded.midi), n: sounded.n }}
+            still={session.practice && metroOn}
           />
         </section>
         {/* While listening (Listen, §9.2): a row on top of the hex panel's top edge, overlaying the chart (it takes
@@ -767,6 +804,19 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
           <div className="tuner-slot" ref={setTunerSlot} />
           <div className="levels-slot" ref={setLevelsSlot} />
         </div>
+        {/* Hide / show the hex panel (SPEC §3.1): the screen's bottom right corner, remembered on the device. */}
+        <button
+          type="button"
+          className="hex-hide-toggle"
+          aria-pressed={hexHidden}
+          title={hexHidden ? 'Show the hex panel' : 'Hide the hex panel (the chart takes the screen)'}
+          onClick={() => {
+            setHexHidden(!hexHidden);
+            focusHex();
+          }}
+        >
+          {hexHidden ? 'Show hex' : 'Hide hex'}
+        </button>
       </main>
     </div>
   );

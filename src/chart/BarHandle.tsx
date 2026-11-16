@@ -1,5 +1,6 @@
-// Bar number + ⋯ bar handle (SPEC §4.1, Write only): click the number to select the bar (⇧ extends to a run);
-// ⋯ opens the bar menu. The handle shows on the active bar and on hover.
+// Bar number + ⋯ bar handle (SPEC §4.1): in Write, click the number to select the bar (⇧ extends to a run; a selected
+// bar again deselects) and ⋯ opens the bar menu, shown on the active bar and on hover. In Practice (§3.7) the number
+// alone picks the bars to loop.
 import { useEffect, useRef, useState } from 'react';
 
 import type { BarAction } from '../bars';
@@ -7,6 +8,8 @@ export type { BarAction };
 
 export interface BarHandleProps {
   bar: number;
+  /** The ⋯ bar menu (Write); Practice shows the number only, to pick bars to loop. */
+  menu?: boolean;
   selected: boolean;
   split: boolean;
   canPaste: boolean;
@@ -15,7 +18,7 @@ export interface BarHandleProps {
   onAction: (bar: number, action: BarAction) => void;
 }
 
-export function BarHandle({ bar, selected, split, canPaste, canDelete, onSelect, onAction }: BarHandleProps) {
+export function BarHandle({ bar, menu = true, selected, split, canPaste, canDelete, onSelect, onAction }: BarHandleProps) {
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLSpanElement>(null);
 
@@ -35,7 +38,12 @@ export function BarHandle({ bar, selected, split, canPaste, canDelete, onSelect,
     };
   }, [open]);
 
-  const items: { action: BarAction; label: string; keys?: string; disabled?: boolean }[] = [
+  const items: {
+    action: BarAction;
+    label: string;
+    keys?: string;
+    disabled?: boolean;
+  }[] = [
     { action: 'insert-before', label: 'Insert before' },
     { action: 'insert-after', label: 'Insert after' },
     { action: 'duplicate', label: 'Duplicate', keys: '⌘D' },
@@ -55,22 +63,25 @@ export function BarHandle({ bar, selected, split, canPaste, canDelete, onSelect,
         type="button"
         className="bar-number"
         aria-pressed={selected}
-        aria-label={`Bar ${bar + 1}: select (shift-click to extend)`}
+        aria-label={menu ? selected ? `Bar ${bar + 1}: deselect` : `Bar ${bar + 1}: select (shift-click to extend)` : `Bar ${bar + 1}: loop it (shift-click to extend; a looped bar again for the whole form)`}
+        title={menu ? undefined : selected ? 'Stop looping: back to the whole form (Esc)' : 'Loop this bar (⇧-click another to loop a run)'}
         onClick={(e) => onSelect(bar, e.shiftKey)}
       >
         {bar + 1}
       </button>
-      <button
-        type="button"
-        className="bar-menu-button"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-label={`Bar ${bar + 1} menu`}
-        onClick={() => setOpen((o) => !o)}
-      >
-        ⋯
-      </button>
-      {open && (
+      {menu && (
+        <button
+          type="button"
+          className="bar-menu-button"
+          aria-haspopup="menu"
+          aria-expanded={open}
+          aria-label={`Bar ${bar + 1} menu`}
+          onClick={() => setOpen((o) => !o)}
+        >
+          ⋯
+        </button>
+      )}
+      {menu && open && (
         <span className="bar-menu" role="menu" aria-label={`Bar ${bar + 1}`}>
           {items.map((it, i) => (
             <button

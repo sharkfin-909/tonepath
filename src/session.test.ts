@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { TICKS } from './melody';
 import { newProgression, type Progression } from './progression';
-import { activeIndex, initialSession, reduce, type Effect, type Intent, type SessionState } from './session';
+import { activeIndex, chooseMode, initialSession, modeOf, reduce, type Effect, type Intent, type SessionState } from './session';
 import type { OnArrival } from './device';
 
 const q = TICKS.q;
@@ -283,5 +283,75 @@ describe('editing commands', () => {
     expect(run([{ type: 'undo' }]).effects).toEqual([{ type: 'history', dir: 'undo' }]);
     const r = run([{ type: 'bar-select', bar: 1, extend: false }, { type: 'restored', caret: q }]);
     expect(r.state).toMatchObject({ caret: q, selection: null, refusal: null });
+  });
+});
+
+describe('the Mode dropdown (modeOf / chooseMode)', () => {
+  it('shows the mode the session is in; Play (unreachable) shows as Write', () => {
+    expect(modeOf(run([]).state)).toBe('write');
+    expect(modeOf(run([{ type: 'mode', mode: 'explore' }]).state)).toBe('explore');
+    expect(modeOf(run([{ type: 'mode', mode: 'practice' }]).state)).toBe('practice');
+    expect(modeOf(run([{ type: 'mode', mode: 'play' }]).state)).toBe('write');
+    expect(modeOf(run([{ type: 'stand', on: true }]).state)).toBe('read');
+  });
+  it('choosing a mode gets there — leaving Read first; choosing Read only enters it', () => {
+    for (const m of ['explore', 'practice', 'write'] as const) {
+      const s = run([{ type: 'stand', on: true }]).state;
+      const r = run(chooseMode(s, m), { state: s });
+      expect(modeOf(r.state)).toBe(m);
+    }
+    expect(chooseMode(run([]).state, 'read')).toEqual([{ type: 'stand', on: true }]);
+  });
+});
+
+describe('Practice over selected bars', () => {
+  it('starts on the first selected bar, loops those bars, and gives the selection back on leaving', () => {
+    const r = run([{ type: 'bar-select', bar: 1, extend: false }, { type: 'bar-select', bar: 2, extend: true }, { type: 'mode', mode: 'practice' }]);
+    expect(r.state.practiceBars).toEqual({ anchor: 1, from: 1, to: 2 });
+    expect(r.state.selection).toBeNull();
+    expect(r.state.playIndex).toBe(1);
+    const back = run([{ type: 'mode', mode: 'write' }], { p: r.p, state: r.state });
+    expect(back.state.practiceBars).toBeNull();
+    expect(back.state.selection).toEqual({ anchor: 1, from: 1, to: 2 });
+  });
+  it('without a selection: the whole form; ✕ goes back to the whole form', () => {
+    expect(run([{ type: 'mode', mode: 'practice' }]).state.practiceBars).toBeNull();
+    const r = run([{ type: 'bar-select', bar: 3, extend: false }, { type: 'mode', mode: 'practice' }, { type: 'practice-all-bars' }]);
+    expect(r.state.practiceBars).toBeNull();
+    expect(r.state.practice).toBe(true);
+  });
+});
+
+describe('bar selection: ⇧ extends', () => {
+  it('from the anchor; with nothing selected, from the caret\'s bar', () => {
+    expect(run([{ type: 'bar-select', bar: 1, extend: false }, { type: 'bar-select', bar: 3, extend: true }]).state.selection).toEqual({ anchor: 1, from: 1, to: 3 });
+    expect(run([{ type: 'bar-select', bar: 2, extend: true }], { state: { caret: 0 } }).state.selection).toEqual({ anchor: 0, from: 0, to: 2 });
+  });
+});
+
+describe('Practice: bar numbers pick the bars to loop', () => {
+  const practising = () => run([{ type: 'mode', mode: 'practice' }], { state: { caret: 0 } });
+  it('a click loops that bar (moving there), ⇧ extends, the only one again: the whole form', () => {
+    const r0 = practising();
+    const r = run([{ type: 'bar-select', bar: 2, extend: false }], { p: r0.p, state: r0.state });
+    expect(r.state.practiceBars).toEqual({ anchor: 2, from: 2, to: 2 });
+    expect(r.state.playIndex).toBe(2);
+    expect(r.state.selection).toBeNull();
+    const ext = run([{ type: 'bar-select', bar: 3, extend: true }], { p: r.p, state: r.state });
+    expect(ext.state.practiceBars).toEqual({ anchor: 2, from: 2, to: 3 });
+    expect(ext.state.playIndex).toBe(2);
+    const off = run([{ type: 'bar-select', bar: 2, extend: false }], { p: r.p, state: r.state });
+    expect(off.state.practiceBars).toBeNull();
+  });
+});
+
+describe('deselecting', () => {
+  it('Write: a plain click on any selected bar clears the selection', () => {
+    const r = run([{ type: 'bar-select', bar: 1, extend: false }, { type: 'bar-select', bar: 3, extend: true }, { type: 'bar-select', bar: 2, extend: false }]);
+    expect(r.state.selection).toBeNull();
+  });
+  it('Practice: a plain click on any looped bar goes back to the whole form', () => {
+    const r = run([{ type: 'mode', mode: 'practice' }, { type: 'bar-select', bar: 1, extend: false }, { type: 'bar-select', bar: 3, extend: true }, { type: 'bar-select', bar: 3, extend: false }], { state: { caret: 0 } });
+    expect(r.state.practiceBars).toBeNull();
   });
 });

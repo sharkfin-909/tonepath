@@ -167,3 +167,81 @@ export function playBass(h: SlotHarmony): void {
   const m = bassNote(h);
   if (c && m !== null) tone(m, c.currentTime, NOTE);
 }
+
+// ---------------------------------------------------------------- metronome
+
+export type ClickSound = 'click' | 'hihat' | 'cowbell';
+
+/** The audio clock (seconds), for scheduling ahead; 0 before the first gesture. */
+export function audioNow(): number {
+  return ctx?.currentTime ?? 0;
+}
+
+/** A short burst of white noise (the hi-hat), cached. */
+let noiseBuf: AudioBuffer | null = null;
+function noise(c: AudioContext): AudioBuffer {
+  if (noiseBuf) return noiseBuf;
+  const len = Math.floor(c.sampleRate * 0.2);
+  noiseBuf = c.createBuffer(1, len, c.sampleRate);
+  const d = noiseBuf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  return noiseBuf;
+}
+
+/**
+ * One metronome click at audio time `at` (Practice with the metronome, SPEC §3.7): synthesised, dry (no reverb), louder
+ * and higher on a bar's first beat (`accent`).
+ */
+export function playClick(sound: ClickSound, accent: boolean, at: number): void {
+  const c = ready();
+  if (!c) return;
+  const out = c.destination;
+  const g = c.createGain();
+  g.connect(out);
+  const peak = accent ? 0.5 : 0.32;
+  const env = (decay: number) => {
+    g.gain.setValueAtTime(0, at);
+    g.gain.linearRampToValueAtTime(peak, at + 0.002);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + decay);
+  };
+  if (sound === 'hihat') {
+    const src = c.createBufferSource();
+    src.buffer = noise(c);
+    const hp = c.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = accent ? 6000 : 7500;
+    src.connect(hp).connect(g);
+    env(accent ? 0.09 : 0.05);
+    src.start(at);
+    src.stop(at + 0.12);
+    return;
+  }
+  const oscs: OscillatorNode[] = [];
+  const add = (type: OscillatorType, hz: number, into: AudioNode = g) => {
+    const o = c.createOscillator();
+    o.type = type;
+    o.frequency.value = hz;
+    o.connect(into);
+    oscs.push(o);
+  };
+  let decay = 0.05;
+  if (sound === 'click') {
+    add('sine', accent ? 1760 : 1320);
+    decay = 0.04;
+  } else {
+    // cowbell: two square partials through a bandpass
+    const bp = c.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 2640;
+    bp.Q.value = 1.5;
+    bp.connect(g);
+    add('square', accent ? 587 : 540, bp);
+    add('square', accent ? 870 : 800, bp);
+    decay = accent ? 0.35 : 0.25;
+  }
+  env(decay);
+  for (const o of oscs) {
+    o.start(at);
+    o.stop(at + decay + 0.02);
+  }
+}

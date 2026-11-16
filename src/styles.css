@@ -185,6 +185,13 @@ body,
     transform: scale(1);
   }
 }
+/* Still (Practice's metronome): chord changes land at once — no fades or slides. */
+.docked-hex.still .hex-bg,
+.docked-hex.still .hex-name,
+.docked-hex.still .hex-ball,
+.docked-hex.still .hex-socket {
+  transition: none;
+}
 @media (prefers-reduced-motion: reduce) {
   .hex-bg,
   .hex-name,
@@ -939,6 +946,34 @@ button.dock-label {
   border-color: var(--ink);
 }
 
+/* Delete bar (SPEC §3.1): a trash can at each bar's bottom right; faint until the bar is hovered or current. */
+.delete-bar {
+  position: absolute;
+  right: 6px;
+  bottom: 2px;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--muted);
+  opacity: 0.35;
+  cursor: pointer;
+}
+.slot:hover .delete-bar,
+.slot.active .delete-bar,
+.delete-bar:focus-visible {
+  opacity: 1;
+}
+.delete-bar:hover {
+  background: rgba(0, 0, 0, 0.07);
+  color: #b3261e;
+}
+
 /* Short refusal notices (bar edits). */
 .notice {
   position: absolute;
@@ -1049,7 +1084,7 @@ button.dock-label {
   font-weight: 400;
 }
 
-/* Read mode (SPEC §3.4; `stand` in code): thin header + the whole form fitted to the page. */
+/* Etude view (SPEC §3.4; `stand` in code): thin header + the whole form fitted to the page. */
 .stand-layout {
   display: grid;
   grid-template-rows: auto 1fr;
@@ -1521,6 +1556,37 @@ select {
   border-color: #f3eee6;
 }
 
+/* Hide / show the hex panel (SPEC §3.1): the main area's bottom right corner, over the hex (or the chart, hidden). */
+.hex-hide-toggle {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 6;
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f3eee6;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.hex-hide-toggle:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+/* Hidden: the chart takes the screen; the toggle sits on the light chart, so it goes dark-on-light. */
+.main.hex-hidden {
+  grid-template-rows: minmax(0, 1fr) 0;
+}
+.main.hex-hidden .dock {
+  box-shadow: none;
+}
+.main.hex-hidden .hex-hide-toggle {
+  background: var(--dock-bg);
+  border-color: var(--dock-bg);
+}
+
 /* The sound section: ▶ buttons and *On arrival*, together in a pill at the right end of the first row. */
 .sound-section {
   flex-wrap: nowrap;
@@ -1979,6 +2045,26 @@ select {
 .practice-rule-label {
   opacity: 0.75;
 }
+/* The metronome's tempo field (bpm): no spinner, so three digits fit. */
+.practice-bpm::-webkit-outer-spin-button,
+.practice-bpm::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+/* The metronome's tempo field (bpm). */
+.practice-bpm {
+  width: 3.2em;
+  -moz-appearance: textfield;
+  appearance: textfield;
+  font: inherit;
+  font-size: 12px;
+  padding: 0 4px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(0, 0, 0, 0.2);
+  color: inherit;
+  text-align: center;
+}
 .practice-rule {
   font: inherit;
   font-size: 12px;
@@ -1998,6 +2084,31 @@ select {
   align-items: center;
   gap: 4px;
   cursor: pointer;
+}
+/* Looping selected bars: a chip after Loop, × back to the whole form. */
+.practice-bars {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 2px 0 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.practice-bars-clear {
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 5px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.practice-bars-clear:hover {
+  background: rgba(255, 255, 255, 0.18);
 }
 .hex-target {
   fill: none;

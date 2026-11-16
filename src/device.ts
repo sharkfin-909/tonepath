@@ -31,8 +31,13 @@ export interface DeviceSettings {
   practiceLoop?: boolean;
   /** Practice: the note count per chord (count rules), default 4. */
   practiceCount?: number;
+  /** Practice's metronome: tempo (bpm, 30–300, default 100) and click sound. */
+  metronomeBpm?: number;
+  metronomeSound?: string;
   /** The dock's layout (SPEC §8.5): the honeycomb (default) or one row, Linear. */
   hexShape?: 'honeycomb' | 'linear';
+  /** The hex panel hidden (SPEC §3.1). */
+  hexHidden?: boolean;
   /** Play mode *On arrival* (SPEC §3.3). */
   playArrival?: OnArrival;
   /** Last-picked instrument: the default for new progressions (SPEC §10). */
@@ -71,4 +76,25 @@ export function writeDevice(storage: Storage, change: Partial<DeviceSettings>): 
     console.warn('Tonepath: could not save device settings', err);
   }
   return next;
+}
+
+/**
+ * One remembered setting (SPEC §12.5): its key in the device record, how a stored value is read — validated, with the
+ * default for anything missing or bad — and, when the value isn't stored as is, how it is stored.
+ */
+export interface DeviceSetting<T> {
+  key: string;
+  read: (raw: unknown) => T;
+  store?: (value: T) => unknown;
+}
+
+export function readSetting<T>(storage: Storage, setting: DeviceSetting<T>): T {
+  return setting.read(readDevice(storage)[setting.key]);
+}
+
+/** Store a setting's value (as read back, so a later read gives the same value). */
+export function writeSetting<T>(storage: Storage, setting: DeviceSetting<T>, value: T): T {
+  const v = setting.read(setting.store ? setting.store(value) : value);
+  writeDevice(storage, { [setting.key]: setting.store ? setting.store(v) : v });
+  return v;
 }

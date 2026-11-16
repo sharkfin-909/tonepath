@@ -65,7 +65,7 @@ export function keyIntent(e: KeyPress, ctx: KeyContext): KeyResult {
   if (plain && e.key === '\\') return handled({ type: 'stand', on: 'toggle' });
 
   if (ctx.mode === 'stand') {
-    // Read (`stand`): only ⇧M, Space = click (and \ above). Nothing is editable.
+    // Etude view (`stand`): only ⇧M, Space = click (and \ above). Nothing is editable.
     if (plain && e.shiftKey && (e.key === 'm' || e.key === 'M')) return handled({ type: 'toggle-mute' });
     if (plain && e.key === ' ' && !e.shiftKey) return e.repeat ? handled() : CLICK;
     if (plain && (e.key === ' ' || e.key.startsWith('Arrow') || e.key === 'Backspace')) return handled();
@@ -78,6 +78,7 @@ export function keyIntent(e: KeyPress, ctx: KeyContext): KeyResult {
   if (ctx.mode === 'play') {
     // Play: ← / → step slots (wrapping); the shared keys; everything else does nothing.
     if (!plain) return NONE;
+    if (e.key === 'Escape' && ctx.practice) return handled({ type: 'practice-all-bars' }); // stop looping bars
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') return handled({ type: 'step', dir: e.key === 'ArrowLeft' ? -1 : 1 });
     const r = shared(e, ctx);
     if (r) return r;
