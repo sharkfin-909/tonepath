@@ -536,8 +536,9 @@ describe('the open etude (issue 080)', () => {
 
 describe("a slot's trash goes through the mode", () => {
   const split = (): Progression => ({ ...prog(), bars: [[{ chord: 'Dm7' }, { chord: 'G7' }], [{ chord: 'C' }]] });
-  it('Improvise stopped deletes the slot (one undo step); running or Read etude, nothing', () => {
+  it('Write etude and Improvise stopped delete the slot (one undo step); running or Read etude, nothing', () => {
     expect(run([{ type: 'slot-delete', bar: 0, part: 0 }], { p: split(), state: { mode: 'improvise' } }).p.bars[0]).toEqual([{ chord: 'G7' }]);
+    expect(run([{ type: 'slot-delete', bar: 0, part: 1 }], { p: split(), state: { mode: 'write' } }).p.bars[0]).toEqual([{ chord: 'Dm7' }]);
     for (const state of [{ mode: 'improvise' as const, running: true }, { mode: 'read' as const }]) {
       expect(run([{ type: 'slot-delete', bar: 0, part: 0 }], { p: split(), state }).p.bars[0]).toHaveLength(2);
     }

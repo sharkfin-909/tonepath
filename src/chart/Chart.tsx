@@ -47,7 +47,7 @@ export interface ChartProps {
   onBarAction: (bar: number, action: BarAction) => void;
   /** Improvise / Read etude: remove the loop (the × at its end repeat) — back to the whole form. */
   onLoopClear?: () => void;
-  /** A slot's trash (Improvise, a split bar): delete that chord; the other fills the bar. */
+  /** A slot's trash (a split bar): delete that chord; the other fills the bar. */
   onDeleteSlot?: (bar: number, part: number) => void;
   canPaste: boolean;
   /**
@@ -253,7 +253,7 @@ export function Chart({
               onShiftSelect={!inert ? () => onBarSelect(slot.bar, true) : undefined}
               onDeleteBar={editsForm && slot.barEnd && bars.length > 1 ? () => onBarAction(slot.bar, 'delete') : undefined}
               onInsertBar={editsForm && slot.barEnd ? () => onBarAction(slot.bar, 'insert-after') : undefined}
-              onDeleteSlot={editsForm && lead && bars[slot.bar].length === 2 ? () => onDeleteSlot?.(slot.bar, slot.part) : undefined}
+              onDeleteSlot={editsForm && bars[slot.bar].length === 2 ? () => onDeleteSlot?.(slot.bar, slot.part) : undefined}
               onAddChord={
                 editsForm && bars[slot.bar].length === 1
                   ? () => {
@@ -275,7 +275,16 @@ export function Chart({
                   : undefined
               }
               onCommit={(text, move) => commit(slot, text, move)}
-              onClear={editsForm && onChordClear && slot.data.chord !== '' ? () => onChordClear(slot.bar, slot.part) : undefined}
+              onClear={
+                editsForm && onChordClear && slot.data.chord !== ''
+                  ? () => {
+                      // Clear it, and open its chord field to type the new one (Improvise: the slot becomes current too).
+                      onChordClear(slot.bar, slot.part);
+                      if (!writing) onSlotClick(slot);
+                      startEditing({ bar: slot.bar, part: slot.part });
+                    }
+                  : undefined
+              }
               onScaleChange={editsForm ? (scale) => onScaleChange(slot.bar, slot.part, scale) : undefined} // Write etude and Improvise
             />
           ))}
@@ -333,7 +342,7 @@ interface SlotViewProps {
   onInsertBar?: () => void;
   /** On a one-chord bar: the "+" in the slot that adds a second chord (splits the bar). */
   onAddChord?: () => void;
-  /** Improvise, a split bar: the slot's trash (bottom left, on hover) — the other slot fills the bar. */
+  /** A split bar: the slot's trash (Write etude: top right; Improvise: bottom left, on hover) — the other slot fills the bar. */
   onDeleteSlot?: () => void;
   /** The first slot carries the time signature. */
   showTimeSignature: boolean;
@@ -357,7 +366,7 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
   const meter = showTimeSignature ? layout : undefined;
   // The key pill (SPEC §3.1): the key this slot's scale belongs to; lit on the current slot and its key mates (only the pill).
   const keyPill = keyLabel && (
-    <span className={['key-pill', onAddChord && 'beside-append'].filter(Boolean).join(' ')} title={`Key family: ${prettyName(keyLabel)}`}>
+    <span className={['key-pill', (onAddChord || (onDeleteSlot && !hideMelody)) && 'beside-append'].filter(Boolean).join(' ')} title={`Key family: ${prettyName(keyLabel)}`}>
       {prettyName(keyLabel)}
     </span>
   );
@@ -551,7 +560,7 @@ function ChordLabel({ chord, harmony, bar, part, onEdit, onClear }: ChordLabelPr
       {overridden && <span className="override-dot" aria-hidden title="Scale override" />}
       {onClear && (
         // Clear the chord (SPEC §4.2): faint until the slot is hovered or current, like the bar's trash can.
-        <button type="button" className="chord-clear" aria-label={`Clear chord ${chord}, bar ${bar + 1}`} onClick={onClear}>
+        <button type="button" className="chord-clear" title="Clear this chord" aria-label={`Clear chord ${chord}, bar ${bar + 1}`} onClick={onClear}>
           <svg viewBox="0 0 12 12" width="9" height="9" aria-hidden>
             <path d="M3 3l6 6M9 3 3 9" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
           </svg>

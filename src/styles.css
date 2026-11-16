@@ -582,6 +582,10 @@ button.dock-label {
 .chord-label:focus-visible + .chord-tip {
   display: block;
 }
+/* On the × the app tooltip ("Clear this chord") speaks instead: one label at a time. */
+.chord-wrap:has(.chord-clear:hover) .chord-tip {
+  display: none;
+}
 
 /* Keep tips and messages inside the chart at a row's right end. */
 .slot:last-child .chord-tip,
@@ -3007,4 +3011,24 @@ select {
 .delete-slot:hover {
   background: rgba(0, 0, 0, 0.07);
   color: #b3261e;
+}
+/* Write etude: the slot's trash sits at the slot's top right (where a one-chord bar has its add-chord "+"), faint
+   like the bar's trash until the slot is hovered or current. */
+.main.write .delete-slot {
+  left: auto;
+  right: 2px;
+  top: 1px;
+  bottom: auto;
+  font-size: var(--chord-px);
+  width: 1.3em;
+  height: 1.3em;
+  opacity: 0.35;
+}
+.main.write .delete-slot svg {
+  width: 0.9em;
+  height: 0.9em;
+}
+.main.write .slot:hover > .delete-slot,
+.main.write .slot.active > .delete-slot {
+  opacity: 1;
 }
