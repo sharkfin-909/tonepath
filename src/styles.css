@@ -906,6 +906,77 @@ button.dock-label {
   box-shadow: inset 0 0 0 2px rgba(47, 111, 219, 0.45);
 }
 
+/* The loop (Improvise / Read etude, SPEC §3.7): one band round the looped bars — top and bottom edges throughout, closed
+   and rounded only at the loop's start and end (open where it wraps to the next row) — with repeat signs. */
+.slot.looped {
+  --loop: #2f6fdb;
+  border-radius: 0;
+  box-shadow: inset 0 2px 0 var(--loop), inset 0 -2px 0 var(--loop);
+}
+.slot.looped:not(.active) {
+  background: rgba(47, 111, 219, 0.04);
+}
+.slot.looped.loop-start {
+  border-top-left-radius: 10px;
+  border-bottom-left-radius: 10px;
+  box-shadow: inset 0 2px 0 var(--loop), inset 0 -2px 0 var(--loop), inset 2px 0 0 var(--loop);
+}
+.slot.looped.loop-end {
+  border-top-right-radius: 10px;
+  border-bottom-right-radius: 10px;
+  box-shadow: inset 0 2px 0 var(--loop), inset 0 -2px 0 var(--loop), inset -2px 0 0 var(--loop);
+}
+.slot.looped.loop-start.loop-end {
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 2px var(--loop);
+}
+.repeat-sign {
+  position: absolute;
+  z-index: 3;
+  width: 20px;
+  fill: var(--loop, #2f6fdb);
+  pointer-events: none;
+}
+.repeat-sign.start {
+  left: 6px;
+}
+.repeat-sign.end {
+  right: 6px;
+}
+/* Room for the repeat signs: the lead sheet's tones start after [: and end before :]. */
+.slot.loop-start .lead-tones {
+  padding-left: 32px;
+}
+.slot.loop-end .lead-tones {
+  padding-right: 32px;
+}
+/* × at the end repeat: stop looping (back to the whole form). Sized with the chord label, so it stays clickable. */
+.loop-clear {
+  position: absolute;
+  right: 3px;
+  z-index: 6;
+  transform: translateY(calc(-100% - 3px));
+  display: grid;
+  place-items: center;
+  font-size: var(--chord-px, 14px);
+  width: 1.1em;
+  height: 1.1em;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--loop, #2f6fdb);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+.loop-clear svg {
+  width: 0.6em;
+  height: 0.6em;
+}
+.loop-clear:hover {
+  background: #b3261e;
+}
+
 .bar-menu {
   position: absolute;
   left: 0;

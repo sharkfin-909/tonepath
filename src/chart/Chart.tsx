@@ -45,6 +45,8 @@ export interface ChartProps {
   onBarSelect: (bar: number, extend: boolean) => void;
   onBarAction: (bar: number, action: BarAction) => void;
   onAppendBar: () => void;
+  /** Improvise / Read etude: remove the loop (the × at its end repeat) — back to the whole form. */
+  onLoopClear?: () => void;
   canPaste: boolean;
   /**
    * The chart's mode (SPEC §3.0): Write etude (the caret, the bar menu); Improvise (a lead sheet — empty staves,
@@ -91,7 +93,7 @@ function useParentSize<T extends HTMLElement>() {
   return [ref, size] as const;
 }
 
-export function Chart({ progression, view, caret, onSlotClick, onEventClick, onTimeClick, onChordCommit, onScaleChange, onChordClear, editRequest, selection, onBarSelect, onBarAction, onAppendBar, canPaste, mode = 'write', current = null, running = false, maxHeight }: ChartProps) {
+export function Chart({ progression, view, caret, onSlotClick, onEventClick, onTimeClick, onChordCommit, onScaleChange, onChordClear, editRequest, selection, onBarSelect, onBarAction, onAppendBar, onLoopClear, canPaste, mode = 'write', current = null, running = false, maxHeight }: ChartProps) {
   const writing = mode === 'write';
   const read = mode === 'read';
   /** Read etude while running: nothing on the chart answers a click. */
@@ -205,6 +207,16 @@ export function Chart({ progression, view, caret, onSlotClick, onEventClick, onT
                   : null
               }
               inSelection={!!selection && slot.bar >= selection.from && slot.bar <= selection.to}
+              loop={
+                // Improvise / Read etude: the selection is the looped bars, drawn as one band with repeat signs (SPEC §3.7).
+                !writing && selection && slot.bar >= selection.from && slot.bar <= selection.to
+                  ? {
+                      start: slot.bar === selection.from && slot.part === 0,
+                      end: slot.bar === selection.to && slot.barEnd,
+                      onClear: inert ? undefined : onLoopClear,
+                    }
+                  : null
+              }
               onShiftSelect={!inert ? () => onBarSelect(slot.bar, true) : undefined}
               onDeleteBar={editsForm && slot.barEnd && bars.length > 1 ? () => onBarAction(slot.bar, 'delete') : undefined}
               onAppend={editsForm && slot.index === slots.length - 1 ? onAppendBar : undefined}
@@ -257,6 +269,8 @@ interface SlotViewProps {
   /** Bar number + ⋯ handle, on the bar's first slot. */
   barTools: { menu: boolean; selected: boolean; split: boolean; canPaste: boolean; canDelete: boolean; onSelect: (bar: number, extend: boolean) => void; onAction: (bar: number, action: BarAction) => void } | null;
   inSelection: boolean;
+  /** Part of the loop (Improvise / Read etude): its first slot carries the start repeat, its last the end repeat and the ×. */
+  loop: { start: boolean; end: boolean; onClear?: () => void } | null;
   /** Write: ⇧-click anywhere in the bar extends the bar selection to it (instead of moving the caret). */
   onShiftSelect?: () => void;
   /** On a bar's last slot: the trash can at its bottom right that deletes the bar (the selection, if it's in one). */
@@ -275,7 +289,7 @@ interface SlotViewProps {
   onScaleChange?: (scale: ScaleId | null) => void;
 }
 
-function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing, keyLabel, keyMate, hideMelody, onEventClick, onTimeClick, span, layout, header, barTools, inSelection, onShiftSelect, onDeleteBar, onAppend, showTimeSignature, editing, error, usedChords, onEdit, onCommit, onClear, onScaleChange }: SlotViewProps) {
+function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing, keyLabel, keyMate, hideMelody, onEventClick, onTimeClick, span, layout, header, barTools, inSelection, loop, onShiftSelect, onDeleteBar, onAppend, showTimeSignature, editing, error, usedChords, onEdit, onCommit, onClear, onScaleChange }: SlotViewProps) {
   // Everything shown runs against the written chord; the stored melody stays concert (SPEC §5.3, §10).
   const { chord, harmony } = slot;
   const spell = (midi: number) => view.name(midi, slot);
@@ -288,7 +302,7 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
 
   return (
     <div
-      className={['slot', active && 'active', keyMate && 'key-mate', (active || keyMate) && playing && 'playing', inSelection && 'bar-selected'].filter(Boolean).join(' ')}
+      className={['slot', active && 'active', keyMate && 'key-mate', (active || keyMate) && playing && 'playing', inSelection && !loop && 'bar-selected', loop && 'looped', loop?.start && 'loop-start', loop?.end && 'loop-end'].filter(Boolean).join(' ')}
       // --staff-top: where the stave's top line sits in the slot; the bar number sits just above it (CSS .bar-handle).
       style={{ gridColumn: `span ${span}`, ['--staff-top' as string]: `${header + staffTop}px` }}
       data-slot={slot.index}
@@ -374,6 +388,23 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
           </svg>
         </button>
       )}
+      {/* The loop's repeat signs (SPEC §3.7): [: at its first bar line, :] and the × (stop looping) at its last. */}
+      {loop?.start && <RepeatSign side="start" top={header + staffTop} height={staffBottom - staffTop} />}
+      {loop?.end && <RepeatSign side="end" top={header + staffTop} height={staffBottom - staffTop} />}
+      {loop?.end && loop.onClear && (
+        <button
+          type="button"
+          className="loop-clear"
+          style={{ top: header + staffTop }}
+          title="Stop looping: back to the whole form (Esc)"
+          aria-label="Stop looping"
+          onClick={loop.onClear}
+        >
+          <svg viewBox="0 0 12 12" width="9" height="9" aria-hidden>
+            <path d="M3 3l6 6M9 3 3 9" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+        </button>
+      )}
       {/* A bar line at the end of each bar; nothing between two chords in a bar (a chord change, not a bar). */}
       {slot.barEnd && <div className={hideMelody ? 'bar-line lead' : 'bar-line'} style={{ top: header + staffTop, height: staffBottom - staffTop }} />}
     </div>
@@ -426,5 +457,18 @@ function ChordLabel({ chord, harmony, bar, part, onEdit, onClear }: ChordLabelPr
         {tooltip(chord, harmony)}
       </span>
     </span>
+  );
+}
+
+/** A repeat sign over the stave's height: start `[:` (thick, thin, dots) or end `:]` (dots, thin, thick). */
+function RepeatSign({ side, top, height }: { side: 'start' | 'end'; top: number; height: number }) {
+  const x = side === 'start' ? { thick: 0, thin: 7, dots: 14 } : { thick: 15, thin: 11, dots: 6 };
+  return (
+    <svg className={`repeat-sign ${side}`} style={{ top, height }} viewBox="0 0 20 40" preserveAspectRatio="none" aria-hidden>
+      <rect x={x.thick} y={0} width={5} height={40} />
+      <rect x={x.thin} y={0} width={2} height={40} />
+      <circle cx={x.dots} cy={14.5} r={3} />
+      <circle cx={x.dots} cy={25.5} r={3} />
+    </svg>
   );
 }

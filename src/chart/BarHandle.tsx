@@ -63,7 +63,7 @@ export function BarHandle({ bar, menu = true, selected, split, canPaste, canDele
         type="button"
         className="bar-number"
         aria-pressed={selected}
-        aria-label={menu ? selected ? `Bar ${bar + 1}: deselect` : `Bar ${bar + 1}: select (shift-click to extend)` : `Bar ${bar + 1}: loop it (shift-click to extend; a looped bar again for the whole form)`}
+        aria-label={menu ? selected ? `Bar ${bar + 1}: deselect` : `Bar ${bar + 1}: select (shift-click to extend)` : selected ? `Bar ${bar + 1}: stop looping (back to the whole form)` : `Bar ${bar + 1}: loop it (shift-click to extend)`}
         title={menu ? undefined : selected ? 'Stop looping: back to the whole form (Esc)' : 'Loop this bar (⇧-click another to loop a run)'}
         onClick={(e) => onSelect(bar, e.shiftKey)}
       >
