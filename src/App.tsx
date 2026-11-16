@@ -418,6 +418,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
         className={[
           'main',
           read && 'read',
+          writing && 'write',
           tune && 'tuner-mode',
           improvise && 'improvise',
           hideHex && 'hex-hidden',

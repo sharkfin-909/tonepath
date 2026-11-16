@@ -193,9 +193,10 @@ export function Chart({
           key={r}
           style={{ gridTemplateColumns: `${GUTTER_PX}px repeat(${barsPerRow * 2}, minmax(0, 1fr))` }}
         >
-          <div className="clef-gutter" style={{ paddingTop: header }}>
+          <div className="clef-gutter" style={{ paddingTop: layout.staveTop }}>
             {/* Improvise's lead sheet has no stave, so no clef (SPEC §3.3). */}
-            {profile.clef && <ClefGutter width={GUTTER_PX} clef={clef} extendRight={read ? SLOT_GAP_PX : 0} />}
+            {/* Its staff runs on into the first bar (Write etude, Read etude: one continuous stave). */}
+            {profile.clef && <ClefGutter width={GUTTER_PX} clef={clef} extendRight={SLOT_GAP_PX} />}
           </div>
           {row.map((slot, si) => (
             <SlotView
@@ -360,6 +361,10 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
       {prettyName(keyLabel)}
     </span>
   );
+  // The loop's repeat signs span the staff's height: over the staff where there is one; on Improvise's lead sheet (no
+  // staff), centred in the card (its padding box: the card less its 1px borders).
+  const signHeight = staffBottom - staffTop;
+  const signTop = hideMelody ? (slotHeight - 2 - signHeight) / 2 : SLOT_PAD_TOP_PX + header + staffTop;
   /** Marks against this (owning) slot's written harmony (SPEC §7.2). */
   const markOf = (e: TimedEvent) => ('pitch' in e.ev ? view.mark(e.ev.pitch, slot) : null);
 
@@ -440,11 +445,9 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
           meter={layout}
           markOf={markOf}
           extendRight={
-            readEtude && !rowEnd
-              ? slot.barEnd
-                ? SLOT_GAP_PX + BAR_LINE_PX + SLOT_GAP_PX
-                : SLOT_GAP_PX
-              : 0
+            // One continuous stave (Write etude, Read etude): each slot's staff bridges the gap to the next — but a
+            // split bar's first half, whose second half already reaches back over the gap: 1px, to close the seam.
+            rowEnd ? 0 : barCard === 'first' ? 1 : slot.barEnd ? SLOT_GAP_PX + BAR_LINE_PX + SLOT_GAP_PX : SLOT_GAP_PX
           }
         />
         )}
@@ -490,13 +493,13 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
         </button>
       )}
       {/* The loop's repeat signs (SPEC §3.7): [: at its first bar line, :] and the × (stop looping) at its last. */}
-      {loop?.start && <RepeatSign side="start" top={SLOT_PAD_TOP_PX + header + staffTop} height={staffBottom - staffTop} />}
-      {loop?.end && <RepeatSign side="end" top={SLOT_PAD_TOP_PX + header + staffTop} height={staffBottom - staffTop} />}
+      {loop?.start && <RepeatSign side="start" top={signTop} height={signHeight} />}
+      {loop?.end && <RepeatSign side="end" top={signTop} height={signHeight} />}
       {loop?.end && loop.onClear && (
         <button
           type="button"
           className="loop-clear"
-          style={{ top: SLOT_PAD_TOP_PX + header + staffTop }}
+          style={{ top: signTop }}
           title="Stop looping: back to the whole form (Esc)"
           aria-label="Stop looping"
           onClick={loop.onClear}

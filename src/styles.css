@@ -325,9 +325,9 @@ button.dock-label {
   background-image: linear-gradient(var(--slot-tint), var(--slot-tint));
 }
 
-/* The current slot in Improvise and Read etude (SPEC §3.3, §3.4): a solid highlight, distinct from Write etude's tint. */
+/* The current slot in Improvise and Read etude (SPEC §3.3, §3.4): Write etude's active-slot blue. */
 .slot.active.playing {
-  --slot-tint: rgba(255, 190, 40, 0.32);
+  --slot-tint: rgba(47, 111, 219, 0.08); /* the same blue as Write etude's active slot */
 }
 
 /* Active slot (drives the docked hex): a light tint across the slot. Its key mates light only their key pills. */
@@ -452,18 +452,25 @@ button.dock-label {
   pointer-events: none;
 }
 
-/* Read etude (SPEC §3.4): continuous stave — borderless cards, staff-level bar lines, lines across gaps. */
-.main.read .slot:not(.lead) {
+/* Write etude and Read etude (SPEC §3.2, §3.4): one continuous stave — no cards (borderless), the staff bridging the
+   gaps and running on from the clef. Read etude's bar lines span the staff only; Write etude's keep the bar strip. */
+:is(.main.read, .main.write) .slot:not(.lead) {
   border: none;
   border-radius: 0;
   overflow: visible;
 }
-.main.read .slot.bar-first,
-.main.read .slot.bar-second {
+:is(.main.read, .main.write) .slot.bar-first,
+:is(.main.read, .main.write) .slot.bar-second {
   border: none;
   border-radius: 0;
 }
-.main.read .slot:not(.lead) .slot-body {
+/* No border: the bar line sits a slot-gap past the slot's edge, and reaches up through the bar strip. */
+.main.write .bar-line {
+  top: calc(-1 * var(--row-gap));
+  right: calc(-1 * (var(--slot-gap) + var(--bar-line)));
+  z-index: 0;
+}
+:is(.main.read, .main.write) .slot:not(.lead) .slot-body {
   overflow: visible;
   position: relative;
   z-index: 1; /* staff bridges draw over the bar line, not under it */
@@ -480,13 +487,13 @@ button.dock-label {
   z-index: 0;
 }
 /* SVG staff bridges can spill into gaps; don’t clip them horizontally. */
-.main.read .chart-fit {
+:is(.main.read, .main.write) .chart-fit {
   overflow-x: visible;
 }
-.main.read .clef-gutter {
+:is(.main.read, .main.write) .clef-gutter {
   overflow: visible;
 }
-.main.read .clef-gutter .vex-host {
+:is(.main.read, .main.write) .clef-gutter .vex-host {
   position: relative;
   z-index: 1;
 }
@@ -1630,10 +1637,6 @@ button.dock-label {
 }
 /* …and the lead sheet's cards keep the original white paper on it (their highlights tint over it), lifted off the
    background by a light shadow. */
-/* Improvise's current slot: the same blue tint as Write etude's active slot (not Read etude's amber). */
-.main.improvise .slot.lead.active.playing {
-  --slot-tint: rgba(47, 111, 219, 0.08);
-}
 .main.improvise .slot.lead {
   --slot-paper: var(--bg);
   box-shadow: 0 1px 2px rgba(29, 27, 25, 0.06), 0 2px 8px rgba(29, 27, 25, 0.08);

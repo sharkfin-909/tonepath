@@ -61,8 +61,17 @@ describe('chart zoom fit', () => {
     expect(headerPx(1, READ)).toBeLessThanOrEqual(headerPx(1, READ_SCALES));
   });
 
-  it("Read etude's cards are borderless: no border counted in its rows", () => {
-    expect(slotChromePx(WRITE) - slotChromePx(READ)).toBe(2);
+  it("only Improvise's lead sheet has bordered cards: Write and Read etude's continuous staves count none", () => {
+    expect(slotChromePx(LEAD) - slotChromePx(READ)).toBe(2);
+    expect(slotChromePx(WRITE)).toBe(slotChromePx(READ));
+  });
+
+  it('the clef gutter\'s stave starts where the slots\' do: their padding, border and header', () => {
+    const top = (look: ChartLook) => {
+      const l = chartLayout(2, STAVE, 400, look);
+      return l.staveTop - l.header;
+    };
+    expect([top(WRITE), top(READ), top(LEAD)]).toEqual([6, 6, 7]); // 6px top padding, + Improvise's 1px card border
   });
 });
 

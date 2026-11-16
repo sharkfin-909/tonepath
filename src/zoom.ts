@@ -50,8 +50,8 @@ export const labelPx = (base: number, min: number, z: number) => Math.max(base, 
 
 const isRead = (look: ChartLook) => look.kind === 'read';
 const rowGapPx = (look: ChartLook) => (isRead(look) ? ROW_GAP_READ_PX : ROW_GAP_PX);
-/** Read etude's cards are borderless (one continuous stave). */
-const borderPx = (look: ChartLook) => (isRead(look) ? 0 : SLOT_BORDER_PX);
+/** Write etude's and Read etude's bars are borderless (one continuous stave); only Improvise's lead sheet has cards. */
+const borderPx = (look: ChartLook) => (look.kind === 'lead' ? SLOT_BORDER_PX : 0);
 /** What a card adds to a row's height besides the header and stave: its top padding and top + bottom border. */
 export const slotChromePx = (look: ChartLook) => SLOT_PAD_TOP_PX + 2 * borderPx(look);
 
@@ -123,6 +123,8 @@ export interface ChartLayout extends Fit {
   rowGap: number;
   /** A slot card's logical height (header + stave + chrome; Improvise's capped, `slotHeightPx`). */
   slotHeight: number;
+  /** Where a slot's stave starts below the row's top (its top padding, border and header): the clef gutter's too. */
+  staveTop: number;
   /** Improvise's 3-row slot (SPEC §3.3): the hex's height — what the two label rows leave of the usual slot height. */
   leadHexHeight: number;
   /** The CSS variables the chart sets for styles.css. */
@@ -148,6 +150,7 @@ export function chartLayout(rows: number, staveHeight: number, height: number, l
     scalePx,
     rowGap,
     slotHeight,
+    staveTop: SLOT_PAD_TOP_PX + borderPx(look) + header,
     leadHexHeight,
     vars: {
       '--row-gap': `${rowGap}px`,
