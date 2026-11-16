@@ -10,7 +10,10 @@ export const SCALE_PX = 11;
 export const HEADER_PX = 48;
 export const MIN_CHORD_PX = 11;
 export const MIN_SCALE_PX = 9;
-export const ROW_GAP_PX = 8;
+/** Logical gap between chart rows: room for each bar's trash can, under the bar (SPEC §3.1). */
+export const ROW_GAP_PX = 32;
+/** Logical gap between slots in a row (each slot a card); the bar line sits in the middle of the gap after a bar. */
+export const SLOT_GAP_PX = 10;
 
 /** Logical font size that renders at least `min` px at zoom z. */
 export const labelPx = (base: number, min: number, z: number) => Math.max(base, min / z);
@@ -24,7 +27,8 @@ export function headerPx(z: number): number {
 
 /** Rendered height of `rows` rows at zoom z. */
 export function chartHeight(rows: number, staveHeight: number, z: number): number {
-  return z * (rows * (headerPx(z) + staveHeight) + Math.max(0, rows - 1) * ROW_GAP_PX);
+  // A row gap after every row, the last too: room for the last row's trash cans (SPEC §3.1).
+  return z * (rows * (headerPx(z) + staveHeight) + rows * ROW_GAP_PX);
 }
 
 export interface Fit {

@@ -15,7 +15,7 @@ import { LeadTones } from './LeadTones';
 import { keyName, keyOf, sameKey } from '../key';
 import { prettyName } from '../spelling';
 
-import { CHORD_PX, MIN_CHORD_PX, MIN_SCALE_PX, ROW_GAP_PX, SCALE_PX, chartHeight, fitZoom, headerPx, labelPx } from '../zoom';
+import { CHORD_PX, MIN_CHORD_PX, MIN_SCALE_PX, ROW_GAP_PX, SCALE_PX, SLOT_GAP_PX, chartHeight, fitZoom, headerPx, labelPx } from '../zoom';
 
 const GUTTER_WIDTH = 46;
 
@@ -123,6 +123,8 @@ export function Chart({ progression, view, caret, onSlotClick, onEventClick, onT
     width: area.width / zoom,
     transform: `scale(${zoom})`,
     gap: ROW_GAP_PX,
+    '--row-gap': `${ROW_GAP_PX}px`,
+    '--slot-gap': `${SLOT_GAP_PX}px`,
     '--chord-px': `${labelPx(CHORD_PX, MIN_CHORD_PX, zoom)}px`,
     '--scale-px': `${labelPx(SCALE_PX, MIN_SCALE_PX, zoom)}px`,
   } as CSSProperties;

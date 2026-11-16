@@ -295,16 +295,22 @@ button.dock-label {
   display: flex;
   flex-direction: column;
   transform-origin: 0 0;
+  /* Room under the last row for its trash cans (the row gap; chartHeight counts it). */
+  padding-bottom: var(--row-gap, 24px);
 }
 
+/* Each slot is a card (SPEC §3.1): --slot-gap between slots, --row-gap between rows (set from zoom.ts). */
 .chart-row {
   display: grid;
+  column-gap: var(--slot-gap, 10px);
 }
 
 .slot {
   position: relative;
   min-width: 0;
-  /* Rounded: the current slot's tint, the playhead and the bar selection's outline. */
+  /* A card: a light rounded border; the current slot's tint, the playhead and the selection fill it. */
+  box-sizing: border-box;
+  border: 1px solid rgba(29, 27, 25, 0.16);
   border-radius: 10px;
 }
 
@@ -417,12 +423,12 @@ button.dock-label {
 }
 
 /* Bar lines span the staff only (no line between two chords in a bar). */
-/* A bar line at the end of each bar: the slot's full height (chord labels to the stave's headroom), 2.5px. */
+/* A bar line at the end of each bar: the slot's full height, 2.5px, in the middle of the gap after the bar's card. */
 .bar-line {
   position: absolute;
   top: 0;
   bottom: 0;
-  right: 0;
+  right: calc(-1px - var(--slot-gap, 10px) / 2 - 1.25px);
   width: 2.5px;
   background: var(--line);
   pointer-events: none;
@@ -1047,15 +1053,18 @@ button.dock-label {
 }
 
 /* Delete bar (SPEC §3.1): a trash can at each bar's bottom right; faint until the bar is hovered or current. */
+/* The bar's trash can: outside the cards, in the row gap under the bar's end (it deletes the bar, not a slot). */
 .delete-bar {
   position: absolute;
-  right: 6px;
-  bottom: 2px;
+  right: -1px;
+  /* Centred in the row gap; sized with the chord label (zoom-proof), like the other small buttons. */
+  font-size: var(--chord-px, 14px);
+  bottom: calc(-1px - var(--row-gap, 32px) / 2 - 0.65em);
   z-index: 5;
   display: grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
+  width: 1.3em;
+  height: 1.3em;
   padding: 0;
   border: none;
   border-radius: 4px;
@@ -1063,6 +1072,10 @@ button.dock-label {
   color: var(--muted);
   opacity: 0.35;
   cursor: pointer;
+}
+.delete-bar svg {
+  width: 0.9em;
+  height: 0.9em;
 }
 .slot:hover .delete-bar,
 .slot.active .delete-bar,
