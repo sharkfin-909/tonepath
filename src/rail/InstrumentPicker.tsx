@@ -14,7 +14,7 @@ export function InstrumentPicker({ instrument, concertClef, onInstrument, onConc
     <div className="instrument-picker">
       {instrument === 'concert' && (
         <div className="rail-setting">
-          <span className="rail-label">Clef</span>
+          <span className="pill-label">Clef</span>
           <Dropdown
             value={concertClef}
             label="Clef"
@@ -26,7 +26,7 @@ export function InstrumentPicker({ instrument, concertClef, onInstrument, onConc
           />
         </div>
       )}
-      <span className="rail-label ins-label">Ins:</span>
+      <span className="pill-label ins-label">Ins:</span>
       <Dropdown value={instrument} label="Instrument" className="instrument-select" options={INSTRUMENTS.map((i) => ({ value: i.id, label: i.name }))} onChange={onInstrument} />
     </div>
   );

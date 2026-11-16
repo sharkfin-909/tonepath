@@ -18,17 +18,17 @@ export function ChordBumpControls({
 }) {
   if (!slot) return null;
   return createPortal(
-    <div className={on ? 'chord-bump well group on' : 'chord-bump well group'}>
+    <div className={on ? 'chord-bump pill on' : 'chord-bump pill'}>
       <button
         type="button"
         role="switch"
         aria-checked={on}
         aria-label="Chord bump"
-        className={on ? 'switch chord-bump-toggle on' : 'switch chord-bump-toggle'}
+        className={on ? 'switch chip chord-bump-toggle on' : 'switch chip chord-bump-toggle'}
         title={on ? 'Chord bump: advance the form after hex note picks' : 'Chord bump off'}
         onClick={() => onToggle(!on)}
       >
-        <span className="chord-bump-label">chord bump</span>
+        <span className="chord-bump-label pill-label">chord bump</span>
         <span className="switch-track" aria-hidden>
           <span className="switch-knob" />
         </span>

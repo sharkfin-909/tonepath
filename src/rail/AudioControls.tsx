@@ -15,20 +15,20 @@ export function AudioControls({ muted, onToggleMute, onChord, onBass, onScale, n
     <div className="audio-controls">
       <button
         type="button"
-        className={muted ? 'rail-button mute on' : 'rail-button mute'}
+        className={muted ? 'rail-button chip mute on' : 'rail-button chip mute'}
         aria-pressed={muted}
         title={muted ? 'Sound off (⇧M)' : 'Sound on (⇧M)'}
         onClick={onToggleMute}
       >
         <span aria-hidden>{muted ? '🔇' : '🔊'}</span> {muted ? 'Muted' : 'Sound'}
       </button>
-      <button type="button" className="rail-button" title="Play the chord (C)" disabled={noChord} onClick={onChord}>
+      <button type="button" className="rail-button chip" title="Play the chord (C)" disabled={noChord} onClick={onChord}>
         ▶ Chord
       </button>
-      <button type="button" className="rail-button" title="Play the bass (B)" disabled={noChord} onClick={onBass}>
+      <button type="button" className="rail-button chip" title="Play the bass (B)" disabled={noChord} onClick={onBass}>
         ▶ Bass
       </button>
-      <button type="button" className="rail-button" title="Play the scale (S or ⇧Space)" disabled={noChord} onClick={onScale}>
+      <button type="button" className="rail-button chip" title="Play the scale (S or ⇧Space)" disabled={noChord} onClick={onScale}>
         ▶ Scale
       </button>
     </div>

@@ -18,19 +18,7 @@
   --panel-glow: inset 0 0 28px color-mix(in srgb, var(--grid-glow) 38%, transparent);
   --line: #1d1b19;
   --divider: #8c8680;
-  /* Groups (SPEC §3.1): every outlined pill — the header's sound, editing, form, transport, mode and Ins: pills. Tweak here. */
-  --group-height: 28px;
-  --group-radius: 14px;
-  --group-pad-x: 8px;
-  --group-gap: 6px;
-  --group-border: 1px solid rgba(255, 255, 255, 0.3);
-  --group-bg: rgba(255, 255, 255, 0.08);
-  /* Wells: the dark recessed boxes above the hex — the tuner and Listen's input level. */
-  --well-height: 30px;
-  --well-radius: 14px;
-  --well-pad-x: 12px;
-  --well-bg: rgba(0, 0, 0, 0.22);
-  --well-edge: rgba(255, 255, 255, 0.12);
+  /* Pills (every outlined pill and the controls in them): tokens in pills.css. */
   /* Active slot, playhead, loop band, caret, key pills — every mode (`src/theme.ts`). */
   --highlight: #dca021;
   --focus: var(--highlight);
@@ -770,24 +758,8 @@ button.dock-label {
   gap: 2px;
 }
 
-.latch-button {
-  border: 1px solid transparent;
-  background: none;
-  padding: 4px 6px;
-  border-radius: 4px;
-  font: inherit;
-  font-size: 13px;
-  text-align: left;
-  color: var(--ink);
-  cursor: pointer;
-}
-
-.latch-button:hover {
-  background: rgba(0, 0, 0, 0.05);
-}
-
+/* .latch-button: a .chip (pills.css); the latched one also gets the highlight outline. */
 .latch-button.on {
-  background: #fff;
   border-color: var(--focus);
   font-weight: 600;
 }
@@ -806,10 +778,6 @@ button.dock-label {
 }
 
 @keyframes latch-flash {
-  0%,
-  100% {
-    background: #fff;
-  }
   40% {
     background: #fde2e1;
     border-color: #c62828;
@@ -842,22 +810,7 @@ button.dock-label {
   gap: 2px;
 }
 
-.rail-button {
-  border: 1px solid transparent;
-  background: none;
-  padding: 4px 6px;
-  border-radius: 4px;
-  font: inherit;
-  font-size: 13px;
-  text-align: left;
-  color: var(--ink);
-  cursor: pointer;
-}
-
-.rail-button:hover {
-  background: rgba(0, 0, 0, 0.05);
-}
-
+/* .rail-button: a .chip (pills.css). */
 .rail-button.mute.on {
   color: var(--muted);
 }
@@ -879,16 +832,6 @@ button.dock-label {
 .undo-controls {
   display: flex;
   gap: 2px;
-}
-
-.rail-button:disabled {
-  color: var(--muted);
-  opacity: 0.5;
-  cursor: default;
-}
-
-.rail-button:disabled:hover {
-  background: none;
 }
 
 /* Rail settings (SPEC §3.1). */
@@ -927,7 +870,6 @@ button.dock-label {
 }
 
 .time-sig {
-  font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -940,7 +882,6 @@ button.dock-label {
   flex-wrap: wrap;
   align-items: center;
   gap: 2px 6px;
-  font-size: 13px;
 }
 
 .rail-setting .inline-value,
@@ -948,11 +889,6 @@ button.dock-label {
   flex: 1;
   min-width: 0;
   margin: 0;
-}
-
-.rail-label {
-  color: var(--muted);
-  font-size: 12px;
 }
 
 .rail-note {
@@ -1315,6 +1251,8 @@ button.dock-label {
 /* The mode panel (SPEC §3.1): the Mode dropdown, always visible. */
 .mode-panel {
   flex: none;
+  display: flex;
+  align-items: center;
 }
 .mode-field {
   display: inline-flex;
@@ -1327,40 +1265,7 @@ button.dock-label {
   position: relative;
   display: inline-flex;
 }
-.dropdown-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-height: 22px;
-  padding: 0 7px;
-  border-radius: 11px;
-  border: 1px solid transparent;
-  background: rgba(255, 255, 255, 0.1);
-  color: inherit;
-  font: inherit;
-  font-size: 12px;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.dropdown-trigger:hover:not(:disabled),
-.dropdown-trigger[aria-expanded='true'] {
-  background: rgba(255, 255, 255, 0.18);
-}
-.dropdown-trigger:focus-visible {
-  outline: 2px solid var(--grid-glow);
-  outline-offset: 1px;
-}
-.dropdown-trigger:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-.mode-panel .dropdown-trigger {
-  background: none;
-  padding: 0 6px;
-}
-.dropdown-prefix {
-  opacity: 0.75;
-}
+/* The trigger is a .chip (.chip--filled unless `bare`), its prefix a .pill-label (pills.css). */
 /* Every picker's value in one weight (SPEC §3.1): regular — the labels beside them stay lighter. */
 .dropdown-value {
   font-weight: 400;
@@ -1726,10 +1631,10 @@ button.dock-label {
 .library-close {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: var(--pill-h);
+  height: var(--pill-h);
   margin-left: 4px;
-  border: var(--group-border);
+  border: var(--pill-border);
   border-radius: 50%;
   background: none;
   color: var(--ink);
@@ -1743,8 +1648,9 @@ button.dock-label {
   border: 1px solid var(--ink);
   background: var(--ink);
   color: var(--dock-bg);
-  padding: 5px 14px;
-  border-radius: 999px;
+  min-height: var(--pill-h);
+  padding: 0 14px;
+  border-radius: var(--pill-radius);
   font: inherit;
   font-size: 14px;
   cursor: pointer;
@@ -1812,7 +1718,7 @@ button.dock-label {
   font: inherit;
   font-size: 15px;
   padding: 4px 6px;
-  border: var(--group-border);
+  border: var(--pill-border);
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.06);
   color: var(--ink);
@@ -1873,11 +1779,15 @@ button.dock-label {
   gap: 6px;
 }
 
+/* Library buttons take the pill's shape and height (pills.css); the library keeps its own type sizes. */
 .library-tool {
-  border: var(--group-border);
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--pill-h);
+  border: var(--pill-border);
   background: none;
-  padding: 5px 12px;
-  border-radius: 999px;
+  padding: 0 12px;
+  border-radius: var(--pill-radius);
   font: inherit;
   font-size: 13px;
   color: var(--ink);
@@ -1989,28 +1899,8 @@ button.dock-label {
   left: 50%;
   transform: translateX(-50%);
   z-index: 2;
-  /* A group like every other pill (SPEC §3.1): light text on the dark panel. */
-  color: #f3eee6;
-  font-size: 12px;
 }
-.octave-step {
-  /* A chevron icon, centred in the pill. */
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  align-self: stretch;
-  border: none;
-  background: none;
-  font: inherit;
-  line-height: 1;
-  padding: 0 6px;
-  cursor: pointer;
-  color: inherit;
-}
-.octave-step:disabled {
-  opacity: 0.3;
-  cursor: default;
-}
+/* .octave-step: a .chip--icon (pills.css). */
 .octave-name {
   min-width: 56px;
   text-align: center;
@@ -2024,10 +1914,6 @@ button.dock-label {
 }
 
 /* Header on the dark panel colour: controls that used dark-on-light fills. */
-.topbar .rail-button:hover,
-.topbar .latch-button.on {
-  background: rgba(255, 255, 255, 0.16);
-}
 
 /* The header and the hex panel: an inner glow in the grid glow's colour. */
 .topbar,
@@ -2045,52 +1931,6 @@ input,
 select,
 textarea {
   font-family: inherit;
-}
-
-/* Groups and wells: the shared look (tokens in :root). Each group's own rule only adds layout specifics. */
-.group {
-  display: flex;
-  align-items: center;
-  gap: var(--group-gap);
-  box-sizing: border-box;
-  height: var(--group-height);
-  padding: 0 var(--group-pad-x);
-  border-radius: var(--group-radius);
-  border: var(--group-border);
-  background: var(--group-bg);
-}
-/* Group text in lowercase (labels, buttons, dropdown values and their options). */
-.group,
-.group button,
-.group select,
-.group option {
-  text-transform: lowercase;
-}
-/* Every group and well flashes when it appears (a mode switch swaps the editing pill for the form group or the
-   transport bar) and when one of its controls is used (App replays it). */
-.group,
-.well {
-  animation: group-flash 600ms ease-out;
-}
-@keyframes group-flash {
-  from {
-    box-shadow: 0 0 0 0 var(--grid-glow);
-    background: color-mix(in srgb, var(--grid-glow) 45%, transparent);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .group,
-  .well {
-    animation: none;
-  }
-}
-.well {
-  box-sizing: border-box;
-  height: var(--well-height);
-  padding: 0 var(--well-pad-x);
-  border-radius: var(--well-radius);
-  background: var(--well-bg);
-  box-shadow: inset 0 0 0 1px var(--well-edge);
 }
 
 /* App tooltips (Tooltips.tsx): a small dark label under the hovered element (above it near the window's bottom). */
@@ -2127,24 +1967,12 @@ select {
   filter: drop-shadow(0 0 1.5px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 3px rgba(255, 255, 255, 0.5));
 }
 
-/* Grid toggle (SPEC §8.5): the bottom left corner of the hex panel. On = the honeycomb; off = Linear. */
+/* Grid toggle (SPEC §8.5), a .pill--sm: the bottom left corner of the hex panel. On = the honeycomb; off = Linear. */
 .grid-toggle {
   position: absolute;
   left: 10px;
   bottom: 10px;
   z-index: 2;
-  padding: 2px 8px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background: rgba(255, 255, 255, 0.08);
-  color: #f3eee6;
-  font: inherit;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.grid-toggle:hover {
-  background: rgba(255, 255, 255, 0.16);
 }
 .grid-toggle.on {
   background: #f3eee6;
@@ -2158,18 +1986,6 @@ select {
   right: 10px;
   bottom: 10px;
   z-index: 6;
-  padding: 2px 8px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background: rgba(255, 255, 255, 0.08);
-  color: #f3eee6;
-  font: inherit;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.hex-hide-toggle:hover {
-  background: rgba(255, 255, 255, 0.16);
 }
 /* Hidden: the chart takes the screen; the toggle sits on the light chart, so it goes dark-on-light. */
 .main.hex-hidden {
@@ -2223,33 +2039,21 @@ select {
 .sound-bar .transport-bar {
   flex-wrap: wrap;
   justify-content: center;
-  height: auto;
   max-width: 100%;
   min-width: 0;
+}
+/* The bottom stack floats over the chart and the hex: every pill in it is opaque. */
+.sound-bar .pill {
+  background: var(--pill-bg-solid);
 }
 .sound-bar .clear-menu {
   top: auto;
   bottom: calc(100% + 4px);
 }
+/* The sound pill (.pill--solid: it sits over the chart), in Outfit Thin throughout. */
 .sound-section {
   flex-wrap: nowrap;
-  background: var(--dock-bg);
-}
-.sound-bar .sound-section,
-.sound-bar .sound-section .rail-button,
-.sound-bar .sound-section .rail-label,
-.sound-bar .sound-section select {
   font-weight: 100;
-  font-size: 12px;
-}
-.sound-bar .sound-section .audio-controls .rail-button {
-  padding: 3px 4px;
-}
-.sound-bar .on-arrival select {
-  width: 132px;
-}
-.sound-bar .rail-button:hover {
-  background: rgba(255, 255, 255, 0.16);
 }
 /* The menu opens upward: the pill sits on the bottom edge of the screen. */
 .sound-bar .dropdown-menu {
@@ -2262,30 +2066,14 @@ select {
 .edit-pill {
   min-width: 0;
 }
-.topbar .edit-pill .latch-button {
-  padding-block: 1px;
-}
 
 /* Stepwise playback ‹ › (beside undo / redo). */
 .step-controls {
   display: inline-flex;
   align-items: center;
 }
-/* Icon-only header buttons (undo / redo): the standard curved-arrow icons. */
-.rail-button.icon-button {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 5px;
-}
-.rail-button.icon-button:disabled {
-  opacity: 0.35;
-  cursor: default;
-}
-
 /* Length latch: note icons with their key (SPEC §3.1). */
 .latch-button {
-  display: inline-flex;
-  align-items: center;
   gap: 2px;
 }
 .latch-button .latch-key {
@@ -2414,18 +2202,10 @@ select {
   margin-right: -4px;
 }
 
-/* The Ins: label in Outfit Thin, like the title and the sound pill (its value: every picker's weight). */
-.topbar .ins-label {
-  font-weight: 100;
-}
-
 .topbar .instrument-select .dropdown-value {
   max-width: 104px;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.topbar .latch-button {
-  padding: 4px 4px;
 }
 .topbar {
   column-gap: 8px;
@@ -2461,28 +2241,12 @@ select {
   .topbar .mode-groups {
     flex-wrap: wrap;
   }
-  /* Groups may wrap here: they grow instead of keeping one row's height. */
-  .topbar .group {
-    height: auto;
-    min-height: var(--group-height);
-  }
-  .topbar .rail-label {
-    white-space: nowrap;
-  }
 }
 
-/* Touch screens: bigger targets in the header and on the hex panel's buttons. */
+/* Touch screens: bigger menu rows (chips grow through their tokens, pills.css). */
 @media (hover: none) and (pointer: coarse) {
-  .topbar .rail-button,
-  .topbar .latch-button,
-  .topbar .dropdown-trigger {
-    min-height: 34px;
-  }
   .dropdown-option {
     padding-block: 12px;
-  }
-  .octave-step {
-    padding: 4px 12px;
   }
 }
 
@@ -2604,14 +2368,11 @@ select {
   display: none;
 }
 
-/* While listening: the input level control and meter, in a pill as tall as the tuner (30px). */
+/* While listening: the input level control and meter, in a pill. */
 .listen-levels {
   display: inline-flex;
   flex: none;
-  align-items: center;
   gap: 8px;
-  color: #f3eee6;
-  font-size: 12px;
   white-space: nowrap;
 }
 .listen-meter {
@@ -2646,9 +2407,6 @@ select {
   flex: none;
   align-items: center;
   gap: 3px;
-}
-.listen-gain-label {
-  opacity: 0.75;
 }
 .listen-gain input[type='range'] {
   /* A small knob on a thin track. */
@@ -2697,12 +2455,10 @@ select {
 }
 /* The tuner's place when there is no tuner to show (SPEC §3.0): tap to start listening, or why the mic can't be used. */
 .tuner.tuner-message {
-  display: block;
+  display: flex;
+  justify-content: center;
   padding: 0 16px;
-  line-height: 30px;
-  font-size: 12px;
   text-align: center;
-  color: #f3eee6;
 }
 .tuner.tuner-message[role='alert'] {
   color: #ffb4a8;
@@ -2710,8 +2466,6 @@ select {
 
 /* The transport bar (SPEC §3.7), centred in the header's second row; and the target rings on the hex. */
 .transport-bar {
-  color: #f3eee6;
-  font-size: 12px;
   color-scheme: dark;
 }
 .transport-field {
@@ -2719,9 +2473,6 @@ select {
   align-items: center;
   gap: 5px;
   white-space: nowrap;
-}
-.transport-label {
-  opacity: 0.75;
 }
 /* The transport's tempo field (bpm): no spinner, so three digits fit. */
 .transport-bpm::-webkit-outer-spin-button,
@@ -2735,34 +2486,20 @@ select {
   -moz-appearance: textfield;
   appearance: textfield;
   font: inherit;
-  font-size: 12px;
+  min-height: var(--chip-h);
   padding: 0 4px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: var(--pill-radius);
+  border: var(--pill-border);
   background: rgba(0, 0, 0, 0.2);
   color: inherit;
   text-align: center;
 }
-/* Switch (SPEC §3.7 loop): label or icon, then a track whose knob slides right when on. */
-.switch {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 2px 4px;
-  border: none;
-  border-radius: 10px;
-  background: none;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-.switch:focus-visible {
-  outline: 2px solid var(--grid-glow);
-  outline-offset: 1px;
+/* Switch (SPEC §3.7 loop), a .chip: label or icon, then a track whose knob slides right when on. */
+.switch.on {
+  background: none; /* the track shows it's on, not a chip fill */
 }
 .transport-scales-label {
   opacity: 0.55;
-  font-size: 12px;
   transition: opacity 120ms ease;
 }
 .transport-scales.on .transport-scales-label {
@@ -2818,10 +2555,10 @@ select {
   align-items: center;
   justify-content: space-between;
   gap: 2px;
+  min-height: var(--chip-h);
   padding: 0 2px 0 8px;
-  border-radius: 10px;
+  border-radius: var(--pill-radius);
   background: rgba(255, 255, 255, 0.06);
-  font-size: 12px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -2835,19 +2572,11 @@ select {
 .transport-bars.looping {
   background: rgba(255, 255, 255, 0.14);
 }
+/* × : a .chip, a little smaller than the bar it sits in. */
 .transport-bars-clear {
-  border: none;
-  background: none;
-  color: inherit;
-  font: inherit;
-  font-size: 14px;
-  line-height: 1;
+  min-height: calc(var(--chip-h) - 4px);
   padding: 0 5px;
-  border-radius: 8px;
-  cursor: pointer;
-}
-.transport-bars-clear:hover {
-  background: rgba(255, 255, 255, 0.18);
+  font-size: 14px;
 }
 .hex-target {
   fill: none;
@@ -2982,7 +2711,7 @@ select {
   }
   /* Bottom up: the tuner, then the bottom stack (sound pill, the mode's groups), then the input level. */
   .layout-c:has(.main.hex-hidden .listen-row .tuner) > .sound-bar {
-    bottom: calc(6px + var(--well-height) + 8px); /* the listen row's padding, the tuner, a gap */
+    bottom: calc(6px + var(--pill-h) + 8px); /* the listen row's padding, the tuner, a gap */
   }
   .main.hex-hidden .listen-row > .levels-slot {
     margin-bottom: calc(var(--sound-bar-h, 0px) + 10px); /* + the row's 6px gap: 8px clear of the bottom stack */
@@ -2991,36 +2720,27 @@ select {
 /* Improvise: chord bump at the listen row's right — hex picks per slot before advancing. */
 .chord-bump {
   display: inline-flex;
-  align-items: center;
   gap: 8px;
   flex-wrap: nowrap;
-  color: #f3eee6;
-  font-size: 12px;
   white-space: nowrap;
 }
 .chord-bump-toggle {
   gap: 8px;
-  padding: 0;
-}
-.chord-bump-label {
-  font-weight: 100;
 }
 /* notes: picker stays in the layout when off so the row doesn't jump on toggle (SPEC §9.2). */
 .chord-bump:not(.on) .chord-bump-notes {
   visibility: hidden;
   pointer-events: none;
 }
-.chord-bump .chord-bump-notes .dropdown-trigger {
-  font-size: 12px;
-}
 
 /* The big tuner (SPEC §9.2): note, a ±50 ¢ scale with a needle, the cents off. */
+/* A .pill (pills.css); note names keep their case. */
 .tuner {
   display: grid;
   grid-template-columns: auto minmax(180px, 360px) auto;
   align-items: center;
   gap: 18px;
-  color: #f3eee6;
+  text-transform: none;
   --zone: rgba(255, 255, 255, 0.5);
 }
 .tuner[data-zone='in'] {
@@ -3054,7 +2774,7 @@ select {
 }
 .tuner-scale {
   position: relative;
-  height: 30px;
+  height: calc(var(--pill-h) - 4px); /* fills the pill, inside its border */
 }
 .tuner-scale::before {
   /* the scale line */
@@ -3083,8 +2803,8 @@ select {
 }
 .tuner-tick {
   position: absolute;
-  top: 9px;
-  bottom: 9px;
+  top: 7px;
+  bottom: 7px;
   width: 1px;
   background: rgba(255, 255, 255, 0.45);
 }
@@ -3148,8 +2868,8 @@ select {
   flex: 0 1 auto;
   min-width: 0;
 }
-.seq-group > .rail-label,
-.etude-group > .rail-label {
+.seq-group > .pill-label,
+.etude-group > .pill-label {
   flex: none;
   white-space: nowrap;
 }
@@ -3186,7 +2906,6 @@ select {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.group .as-typed,
 .dropdown-option.as-typed .dropdown-option-name {
   text-transform: none;
 }
@@ -3287,11 +3006,4 @@ select {
   margin-left: auto;
   margin-right: -5px; /* its ▾ sits as close to the pill's edge as mode: sits to the other */
 }
-/* The hairline between the two halves of a combined pill (chord sequence · etude, mode · ins). */
-.group-sep {
-  flex: none;
-  align-self: stretch;
-  width: 1px;
-  margin: 6px 2px;
-  background: rgba(255, 255, 255, 0.25);
-}
+

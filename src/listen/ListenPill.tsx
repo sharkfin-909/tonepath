@@ -135,14 +135,14 @@ export function ListenPill({ onHeard, nameOf, onNote, auto = false, tunerSlot = 
   return (
     <>
     {on && !held && tunerSlot && createPortal(<Tuner name={frame.midi === null ? null : nameOf(frame.midi)} cents={frame.cents} />, tunerSlot)}
-    {on && held && tunerSlot && createPortal(<div className="tuner well tuner-message" role="status">tap to start listening</div>, tunerSlot)}
-    {auto && !on && asking && tunerSlot && createPortal(<div className="tuner well tuner-message" role="status">allow the microphone to start listening</div>, tunerSlot)}
-    {auto && !on && error && tunerSlot && createPortal(<div className="tuner well tuner-message" role="alert">{MIC_PROBLEM_TEXT[error]}</div>, tunerSlot)}
+    {on && held && tunerSlot && createPortal(<div className="tuner pill tuner-message" role="status">tap to start listening</div>, tunerSlot)}
+    {auto && !on && asking && tunerSlot && createPortal(<div className="tuner pill tuner-message" role="status">allow the microphone to start listening</div>, tunerSlot)}
+    {auto && !on && error && tunerSlot && createPortal(<div className="tuner pill tuner-message" role="alert">{MIC_PROBLEM_TEXT[error]}</div>, tunerSlot)}
     {/* While listening: the input level control and meter, in a pill as tall as the tuner, at the row's left end. */}
     {on && levelsSlot && createPortal(
-      <div className="listen-levels well">
+      <div className="listen-levels pill">
         <label className="listen-gain" title={`Input level ${gainDb > 0 ? '+' : ''}${gainDb} dB: playing should pass the mark, silence stay below it`}>
-          <span className="listen-gain-label">In</span>
+          <span className="listen-gain-label pill-label">In</span>
           <input
             type="range"
             min={INPUT_GAIN_DB.min}
@@ -180,7 +180,7 @@ function Tuner({ name, cents }: { name: string | null; cents: number }) {
   const showNeedle = zone === 'near' || zone === 'off';
   return (
     <div
-      className="tuner well"
+      className="tuner pill"
       data-zone={zone}
       role="status"
       title={TUNER_TITLE}

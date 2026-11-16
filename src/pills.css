@@ -1,0 +1,176 @@
+/* ── Pills (SPEC §3.1): the app chrome's one design system ─────────────────────────────────────────────────────────
+   Every pill — the header's mode · ins and chord sequence · etude, the sound pill, the editing pill, the form group,
+   the transport bar, the tuner, the input level, chord bump, the octave switch, Grid and Hide hex — is a `.pill`,
+   and every control inside one is a `.chip`. Their sizes, shape and type are the tokens below; tweak them here, and
+   tweak them per screen size in the responsive block at the end, not in the component rules (styles.css), which only
+   lay things out. Loaded before styles.css, so component layout rules win where they overlap.
+
+   .pill          an outlined pill: a row of controls, fully rounded, lowercase; flashes when it appears or is used
+   .pill--solid   opaque, for a pill over the chart (the sound pill)
+   .pill--sm      a small standalone pill button (Grid, Hide hex)
+   .pill-sep      the hairline between two halves of one pill (mode | ins, chord sequence | etude)
+   .pill-label    a pill's Thin label (chord sequence:, etude:, ins:, audio on chord, chord bump, in, bpm …)
+   .chip          a control inside a pill: buttons, dropdown triggers, switches; no fill until hovered
+   .chip--filled  a chip with a resting fill (dropdown triggers)
+   .chip--icon    an icon-only chip (undo / redo, step, rewind, octave ‹ ›)
+   .chip.on       a latched chip (note length, rest)
+   ───────────────────────────────────────────────────────────────────────────────────────────────────────────────── */
+:root {
+  /* The pill */
+  --pill-h: 28px; /* a pill's height (its minimum: a pill that wraps grows) */
+  --pill-pad-x: 8px;
+  --pill-gap: 6px;
+  --pill-radius: 999px; /* always fully rounded */
+  --pill-border: 1px solid rgba(255, 255, 255, 0.3);
+  --pill-bg: rgba(255, 255, 255, 0.08);
+  --pill-bg-solid: var(--dock-bg);
+  --pill-ink: #f3eee6;
+  --pill-font: 12px;
+  --pill-label-weight: 100; /* Outfit Thin */
+  --pill-label-ink: #b8afa3;
+  --pill-sep: rgba(255, 255, 255, 0.25);
+  /* Small standalone pills */
+  --pill-sm-h: 20px;
+  --pill-sm-pad-x: 8px;
+  --pill-sm-font: 11px;
+  /* Chips: the controls inside a pill */
+  --chip-h: 22px; /* a chip's minimum height */
+  --chip-pad-x: 6px;
+  --chip-icon-w: 26px; /* an icon chip's minimum width */
+  --chip-gap: 4px;
+  --chip-bg: rgba(255, 255, 255, 0.1); /* .chip--filled at rest */
+  --chip-bg-hover: rgba(255, 255, 255, 0.18);
+  --chip-bg-on: rgba(255, 255, 255, 0.16);
+  --chip-focus: var(--grid-glow);
+  /* Touch */
+  --touch-min: 34px;
+}
+
+/* ── .pill ── */
+.pill {
+  display: flex;
+  align-items: center;
+  gap: var(--pill-gap);
+  box-sizing: border-box;
+  min-height: var(--pill-h);
+  padding: 0 var(--pill-pad-x);
+  border-radius: var(--pill-radius);
+  border: var(--pill-border);
+  background: var(--pill-bg);
+  color: var(--pill-ink);
+  font-size: var(--pill-font);
+  line-height: 1.2;
+  animation: pill-flash 600ms ease-out; /* when it appears; App replays it when one of its controls is used */
+}
+/* Lowercase throughout (labels, buttons, dropdown values and their options), except text shown as typed. */
+.pill,
+.pill button,
+.pill select,
+.pill option {
+  text-transform: lowercase;
+}
+.pill .as-typed {
+  text-transform: none;
+}
+@keyframes pill-flash {
+  from {
+    box-shadow: 0 0 0 0 var(--grid-glow);
+    background: color-mix(in srgb, var(--grid-glow) 45%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pill {
+    animation: none;
+  }
+}
+.pill--solid {
+  background: var(--pill-bg-solid);
+}
+.pill--sm {
+  display: inline-flex;
+  justify-content: center;
+  min-height: var(--pill-sm-h);
+  padding: 0 var(--pill-sm-pad-x);
+  font: inherit;
+  font-size: var(--pill-sm-font);
+  font-weight: 600;
+  cursor: pointer;
+}
+button.pill--sm:hover:not(.on) {
+  background: var(--chip-bg-hover);
+}
+.pill-sep {
+  flex: none;
+  align-self: stretch;
+  width: 1px;
+  margin: 6px 2px;
+  background: var(--pill-sep);
+}
+.pill-label,
+.pill .dropdown-prefix {
+  color: var(--pill-label-ink);
+  font-weight: var(--pill-label-weight);
+  white-space: nowrap;
+}
+
+/* ── .chip ── */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--chip-gap);
+  box-sizing: border-box;
+  min-height: var(--chip-h);
+  padding: 0 var(--chip-pad-x);
+  border-radius: var(--pill-radius);
+  border: 1px solid transparent;
+  background: none;
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.chip--filled {
+  background: var(--chip-bg);
+}
+.chip:hover:not(:disabled),
+.chip[aria-expanded='true'] {
+  background: var(--chip-bg-hover);
+}
+.chip.on {
+  background: var(--chip-bg-on);
+}
+.chip:focus-visible {
+  outline: 2px solid var(--chip-focus);
+  outline-offset: 1px;
+}
+.chip:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.chip--icon {
+  min-width: var(--chip-icon-w);
+  padding: 0 4px;
+}
+
+/* ── Responsive: token overrides only (SPEC §3.6). ── */
+/* Tablet and down. */
+@media (max-width: 1024px) {
+  :root {
+    /* e.g. --pill-font: 12px; */
+  }
+}
+/* Phones. */
+@media (max-width: 640px) {
+  :root {
+    /* e.g. --pill-pad-x: 6px; --pill-gap: 4px; */
+  }
+}
+/* Touch screens: every chip at least a fingertip tall and wide; pills grow to hold them. */
+@media (hover: none) and (pointer: coarse) {
+  :root {
+    --chip-h: var(--touch-min);
+    --chip-icon-w: var(--touch-min);
+  }
+}

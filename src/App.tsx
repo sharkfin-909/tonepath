@@ -166,11 +166,11 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
     onEnd: () => dispatch({ type: 'transport-end' }),
   });
 
-  // Groups (the header's pills, the hex panel's wells) flash when one of their controls is used: replay the CSS
+  // Pills flash when one of their controls is used: replay the CSS
   // animation on the group the click or change came from.
   useEffect(() => {
     const flash = (e: Event) => {
-      const g = (e.target as Element | null)?.closest?.('.group, .well');
+      const g = (e.target as Element | null)?.closest?.('.pill');
       if (!(g instanceof HTMLElement)) return;
       g.style.animation = 'none';
       void g.offsetWidth; // restart
@@ -246,12 +246,12 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
   /** Undo / redo (SPEC §6.3): Write etude's editing pill, and Improvise's form group. */
   const undoRedo = (
         <div className="undo-controls">
-          <button type="button" className="rail-button icon-button" title="Undo (⌘Z)" aria-label="Undo" disabled={!doc.canUndo} onClick={() => dispatch({ type: 'undo' })}>
+          <button type="button" className="rail-button chip chip--icon" title="Undo (⌘Z)" aria-label="Undo" disabled={!doc.canUndo} onClick={() => dispatch({ type: 'undo' })}>
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
               <path fill="currentColor" d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z" />
             </svg>
           </button>
-          <button type="button" className="rail-button icon-button" title="Redo (⇧⌘Z)" aria-label="Redo" disabled={!doc.canRedo} onClick={() => dispatch({ type: 'redo' })}>
+          <button type="button" className="rail-button chip chip--icon" title="Redo (⇧⌘Z)" aria-label="Redo" disabled={!doc.canRedo} onClick={() => dispatch({ type: 'redo' })}>
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
               <path fill="currentColor" d="M18.4 10.6C16.55 8.99 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z" />
             </svg>
@@ -280,7 +280,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
   }, [dockedBottom, hideHex, linear, mode]);
 
   const formControls = profile.formGroup && (
-    <div className="edit-pill form-group group">
+    <div className="edit-pill form-group pill">
       <TimeSignatureField value={progression.timeSignature} onChange={(text) => dispatch({ type: 'time-signature', text })} />
       <BarsPerRow value={progression.barsPerRow} onChange={(n) => dispatch({ type: 'bars-per-row', n })} />
       {undoRedo}
@@ -306,7 +306,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
   );
 
   const editControls = profile.editPill && (
-    <div className="edit-pill group">
+    <div className="edit-pill pill">
       <LengthLatch
         value={session.length}
         onChange={(d) => dispatch({ type: 'length', d })}
@@ -320,7 +320,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
       <div className="step-controls">
         <button
           type="button"
-          className="rail-button icon-button"
+          className="rail-button chip chip--icon"
           title="Nudge the note at the caret down a scale step (↓) · ⇧-click / ⇧↓ a semitone · ⌥↓ an octave"
           aria-label="Nudge down"
           onClick={(e) =>
@@ -338,7 +338,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
         </button>
         <button
           type="button"
-          className="rail-button icon-button"
+          className="rail-button chip chip--icon"
           title="Nudge the note at the caret up a scale step (↑) · ⇧-click / ⇧↑ a semitone · ⌥↑ an octave"
           aria-label="Nudge up"
           onClick={(e) =>
@@ -356,12 +356,12 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
         </button>
       </div>
       <div className="step-controls">
-        <button type="button" className="rail-button icon-button" title="Step back: play the note before the caret, and move the caret to it" aria-label="Step back" onClick={() => dispatch({ type: 'step-play', dir: -1 })}>
+        <button type="button" className="rail-button chip chip--icon" title="Step back: play the note before the caret, and move the caret to it" aria-label="Step back" onClick={() => dispatch({ type: 'step-play', dir: -1 })}>
           <svg viewBox="0 0 12 12" width="16" height="16" aria-hidden>
             <path d="M7.5 2.5 4 6l3.5 3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
-        <button type="button" className="rail-button icon-button" title="Step forward: play the note at the caret, and move past it (` or ~)" aria-label="Step forward" onClick={() => dispatch({ type: 'step-play' })}>
+        <button type="button" className="rail-button chip chip--icon" title="Step forward: play the note at the caret, and move past it (` or ~)" aria-label="Step forward" onClick={() => dispatch({ type: 'step-play' })}>
           <svg viewBox="0 0 12 12" width="16" height="16" aria-hidden>
             <path d="M4.5 2.5 8 6 4.5 9.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -393,7 +393,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
           {transportControls}
         </div>
       )}
-      <div className="sound-section group">
+      <div className="sound-section pill pill--solid">
         <AudioControls
           muted={muted}
           onToggleMute={() => dispatch({ type: 'toggle-mute' })}
@@ -403,7 +403,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
           noChord={profile.noChord}
         />
         <div className="rail-setting on-arrival">
-          <span className="rail-label">Audio on chord</span>
+          <span className="pill-label">Audio on chord</span>
           <Dropdown
             value={session.onArrival}
             label="Audio on chord"
@@ -444,9 +444,9 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
           <span className="brand">TONEPATH</span>
         </div>
         {/* Row 1, left: the mode panel and clef (Concert) + instrument, in one pill (SPEC §3.1). */}
-        <div className="mode-ins-group group">
+        <div className="mode-ins-group pill">
           {modeSwitch}
-          <span className="group-sep" aria-hidden />
+          <span className="pill-sep" aria-hidden />
           <span className="ins-group">
             <InstrumentPicker
               instrument={view.inst.id}
@@ -459,16 +459,16 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
         {/* Row 1, right: chord sequence and etude, in one pill, then ☰ (SPEC §3.1). */}
         <div className="topbar-end">
           <div className="topbar-file">
-            <span className="file-group group">
+            <span className="file-group pill">
               <span className="seq-group">
-                <span className="rail-label">chord sequence:</span>
+                <span className="pill-label">chord sequence:</span>
                 <h1 className="rail-heading">
                   <TitleField title={progression.title} editing={renameOnOpen} onRename={(text) => dispatch({ type: 'title', text })} />
                 </h1>
               </span>
-              <span className="group-sep" aria-hidden />
+              <span className="pill-sep" aria-hidden />
               <span className="etude-group">
-                <span className="rail-label">etude:</span>
+                <span className="pill-label">etude:</span>
                 <EtudePicker
                   etudes={progression.etudes}
                   open={etude.id}
@@ -584,7 +584,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
                 {!narrow && (
                   <button
                     type="button"
-                    className={linear ? 'grid-toggle' : 'grid-toggle on'}
+                    className={linear ? 'grid-toggle pill pill--sm' : 'grid-toggle pill pill--sm on'}
                     aria-pressed={!linear}
                     title={linear ? 'Grid: show the honeycomb' : 'Grid off: one row (Linear), by octave'}
                     onClick={() => {
@@ -596,14 +596,14 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
                   </button>
                 )}
                 {linear && (
-                  <div className="octave-switch group" role="group" aria-label="Octave">
-                    <button type="button" className="octave-step" aria-label="Octave down" title="Octave down" disabled={octave <= octaves.min} onClick={() => setOctave(octave - 12)}>
+                  <div className="octave-switch pill" role="group" aria-label="Octave">
+                    <button type="button" className="octave-step chip chip--icon" aria-label="Octave down" title="Octave down" disabled={octave <= octaves.min} onClick={() => setOctave(octave - 12)}>
                       <svg viewBox="0 0 12 12" width="14" height="14" aria-hidden>
                         <path d="M7.5 2.5 4 6l3.5 3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     </button>
                     <span className="octave-name">{`oct ${octave / 12 - 1}`}</span>
-                    <button type="button" className="octave-step" aria-label="Octave up" title="Octave up" disabled={octave >= octaves.max} onClick={() => setOctave(octave + 12)}>
+                    <button type="button" className="octave-step chip chip--icon" aria-label="Octave up" title="Octave up" disabled={octave >= octaves.max} onClick={() => setOctave(octave + 12)}>
                       <svg viewBox="0 0 12 12" width="14" height="14" aria-hidden>
                         <path d="M4.5 2.5 8 6 4.5 9.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
@@ -630,7 +630,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
             {profile.hexHideable && (
               <button
                 type="button"
-                className="hex-hide-toggle"
+                className="hex-hide-toggle pill pill--sm"
                 aria-pressed={hexHidden}
                 title={hexHidden ? 'Show the hex panel' : 'Hide the hex panel'}
                 onClick={() => {
@@ -648,7 +648,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
               {!narrow && (
                 <button
                   type="button"
-                  className={linear ? 'grid-toggle' : 'grid-toggle on'}
+                  className={linear ? 'grid-toggle pill pill--sm' : 'grid-toggle pill pill--sm on'}
                   aria-pressed={!linear}
                   title={linear ? 'Grid: show the honeycomb' : 'Grid off: one row (Linear), by octave'}
                   onClick={() => {
@@ -660,14 +660,14 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
                 </button>
               )}
               {linear && (
-                <div className="octave-switch group" role="group" aria-label="Octave">
-                  <button type="button" className="octave-step" aria-label="Octave down" title="Octave down" disabled={octave <= octaves.min} onClick={() => setOctave(octave - 12)}>
+                <div className="octave-switch pill" role="group" aria-label="Octave">
+                  <button type="button" className="octave-step chip chip--icon" aria-label="Octave down" title="Octave down" disabled={octave <= octaves.min} onClick={() => setOctave(octave - 12)}>
                     <svg viewBox="0 0 12 12" width="14" height="14" aria-hidden>
                       <path d="M7.5 2.5 4 6l3.5 3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </button>
                   <span className="octave-name">{`oct ${octave / 12 - 1}`}</span>
-                  <button type="button" className="octave-step" aria-label="Octave up" title="Octave up" disabled={octave >= octaves.max} onClick={() => setOctave(octave + 12)}>
+                  <button type="button" className="octave-step chip chip--icon" aria-label="Octave up" title="Octave up" disabled={octave >= octaves.max} onClick={() => setOctave(octave + 12)}>
                     <svg viewBox="0 0 12 12" width="14" height="14" aria-hidden>
                       <path d="M4.5 2.5 8 6 4.5 9.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>

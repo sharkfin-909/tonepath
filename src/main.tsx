@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Root } from './Root';
 import { loadNotationFonts } from './notation/fonts';
+import './pills.css';
 import './styles.css';
 
 const root = createRoot(document.getElementById('root')!);

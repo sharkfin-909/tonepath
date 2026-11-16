@@ -147,8 +147,8 @@ export function LibraryScreen(props: LibraryScreenProps) {
           <p className="library-current-seq">
             <span className="library-current-label">current chord sequence:</span> <span className="library-current-title">{current.title}</span>
           </p>
-          <span className="library-current-etude group">
-            <span className="rail-label">choose etude</span>
+          <span className="library-current-etude pill">
+            <span className="pill-label">choose etude</span>
             <EtudePicker
               etudes={current.etudes}
               open={current.open}

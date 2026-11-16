@@ -30,13 +30,15 @@ export interface DropdownProps<T extends string | number> {
   /** Shown before the value on the button, e.g. "mode:". */
   prefix?: string;
   disabled?: boolean;
+  /** No resting fill on the button (a `.chip` rather than `.chip--filled`): the mode panel. */
+  bare?: boolean;
   /** Extra class on the wrapper. */
   className?: string;
   /** Under the options (e.g. the mode menu's keys). */
   footer?: ReactNode;
 }
 
-export function Dropdown<T extends string | number>({ value, options, onChange, label, prefix, disabled = false, className, footer }: DropdownProps<T>) {
+export function Dropdown<T extends string | number>({ value, options, onChange, label, prefix, disabled = false, bare = false, className, footer }: DropdownProps<T>) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const [alignRight, setAlignRight] = useState(false);
@@ -118,7 +120,7 @@ export function Dropdown<T extends string | number>({ value, options, onChange, 
       <button
         ref={button}
         type="button"
-        className="dropdown-trigger"
+        className={bare ? 'dropdown-trigger chip' : 'dropdown-trigger chip chip--filled'}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? id : undefined}

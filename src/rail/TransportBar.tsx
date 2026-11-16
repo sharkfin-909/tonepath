@@ -82,19 +82,19 @@ export function TransportBar({
   onShowScales,
 }: TransportBarProps) {
   return (
-    <div className="transport-bar group">
+    <div className="transport-bar pill">
       <label className="transport-field" title={`Tempo, in beats per minute (${BPM.min}–${BPM.max})`}>
         <BpmField bpm={bpm} onBpm={onBpm} />
-        <span className="transport-label">bpm</span>
+        <span className="transport-label pill-label">bpm</span>
       </label>
       <Dropdown value={sound} label="Click sound" options={METRONOME_SOUNDS.map((s) => ({ value: s.id, label: s.label }))} onChange={onSound} />
       <span className="step-controls">
-        <button type="button" className="rail-button icon-button" aria-label="Rewind" title="Rewind to the first chord" onClick={onRewind}>
+        <button type="button" className="rail-button chip chip--icon" aria-label="Rewind" title="Rewind to the first chord" onClick={onRewind}>
           {icon('M2 2h1.6v8H2zM10 2v8L4 6z')}
         </button>
         <button
           type="button"
-          className="rail-button icon-button"
+          className="rail-button chip chip--icon"
           aria-label={running ? 'Stop' : 'Start'}
           title={running ? 'Stop' : 'Start from this chord'}
           onClick={onStartStop}
@@ -108,7 +108,7 @@ export function TransportBar({
         role="switch"
         aria-checked={loop}
         aria-label="Loop"
-        className={loop ? 'switch transport-loop on' : 'switch transport-loop'}
+        className={loop ? 'switch chip transport-loop on' : 'switch chip transport-loop'}
         title={bars ? 'Loop: round the looped bars again at their end' : 'Loop: round the form again at its end (click bar numbers to loop just them)'}
         onClick={() => onLoop(!loop)}
       >
@@ -128,7 +128,7 @@ export function TransportBar({
           role="switch"
           aria-checked={!!showScales}
           aria-label="Show scales"
-          className={showScales ? 'switch transport-scales on' : 'switch transport-scales'}
+          className={showScales ? 'switch chip transport-scales on' : 'switch chip transport-scales'}
           title={showScales ? 'Hide scale names above each chord' : 'Show scale names above each chord'}
           onClick={() => onShowScales(!showScales)}
         >
@@ -143,7 +143,7 @@ export function TransportBar({
       <span className={bars ? 'transport-bars looping' : 'transport-bars'} role="status">
         <span className="transport-bars-text">{!bars ? 'whole form' : bars.from === bars.to ? `bar ${bars.from + 1}` : `bars ${bars.from + 1}–${bars.to + 1}`}</span>
         {bars && (
-          <button type="button" className="transport-bars-clear" aria-label="Loop the whole form" title="Loop the whole form" onClick={onAllBars}>
+          <button type="button" className="transport-bars-clear chip" aria-label="Loop the whole form" title="Loop the whole form" onClick={onAllBars}>
             ×
           </button>
         )}

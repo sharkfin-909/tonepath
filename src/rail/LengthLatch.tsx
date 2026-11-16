@@ -71,7 +71,7 @@ export function LengthLatch({ value, onChange, rest, onToggleRest, refusal, onRe
           type="button"
           role="radio"
           aria-checked={value === d}
-          className={['latch-button', value === d && 'on', refusal?.d === d && 'flash'].filter(Boolean).join(' ')}
+          className={['latch-button', 'chip', value === d && 'on', refusal?.d === d && 'flash'].filter(Boolean).join(' ')}
           onClick={() => onChange(d)}
           aria-label={`${label} (${i + 1})`}
           title={`${label} (${i + 1})`}
@@ -83,7 +83,7 @@ export function LengthLatch({ value, onChange, rest, onToggleRest, refusal, onRe
       <button
         type="button"
         aria-pressed={rest}
-        className={['latch-button', 'rest-latch', rest && 'on'].filter(Boolean).join(' ')}
+        className={['latch-button', 'chip', 'rest-latch', rest && 'on'].filter(Boolean).join(' ')}
         onClick={onToggleRest}
         title="Rest latch: length keys insert rests (R)"
         aria-label="Rest (R)"

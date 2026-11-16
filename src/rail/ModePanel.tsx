@@ -35,6 +35,7 @@ export function ModePanel({ mode, onMode }: ModePanelProps) {
       <Dropdown
         value={mode}
         label="Mode"
+        bare
         prefix="mode:"
         options={MODES.map((m) => ({ value: m, label: MODE_LABELS[m], description: MODE_INFO[m].blurb, tags: MODE_INFO[m].uses }))}
         onChange={onMode}

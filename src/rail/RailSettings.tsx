@@ -92,7 +92,7 @@ export function TimeSignatureField({ value, onChange }: { value: string; onChang
   const bad = !parseTimeSignature(value);
   return (
     <div className="rail-setting">
-      <span className="rail-label">Time</span>
+      <span className="pill-label">Time</span>
       <InlineField value={value} label="Time signature" className={bad ? 'time-sig bad' : 'time-sig'} onCommit={onChange} />
       {bad && <span className="rail-note">laid out as 4/4</span>}
     </div>
@@ -102,7 +102,7 @@ export function TimeSignatureField({ value, onChange }: { value: string; onChang
 export function BarsPerRow({ value, onChange }: { value: number; onChange: (n: number) => void }) {
   return (
     <div className="rail-setting">
-      <span className="rail-label">Bars / row</span>
+      <span className="pill-label">Bars / row</span>
       <Dropdown value={value} label="Bars per row" options={BARS_PER_ROW.map((n) => ({ value: n, label: String(n) }))} onChange={onChange} />
     </div>
   );
@@ -139,7 +139,7 @@ export function ClearMenu({ canClearNotes, canClearAll, onClearNotes, onClearAll
     <div className="clear-menu-wrap" ref={wrap}>
       <button
         type="button"
-        className="rail-button clear-menu-button"
+        className="rail-button chip clear-menu-button"
         aria-haspopup="menu"
         aria-expanded={open}
         disabled={!canClearNotes && !canClearAll}
