@@ -2,9 +2,9 @@
 id: 82
 title: "Library and files at v3"
 labels: [ready-for-agent]
-status: open
+status: closed
 blocked_by: [78]
-assignee:
+assignee: claude
 ---
 
 ## Parent
@@ -25,11 +25,18 @@ assignee:
 
 ## Acceptance criteria
 
-- [ ] Round trip: a two-etude progression exports and imports back equal (but for ids and timestamps)
-- [ ] A v2 export from the current app imports as one etude
-- [ ] Library rows show the etude count and instruments; Duplicate copies every etude
-- [ ] A newer `v` (4) is still rejected with the "newer Tonepath" message
+- [x] Round trip: a two-etude progression exports and imports back equal (but for ids and timestamps)
+- [x] A v2 export from the current app imports as one etude
+- [x] Library rows show the etude count and instruments; Duplicate copies every etude
+- [x] A newer `v` (4) is still rejected with the "newer Tonepath" message
 
 ## Blocked by
 
 - [078](078-schema-v3-etudes.md)
+
+## Resolution
+
+Most of it landed with 078 (files at v3, etude ids left out and re-made on import, v1 / v2 through the chain) and
+080 (`etudeSummary` on library rows). Added here: tests for the row summary and for Duplicate copying every etude.
+Etude ids are only unique within a progression, so Duplicate keeps them (no fresh ids needed). The demos stay v2
+files and migrate on import (checked on real storage).

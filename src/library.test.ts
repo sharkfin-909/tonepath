@@ -14,6 +14,7 @@ import {
   restoreProgression,
   importTexts,
   migrateStorage,
+  etudeSummary,
 } from './library';
 import { exportAll, exportOne, NEWER_VERSION } from './schema';
 import { isReadOnly, setReadOnly } from './readOnly';
@@ -195,5 +196,23 @@ describe('import and storage migration', () => {
     expect(s.getItem('tonepath:progression:d')).toBe('"newer"'); // honeycomb beats improwiser
     expect(s.getItem('other')).toBe('x');
     expect([...Array(s.length).keys()].map((i) => s.key(i)).filter((k) => k?.startsWith('improwiser:') || k?.startsWith('honeycomb:'))).toEqual([]);
+  });
+});
+
+describe('library rows and Duplicate with etudes (issue 082)', () => {
+  const etudes = [
+    { id: 'e1', name: 'A', instrument: 'eb-alto-sax', melody: [] },
+    { id: 'e2', name: 'B', instrument: 'bb-trumpet', melody: [{ pitch: 60, d: 'q' as const }] },
+    { id: 'e3', name: 'C', instrument: 'eb-alto-sax', melody: [] },
+  ];
+  it('a row names the etude count and their instruments, distinct, in etude order', () => {
+    expect(etudeSummary(newProgression())).toBe('1 etude · Concert');
+    expect(etudeSummary({ etudes })).toBe('3 etudes · E♭ alto sax, B♭ trumpet');
+  });
+  it('Duplicate copies every etude', () => {
+    const s = new MemoryStorage();
+    const src = saveProgression(s, { ...newProgression(), title: 'Two', etudes, id: 'src', updatedAt: '' }, at(0));
+    const d = duplicateProgression(s, src, ids, at(1));
+    expect(d.etudes).toEqual(etudes);
   });
 });
