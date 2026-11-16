@@ -295,8 +295,10 @@ button.dock-label {
   display: flex;
   flex-direction: column;
   transform-origin: 0 0;
-  /* The bar strip above the first row (the row gap above every row is its bar strip; chartHeight counts it). */
+  /* The bar strip above the first row (the row gap above every row is its bar strip; chartHeight counts it), and
+     the space under the last row's cards (--row-after: under every row, so a strip belongs to the bar below it). */
   padding-top: var(--row-gap, 30px);
+  padding-bottom: var(--row-after, 14px);
 }
 
 /* Each slot is a card (SPEC §3.1): --slot-gap between slots, --row-gap between rows (set from zoom.ts). */
