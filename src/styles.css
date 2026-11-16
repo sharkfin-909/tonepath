@@ -304,6 +304,8 @@ button.dock-label {
 .slot {
   position: relative;
   min-width: 0;
+  /* Rounded: the current slot's tint, the playhead and the bar selection's outline. */
+  border-radius: 10px;
 }
 
 /* The current slot in Improvise and Read etude (SPEC §3.3, §3.4): a solid highlight, distinct from Write etude's tint. */
