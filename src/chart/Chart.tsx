@@ -64,6 +64,8 @@ export interface ChartProps {
   fitHeight?: number;
   /** Read etude: scale names in the slot header (off by default). */
   scales?: boolean;
+  /** Improvise: the cards' rendered height cap (phones: lower; `zoom.ts`). */
+  leadMaxPx?: number;
 }
 
 function useWidth<T extends HTMLElement>() {
@@ -116,6 +118,7 @@ export function Chart({
   current = null,
   fitHeight,
   scales = false,
+  leadMaxPx,
 }: ChartProps) {
   const kind = profile.chart;
   const writing = kind === 'write';
@@ -142,7 +145,7 @@ export function Chart({
 
   // Chart zoom (SPEC §3.1): lay out at logical width area/z, scale by z. Every size comes from the layout (`zoom.ts`).
   const staveHeight = staveMetrics().height;
-  const layout = chartLayout(rows.length, staveHeight, fitHeight ?? area.height, { kind, scales });
+  const layout = chartLayout(rows.length, staveHeight, fitHeight ?? area.height, { kind, scales, leadMaxPx });
   const { zoom, scrolls, header } = layout;
   const zoomStyle = {
     width: area.width / zoom,

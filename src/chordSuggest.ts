@@ -78,9 +78,15 @@ function withTones(symbol: string): ChordSuggestion[] {
  * Root letters capitalised as typed (SPEC §4.2): the first letter of each symbol and the letter after a `/`
  * (a slash bass) become A–G; everything else is left alone — `b` after a root is a flat, qualities stay lower case.
  * `d` → `D`, `bbm7` → `Bbm7`, `g7/b` → `G7/B`, `dm7 g7` → `Dm7 G7`.
+ * After a space, `dim` / `aug` stay lower case (a quality, not a root): `b dim` → `B dim`.
  */
 export function capitaliseRoots(text: string): string {
-  return text.replace(/(^|\s|\/)([a-g])/g, (_, before: string, letter: string) => before + letter.toUpperCase());
+  return (
+    text
+      .replace(/(^|\s|\/)([a-g])/g, (_, before: string, letter: string) => before + letter.toUpperCase())
+      // A quality typed after a space keeps its case: no root is followed by i or u, so `dim` / `aug` aren't roots.
+      .replace(/(\s)([DA])(?=[iu])/g, (_, before: string, letter: string) => before + letter.toLowerCase())
+  );
 }
 
 /** The text with the token at `from` replaced by `symbol`. */

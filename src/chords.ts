@@ -292,8 +292,23 @@ export function interpretation(text: string): string {
   }
 }
 
-/** Split typed text into chord symbols on whitespace outside parentheses (SPEC §4.2). */
+/**
+ * Split typed text into chord symbols on whitespace outside parentheses (SPEC §4.2). A word that is no chord on its
+ * own joins the chord before it when the two make one — a space typed before the quality: `B dim` → `Bdim`,
+ * `C maj7` → `Cmaj7` — while `Dm7 G7` stays two.
+ */
 export function splitSymbols(text: string): string[] {
+  const words = splitWords(text);
+  const out: string[] = [];
+  for (const w of words) {
+    const prev = out[out.length - 1];
+    if (prev !== undefined && parseChord(w).kind !== 'chord' && parseChord(prev + w).kind === 'chord') out[out.length - 1] = prev + w;
+    else out.push(w);
+  }
+  return out;
+}
+
+function splitWords(text: string): string[] {
   const out: string[] = [];
   let cur = '';
   let depth = 0;

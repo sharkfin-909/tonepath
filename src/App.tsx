@@ -26,7 +26,7 @@ import { ModePanel } from './rail/ModePanel';
 import { Dropdown } from './rail/Dropdown';
 import { modeProfile } from './modeProfile';
 import { hexLighting } from './hexLighting';
-import { chartArea } from './zoom';
+import { LEAD_SLOT_MAX_PHONE_PX, chartArea } from './zoom';
 import { useChartSession } from './useChartSession';
 import { useTransport } from './useTransport';
 import { etudeOf } from './progression';
@@ -573,6 +573,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
               profile={profile}
               current={writing ? null : active.index}
               scales={read && showReadScales}
+              leadMaxPx={narrow ? LEAD_SLOT_MAX_PHONE_PX : undefined}
               fitHeight={area.fitHeight}
             />
           )}

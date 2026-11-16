@@ -63,6 +63,11 @@ describe('chord autosuggest', () => {
     expect(capitaliseRoots('ebmaj7')).toBe('Ebmaj7');
     expect(capitaliseRoots('g7/b')).toBe('G7/B');
     expect(capitaliseRoots('dm7 g7')).toBe('Dm7 G7');
+    // A quality typed after a space keeps its case: no root is followed by i or u (dim, aug).
+    expect(capitaliseRoots('B dim')).toBe('B dim');
+    expect(capitaliseRoots('B Dim')).toBe('B dim'); // the D capitalised at "B d" goes back down at the i
+    expect(capitaliseRoots('c aug')).toBe('C aug');
+    expect(capitaliseRoots('b d')).toBe('B D');
     expect(capitaliseRoots('c6/9 cm(add9) csus4 caug cdim7 c7alt')).toBe('C6/9 Cm(add9) Csus4 Caug Cdim7 C7alt');
     expect(capitaliseRoots('n.c.')).toBe('n.c.');
   });

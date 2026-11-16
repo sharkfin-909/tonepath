@@ -206,7 +206,16 @@ describe('splitSymbols', () => {
     ['Dm7', ['Dm7']],
     ['  Dm7   G7 ', ['Dm7', 'G7']],
     ['C7(b9, #11) F', ['C7(b9, #11)', 'F']],
-    ['C maj7', ['C', 'maj7']],
+    // A word that is no chord on its own joins the chord before it, when the two make one: a space before the quality.
+    ['C maj7', ['Cmaj7']],
+    ['B dim', ['Bdim']],
+    ['B dim7 E7', ['Bdim7', 'E7']],
+    ['B 7', ['B7']],
+    ['C m', ['Cm']],
+    ['C aug', ['Caug']],
+    ['Bb ø', ['Bbø']],
+    ['Dm7 G7', ['Dm7', 'G7']],
+    ['C xyz', ['C', 'xyz']], // still two (the second refused later)
     ['A B C', ['A', 'B', 'C']],
     ['', []],
   ])('%j', (text, want) => expect(splitSymbols(text)).toEqual(want));

@@ -1440,7 +1440,7 @@ button.dock-label {
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr) auto;
   align-items: center;
-  max-height: var(--lead-slot-max, 200px); /* logical at this zoom — renders ≤ `LEAD_SLOT_MAX_PX` on screen (`zoom.ts`) */
+  max-height: var(--lead-slot-max, 160px); /* logical at this zoom — renders ≤ `LEAD_SLOT_MAX_PX` on screen (`zoom.ts`) */
   min-height: 0;
   /* Bar numbers / trash sit in the row gap (`.bar-handle`, etc.): clip only the card innards below. */
 }

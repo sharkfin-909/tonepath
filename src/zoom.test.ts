@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CHART_PAD_TOP_PX,
   LEAD_SLOT_MAX_PX,
+  LEAD_SLOT_MAX_PHONE_PX,
   MIN_CHORD_PX,
   MIN_SCALE_PX,
   READ_PAD_BOTTOM_PX,
@@ -91,6 +92,12 @@ describe('chart layout', () => {
     expect(l.vars['--row-gap']).toBe('30px');
     expect(chartLayout(1, STAVE, 360, READ).vars['--row-gap']).toBe('10px');
     expect(l.vars['--bar-line']).toBe('2.5px');
+  });
+
+  it('phones: a smaller cap (leadMaxPx) holds the cards lower', () => {
+    const l = chartLayout(1, STAVE, 360, { ...LEAD, leadMaxPx: LEAD_SLOT_MAX_PHONE_PX });
+    expect(l.slotHeight * l.zoom).toBeLessThanOrEqual(LEAD_SLOT_MAX_PHONE_PX + 1e-9);
+    expect(LEAD_SLOT_MAX_PHONE_PX).toBeLessThan(LEAD_SLOT_MAX_PX);
   });
 
   it("Improvise's cards are at most LEAD_SLOT_MAX_PX on screen; the hex gets what the label rows leave", () => {

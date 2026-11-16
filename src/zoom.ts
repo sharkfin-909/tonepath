@@ -37,15 +37,19 @@ export const READ_PAD_BOTTOM_PX = 16;
 /** Improvise's 3-row slot: the hex never shrinks below this. */
 export const LEAD_HEX_MIN_PX = 24;
 /** Improvise lead cards: max height on screen after chart `scale(z)` (DevTools / layout); logical cap is ÷ z. */
-export const LEAD_SLOT_MAX_PX = 200;
+export const LEAD_SLOT_MAX_PX = 160;
+/** Phones (SPEC §3.6): Improvise's cards are lower still. */
+export const LEAD_SLOT_MAX_PHONE_PX = 120;
 
-/** Logical slot height that renders at most `LEAD_SLOT_MAX_PX` at zoom z. */
-export const leadSlotCapLogicalPx = (z: number) => LEAD_SLOT_MAX_PX / z;
+/** Logical slot height that renders at most `max` (default `LEAD_SLOT_MAX_PX`) at zoom z. */
+export const leadSlotCapLogicalPx = (z: number, max = LEAD_SLOT_MAX_PX) => max / z;
 
 /** How the chart is drawn: its kind, and (Read etude) whether scale names sit beside the chords. */
 export interface ChartLook {
   kind: ChartKind;
   scales?: boolean;
+  /** Improvise: the cards' rendered height cap (default `LEAD_SLOT_MAX_PX`; phones `LEAD_SLOT_MAX_PHONE_PX`). */
+  leadMaxPx?: number;
 }
 
 /** Logical font size that renders at least `min` px at zoom z. */
@@ -81,7 +85,7 @@ const leadLabelsPx = (z: number) => 1.595 * labelPx(SCALE_PX, MIN_SCALE_PX, z) +
 export function slotHeightPx(z: number, staveHeight: number, look: ChartLook): number {
   const natural = headerPx(z, look) + staveHeight + slotChromePx(look);
   if (look.kind !== 'lead') return natural;
-  const cap = leadSlotCapLogicalPx(z);
+  const cap = leadSlotCapLogicalPx(z, look.leadMaxPx);
   const floor = slotChromePx(look) + leadLabelsPx(z) + LEAD_HEX_MIN_PX;
   return Math.min(cap, Math.max(Math.min(natural, cap), floor));
 }
