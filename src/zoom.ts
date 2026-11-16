@@ -36,6 +36,8 @@ export const CHART_PAD_TOP_PX = 16;
 export const READ_PAD_BOTTOM_PX = 16;
 /** Improvise's 3-row slot: the hex never shrinks below this. */
 export const LEAD_HEX_MIN_PX = 24;
+/** Improvise's cards (the lead sheet) are at most this tall (logical px), unless their labels need more. */
+export const LEAD_SLOT_MAX_PX = 128;
 
 /** How the chart is drawn: its kind, and (Read etude) whether scale names sit beside the chords. */
 export interface ChartLook {
@@ -66,10 +68,23 @@ export function headerPx(z: number, look: ChartLook): number {
   return Math.max(HEADER_PX, Math.ceil(chord * 1.4 + scale * 1.5 + 4 + 10));
 }
 
+/** Improvise's 3-row slot: its two label rows — [bar number · key pill] and [chord · scale] — as styles.css draws them. */
+const leadLabelsPx = (z: number) => 1.595 * labelPx(SCALE_PX, MIN_SCALE_PX, z) + 6 + (1.25 * labelPx(CHORD_PX, MIN_CHORD_PX, z) + 8);
+
+/**
+ * A card's logical height at zoom z: header + stave + chrome; Improvise's lead sheet caps it at `LEAD_SLOT_MAX_PX`
+ * (never so low that its labels and the smallest hex don't fit).
+ */
+export function slotHeightPx(z: number, staveHeight: number, look: ChartLook): number {
+  const natural = headerPx(z, look) + staveHeight + slotChromePx(look);
+  if (look.kind !== 'lead') return natural;
+  return Math.max(Math.min(natural, LEAD_SLOT_MAX_PX), slotChromePx(look) + leadLabelsPx(z) + LEAD_HEX_MIN_PX);
+}
+
 /** Rendered height of `rows` rows at zoom z. */
 export function chartHeight(rows: number, staveHeight: number, z: number, look: ChartLook): number {
   // A row gap above every row, the first too (SPEC §3.1).
-  return z * rows * (headerPx(z, look) + staveHeight + slotChromePx(look) + rowGapPx(look) + ROW_AFTER_PX);
+  return z * rows * (slotHeightPx(z, staveHeight, look) + rowGapPx(look) + ROW_AFTER_PX);
 }
 
 export interface Fit {
@@ -106,7 +121,7 @@ export interface ChartLayout extends Fit {
   chordPx: number;
   scalePx: number;
   rowGap: number;
-  /** A slot card's height (header + stave + chrome). */
+  /** A slot card's logical height (header + stave + chrome; Improvise's capped, `slotHeightPx`). */
   slotHeight: number;
   /** Improvise's 3-row slot (SPEC §3.3): the hex's height — what the two label rows leave of the usual slot height. */
   leadHexHeight: number;
@@ -122,9 +137,9 @@ export function chartLayout(rows: number, staveHeight: number, height: number, l
   const chordPx = labelPx(CHORD_PX, MIN_CHORD_PX, z);
   const scalePx = labelPx(SCALE_PX, MIN_SCALE_PX, z);
   const rowGap = rowGapPx(look);
-  // The lead slot's label rows: [bar number · key pill] (scale-sized, line-height ≈ 1.6 + 6px) and [chord · scale]
-  // (chord line-height 1.25 + 8px), as styles.css `.slot.lead` draws them.
-  const leadHexHeight = Math.max(LEAD_HEX_MIN_PX, header + staveHeight - (1.595 * scalePx + 6) - (1.25 * chordPx + 8));
+  const slotHeight = slotHeightPx(z, staveHeight, look);
+  // The lead slot's hex: what its two label rows leave of the card.
+  const leadHexHeight = Math.max(LEAD_HEX_MIN_PX, slotHeight - slotChromePx(look) - leadLabelsPx(z));
   return {
     ...fit,
     height: chartHeight(rows, staveHeight, z, look),
@@ -132,7 +147,7 @@ export function chartLayout(rows: number, staveHeight: number, height: number, l
     chordPx,
     scalePx,
     rowGap,
-    slotHeight: header + staveHeight + slotChromePx(look),
+    slotHeight,
     leadHexHeight,
     vars: {
       '--row-gap': `${rowGap}px`,

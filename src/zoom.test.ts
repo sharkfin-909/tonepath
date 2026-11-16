@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CHART_PAD_TOP_PX,
+  LEAD_SLOT_MAX_PX,
   MIN_CHORD_PX,
   MIN_SCALE_PX,
   READ_PAD_BOTTOM_PX,
@@ -83,11 +84,13 @@ describe('chart layout', () => {
     expect(l.vars['--bar-line']).toBe('2.5px');
   });
 
-  it("Improvise's 3-row slot keeps the usual slot height; its hex gets what the label rows leave", () => {
+  it("Improvise's cards are at most 128px tall; the hex gets what the label rows leave", () => {
     const l = chartLayout(1, STAVE, 360, LEAD);
-    expect(l.slotHeight).toBe(l.header + STAVE + slotChromePx(LEAD));
+    expect(l.slotHeight).toBe(LEAD_SLOT_MAX_PX);
+    expect(chartLayout(1, STAVE, 360, WRITE).slotHeight).toBe(headerPx(ZOOM_CAP, WRITE) + STAVE + slotChromePx(WRITE)); // others uncapped
     expect(l.leadHexHeight).toBeGreaterThan(24);
-    expect(l.leadHexHeight).toBeLessThan(l.header + STAVE);
+    expect(l.leadHexHeight).toBeLessThan(LEAD_SLOT_MAX_PX);
+    expect(l.height).toBeCloseTo(l.zoom * (LEAD_SLOT_MAX_PX + 30 + 14)); // the rows are sized to the capped cards
     // At a tiny zoom the labels grow; the hex never goes below its minimum.
     expect(chartLayout(40, STAVE, 100, LEAD).leadHexHeight).toBeGreaterThanOrEqual(24);
   });

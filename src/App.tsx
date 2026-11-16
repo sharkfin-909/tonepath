@@ -445,7 +445,6 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
                 selection={null}
                 onBarSelect={() => {}}
                 onBarAction={() => {}}
-                onAppendBar={() => {}}
                 canPaste={false}
                 profile={profile}
                 current={null}
@@ -468,7 +467,6 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
               selection={session.selection}
               onBarSelect={(bar, extend) => dispatch({ type: 'bar-select', bar, extend })}
               onBarAction={(bar, action) => dispatch({ type: 'bar-action', bar, action })}
-              onAppendBar={() => dispatch({ type: 'append-bar' })}
               onLoopClear={() => dispatch({ type: 'clear-selection' })}
               canPaste={!!session.clip}
               profile={profile}

@@ -1204,9 +1204,41 @@ button.dock-label {
   opacity: 0.35;
   cursor: pointer;
 }
-.delete-bar svg {
+.delete-bar svg,
+.insert-bar svg {
   width: 0.9em;
   height: 0.9em;
+}
+/* The bar strip's "+" (SPEC §3.1): beside the trash can, inserts a bar after this one. Same size and fade. */
+.insert-bar {
+  position: absolute;
+  right: calc(-1px + 1.45em);
+  font-size: var(--chord-px);
+  top: calc(-1px - var(--row-gap) / 2 - 0.65em);
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  width: 1.3em;
+  height: 1.3em;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--muted);
+  opacity: 0.35;
+  cursor: pointer;
+}
+.insert-bar.alone {
+  right: -1px; /* the only bar has no trash can */
+}
+.slot:hover .insert-bar,
+.slot.active .insert-bar,
+.insert-bar:focus-visible {
+  opacity: 1;
+}
+.insert-bar:hover {
+  background: rgba(0, 0, 0, 0.07);
+  color: var(--ink);
 }
 .slot:hover .delete-bar,
 .slot.active .delete-bar,

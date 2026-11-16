@@ -45,7 +45,6 @@ export interface ChartProps {
   selection: { from: number; to: number } | null;
   onBarSelect: (bar: number, extend: boolean) => void;
   onBarAction: (bar: number, action: BarAction) => void;
-  onAppendBar: () => void;
   /** Improvise / Read etude: remove the loop (the × at its end repeat) — back to the whole form. */
   onLoopClear?: () => void;
   canPaste: boolean;
@@ -108,7 +107,6 @@ export function Chart({
   selection,
   onBarSelect,
   onBarAction,
-  onAppendBar,
   onLoopClear,
   canPaste,
   profile,
@@ -250,7 +248,16 @@ export function Chart({
               }
               onShiftSelect={!inert ? () => onBarSelect(slot.bar, true) : undefined}
               onDeleteBar={editsForm && slot.barEnd && bars.length > 1 ? () => onBarAction(slot.bar, 'delete') : undefined}
-              onAppend={editsForm && slot.index === slots.length - 1 ? onAppendBar : undefined}
+              onInsertBar={editsForm && slot.barEnd ? () => onBarAction(slot.bar, 'insert-after') : undefined}
+              onAddChord={
+                editsForm && bars[slot.bar].length === 1
+                  ? () => {
+                      // A second chord in this bar: split it, and type the new chord straight away.
+                      onBarAction(slot.bar, 'split');
+                      startEditing({ bar: slot.bar, part: 1 });
+                    }
+                  : undefined
+              }
               editing={editing?.bar === slot.bar && editing.part === slot.part}
               error={error}
               usedChords={usedChords}
@@ -317,8 +324,10 @@ interface SlotViewProps {
   onShiftSelect?: () => void;
   /** On a bar's last slot: the trash can at its bottom right that deletes the bar (the selection, if it's in one). */
   onDeleteBar?: () => void;
-  /** On the last slot: the "+" that appends a bar. */
-  onAppend?: () => void;
+  /** On a bar's last slot: the "+" beside the trash can that inserts a bar after it. */
+  onInsertBar?: () => void;
+  /** On a one-chord bar: the "+" in the slot that adds a second chord (splits the bar). */
+  onAddChord?: () => void;
   /** The first slot carries the time signature. */
   showTimeSignature: boolean;
   editing: boolean;
@@ -331,7 +340,7 @@ interface SlotViewProps {
   onScaleChange?: (scale: ScaleId | null) => void;
 }
 
-function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing, keyLabel, keyMate, hideMelody, leadHexHeight, slotHeight, onEventClick, onTimeClick, span, layout, header, barTools, inSelection, barCard, rowEnd, readEtude, readShowScales, loop, onShiftSelect, onDeleteBar, onAppend, showTimeSignature, editing, error, usedChords, onEdit, onCommit, onClear, onScaleChange }: SlotViewProps) {
+function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing, keyLabel, keyMate, hideMelody, leadHexHeight, slotHeight, onEventClick, onTimeClick, span, layout, header, barTools, inSelection, barCard, rowEnd, readEtude, readShowScales, loop, onShiftSelect, onDeleteBar, onInsertBar, onAddChord, showTimeSignature, editing, error, usedChords, onEdit, onCommit, onClear, onScaleChange }: SlotViewProps) {
   // Everything shown runs against the written chord; the stored melody stays concert (SPEC §5.3, §10).
   const { chord, harmony } = slot;
   const spell = (midi: number) => view.name(midi, slot);
@@ -341,7 +350,7 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
   const meter = showTimeSignature ? layout : undefined;
   // The key pill (SPEC §3.1): the key this slot's scale belongs to; lit on the current slot and its key mates (only the pill).
   const keyPill = keyLabel && (
-    <span className={['key-pill', onAppend && 'beside-append'].filter(Boolean).join(' ')} title={`Key family: ${prettyName(keyLabel)}`}>
+    <span className={['key-pill', onAddChord && 'beside-append'].filter(Boolean).join(' ')} title={`Key family: ${prettyName(keyLabel)}`}>
       {prettyName(keyLabel)}
     </span>
   );
@@ -357,7 +366,7 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
         gridColumn: `span ${span}`,
         ['--staff-top' as string]: `${SLOT_PAD_TOP_PX + header + staffTop}px`,
         ...(readEtude ? { ['--staff-bottom' as string]: `${SLOT_PAD_TOP_PX + header + staffBottom}px` } : {}),
-        ...(hideMelody ? { minHeight: slotHeight } : {}),
+        ...(hideMelody ? { height: slotHeight } : {}),
       }}
       data-slot={slot.index}
       // ⇧-click (Write): extend the bar selection to this bar — caught before notes, the stave or the chord see it.
@@ -382,8 +391,8 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
       }}
     >
       {barTools && !readEtude && <BarHandle bar={slot.bar} {...barTools} />}
-      {onAppend && (
-        <button type="button" className="append-bar" title="Add a bar" aria-label="Add a bar" onClick={onAppend}>
+      {onAddChord && (
+        <button type="button" className="append-bar add-chord" title="Add a chord to this bar" aria-label={`Add a chord to bar ${slot.bar + 1}`} onClick={onAddChord}>
           +
         </button>
       )}
@@ -434,6 +443,19 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
         />
         )}
       </div>
+      {onInsertBar && (
+        <button
+          type="button"
+          className={onDeleteBar ? 'insert-bar' : 'insert-bar alone'}
+          title="Add a bar after this one"
+          aria-label={`Add a bar after bar ${slot.bar + 1}`}
+          onClick={onInsertBar}
+        >
+          <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden>
+            <path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        </button>
+      )}
       {onDeleteBar && (
         <button
           type="button"
