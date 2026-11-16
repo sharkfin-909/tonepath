@@ -1,6 +1,6 @@
 # Tonepath v1 — build spec
 
-Compiled 2026-11-13 (updated the same day by [Spec update](issues/041-spec-update.md); kept current with the build through 2026-11-15; §3's mode menu, decided 2026-11-16 in [Mode menu](issues/068-mode-menu.md), is not yet built) from the decisions on [Map: Tonepath v1 spec (as Honeycomb)](issues/001-map-improwiser-v1-spec.md). Each section cites the ticket(s) that hold the full reasoning; where an earlier decision was superseded, only the latest is stated here. Terms are defined in [CONTEXT.md](CONTEXT.md) (the glossary is normative). Example data: [examples/demo.tonepath.json](examples/demo.tonepath.json), [examples/rhythm-changes.tonepath.json](examples/rhythm-changes.tonepath.json).
+Compiled 2026-11-13 (updated the same day by [Spec update](issues/041-spec-update.md); kept current with the build through 2026-11-16, incl. the mode menu of [Mode menu](issues/068-mode-menu.md)) from the decisions on [Map: Tonepath v1 spec (as Honeycomb)](issues/001-map-improwiser-v1-spec.md). Each section cites the ticket(s) that hold the full reasoning; where an earlier decision was superseded, only the latest is stated here. Terms are defined in [CONTEXT.md](CONTEXT.md) (the glossary is normative). Example data: [examples/demo.tonepath.json](examples/demo.tonepath.json), [examples/rhythm-changes.tonepath.json](examples/rhythm-changes.tonepath.json).
 
 ---
 
@@ -36,12 +36,14 @@ Pure modules (no React / DOM), each unit-tested with the tables in §14:
 | `schema` | Envelope, validation / repair, migrations `migrateNtoN+1`. |
 | `audio` | `playNote`, `playChord`, `playScale`, `playRoot`, `playBass`; mute; the generated-impulse reverb (§9). The UI never touches Web Audio. |
 | `listen/pitch` | YIN pitch detection, onset detection and the note tracker over raw samples (§9.2). |
-| `practice` | Built: Practice's note counts, five advance rules and targets. Under §3 it is cut down to what the transport needs (looped bars as a slot range, the upcoming chord's targets) or folded into `metronomeRun` (§3.7). |
+| `transport` | The transport besides its timing: the looped bars as a slot range, the slot after a slot within them, the form the metronome runs, the upcoming chord's targets (§3.7). |
+| `metronome` / `metronomeRun` | Tempo and click sounds; the run on a clock — clicks ahead on the beat, chords announced on time, wrap or end (§3.7). |
+| `micIntake` | The echo guard: a heard note start is the player's, or the app's own sound (§3.3, §9.2). |
 | `pointerClick` | Space = a click under the pointer (§11). Not pure: dispatches DOM events. |
 
 ## 3. Screens and modes — [Mode menu](issues/068-mode-menu.md)
 
-**Not yet built** (decided 2026-11-16): this section describes the mode menu of [Mode menu](issues/068-mode-menu.md), which replaces the built Explore · Practice · Write · Etude view dropdown and the Audio input switch. The rest of the spec still matches the build except where it points here.
+The mode menu of [Mode menu](issues/068-mode-menu.md) (2026-11-16) replaced the Explore · Practice · Write · Etude view dropdown and the Audio input switch.
 
 ### 3.0 The modes
 
@@ -57,7 +59,7 @@ The **Mode:** dropdown offers four modes, in this order. Each is a fixed set of 
 | Sound pill | yes (chord controls greyed) | yes | yes | yes |
 | Hide hex | — | yes | — | — |
 
-- **Opening**: every open or reload of a progression starts in **Tuner**, so the browser may ask for the microphone at once. Where the browser keeps audio suspended until a user gesture, the tuner bar shows **tap to start listening** until the first click or key.
+- **Opening**: every open or reload of a progression starts in **Tuner**, so the browser may ask for the microphone at once; while it asks, the tuner bar shows **allow the microphone to start listening**. Where the browser keeps audio suspended until a user gesture, the tuner bar shows **tap to start listening** until the first click or key.
 - **The mode decides the mic**: Listen (§9.2) is on in Tuner and Improvise and off in Write etude and Read etude; there is no Audio input switch. Leaving Tuner or Improvise closes the mic.
 - **Mic unavailable** (permission denied, no input device, insecure origin): the mode stays; the tuner bar says why (e.g. *Mic blocked: allow it in the browser's site settings*); hex clicks keep working.
 - **Switching**: the dropdown, `[` / `]` (previous / next mode, no wrap) and `\` (Write etude ↔ Read etude; from Tuner or Improvise → Read etude) (§11). Switching modes is silent and always **stops the transport**.

@@ -1,8 +1,8 @@
-// The editing session (SPEC §3.3, §6.2, §9): Write / Play rules, entry, browsing and *On arrival*, as pure steps.
+// The editing session (SPEC §3.0–3.8, §6.2, §9): each mode's rules, entry, browsing, the transport and *On arrival*, as pure steps.
 import { describe, expect, it } from 'vitest';
 import { TICKS } from './melody';
 import { newProgression, type Progression } from './progression';
-import { activeIndex, chooseMode, initialSession, modeOf, reduce, type Effect, type Intent, type SessionState } from './session';
+import { activeIndex, initialSession, reduce, type Effect, type Intent, type SessionState } from './session';
 import type { OnArrival } from './device';
 
 const q = TICKS.q;
@@ -18,7 +18,7 @@ const prog = (): Progression => ({
 /** Apply intents in order, committing edits; collects every effect. */
 function run(intents: Intent[], opts: { p?: Progression; onArrival?: OnArrival; state?: Partial<SessionState> } = {}) {
   let p = opts.p ?? prog();
-  let state: SessionState = { ...initialSession(p, { onArrival: opts.onArrival ?? 'silent' }), ...opts.state };
+  let state: SessionState = { ...initialSession(p, { onArrival: opts.onArrival ?? 'silent' }), mode: 'write', ...opts.state };
   const effects: Effect[] = [];
   const per: Effect[][] = [];
   for (const intent of intents) {
@@ -37,7 +37,7 @@ const show = (es: Effect[]) =>
 
 const pick = (written: number): Intent => ({ type: 'pick', written });
 
-describe('Write: entry', () => {
+describe('Write etude: entry', () => {
   it('a pick inserts with the latched length, plays the note, and moves the caret', () => {
     const r = run([pick(62)]);
     expect(r.p.melody).toEqual([{ pitch: 62, d: 'q' }]);
@@ -67,38 +67,68 @@ describe('Write: entry', () => {
   });
 });
 
-describe('Explore mode', () => {
-  const explore: Intent = { type: 'mode', mode: 'explore' };
-  it('a pick only auditions: nothing written, the caret stays', () => {
-    const r = run([explore, pick(62)]);
-    expect(r.p.melody).toEqual([]);
-    expect(r.state.caret).toBe(0);
-    expect(show(r.per[1])).toEqual(['note 62']);
+describe('opening, and the mode decides', () => {
+  it('every open starts in Tuner, on the caret\'s slot (the melody\'s end)', () => {
+    const p = { ...prog(), melody: [{ pitch: 62, d: 'w' as const }, { pitch: 67, d: 'q' as const }] };
+    expect(initialSession(p, { onArrival: 'silent' })).toMatchObject({ mode: 'tuner', slot: 1, running: false });
   });
 
-  it('nothing edits the hidden melody: delete, nudge and Clear do nothing', () => {
+  it('only Write etude writes: a pick elsewhere auditions and records nothing', () => {
+    for (const mode of ['tuner', 'improvise'] as const) {
+      const r = run([{ type: 'mode', mode }, pick(62)]);
+      expect(r.p.melody).toEqual([]);
+      expect(show(r.per[1])).toContain('note 62');
+    }
+    expect(run([{ type: 'mode', mode: 'read' }, pick(62)]).per[1]).toEqual([]); // no hex in Read etude
+  });
+
+  it('only Write etude edits the melody: delete, nudge, Rest + length and Clear do nothing elsewhere', () => {
     const p = { ...prog(), melody: [{ pitch: 60, d: 'q' as const }] };
-    for (const i of [{ type: 'delete', back: true }, { type: 'nudge', dir: 1, octave: false }, { type: 'clear-notes' }] as Intent[]) {
-      const r = run([explore, i], { p, state: { caret: q } });
-      expect(r.p.melody).toEqual(p.melody);
+    const edits = [{ type: 'delete', back: true }, { type: 'nudge', dir: 1, octave: false }, { type: 'clear-notes' }, { type: 'clear-all' }, { type: 'step-play' }] as Intent[];
+    for (const mode of ['tuner', 'improvise', 'read'] as const) {
+      for (const i of edits) expect(run([{ type: 'mode', mode }, i], { p, state: { caret: q } }).p).toBe(p);
+      const r = run([{ type: 'mode', mode }, { type: 'toggle-rest' }, { type: 'length', d: 'h' }], { p });
+      expect(r.p).toBe(p);
     }
   });
 
-  it('Rest on: a length key inserts nothing', () => {
-    const r = run([explore, { type: 'toggle-rest' }, { type: 'length', d: 'h' }]);
-    expect(r.p.melody).toEqual([]);
-    expect(r.state.length).toBe('h');
-  });
-
-  it('Write (or Practice, then Write) writes again; the input never stops hex picks writing', () => {
-    expect(run([explore, { type: 'mode', mode: 'write' }, pick(62)]).p.melody).toEqual([{ pitch: 62, d: 'q' }]);
-    expect(run([explore, { type: 'mode', mode: 'practice' }, { type: 'mode', mode: 'write' }, pick(62)]).p.melody).toEqual([{ pitch: 62, d: 'q' }]);
-    expect(run([{ type: 'input', how: 'instrument' }, pick(62)]).p.melody).toEqual([{ pitch: 62, d: 'q' }]);
-    expect(run([explore]).state).toMatchObject({ explore: true, playIndex: null });
+  it('Tuner: no chord to sound, no chart to click', () => {
+    const r = run([{ type: 'mode', mode: 'tuner' }, { type: 'sound', what: 'chord' }, { type: 'slot-click', index: 2 }, { type: 'browse', dir: 1 }, { type: 'bar-select', bar: 1, extend: false }]);
+    expect(r.effects).toEqual([]);
+    expect(r.state).toMatchObject({ slot: 0, selection: null });
+    expect(run([{ type: 'mode', mode: 'tuner' }, { type: 'toggle-mute' }]).state.muted).toBe(true);
   });
 });
 
-describe('Write: On arrival sounds with the first entry of a slot', () => {
+describe('switching modes', () => {
+  const to = (mode: Extract<Intent, { type: 'mode' }>['mode']): Intent => ({ type: 'mode', mode });
+  it('[ / ] step through Tuner · Improvise · Write etude · Read etude, no wrap', () => {
+    expect(run([to('prev')]).state.mode).toBe('improvise');
+    expect(run([to('next')]).state.mode).toBe('read');
+    expect(run([to('next'), to('next')]).state.mode).toBe('read');
+    expect(run([to('tuner'), to('prev')]).state.mode).toBe('tuner');
+  });
+
+  it('\\ toggles Write etude ↔ Read etude; from Tuner or Improvise it goes to Read etude', () => {
+    expect(run([to('toggle-read')]).state.mode).toBe('read');
+    expect(run([to('toggle-read'), to('toggle-read')]).state.mode).toBe('write');
+    expect(run([to('tuner'), to('toggle-read')]).state.mode).toBe('read');
+  });
+
+  it('the current slot carries: the caret\'s slot on the way out, the slot\'s start on the way back', () => {
+    const r = run([to('improvise'), { type: 'browse', dir: 1 }, to('read'), { type: 'step', dir: 1 }, to('write')], { state: { caret: q } });
+    expect(r.state).toMatchObject({ mode: 'write', caret: 2 * W });
+    // Back to the caret's own slot: the caret stays where it was.
+    expect(run([to('tuner'), to('write')], { state: { caret: q } }).state.caret).toBe(q);
+  });
+
+  it('switching stops the transport; the selection (= the looped bars) is kept', () => {
+    const r = run([{ type: 'bar-select', bar: 2, extend: false }, to('improvise'), { type: 'transport', run: true }, to('read')]);
+    expect(r.state).toMatchObject({ mode: 'read', running: false, selection: { from: 2, to: 2 }, slot: 2 });
+  });
+});
+
+describe('Write etude: On arrival sounds with the first entry of a slot', () => {
   it('first note of a slot: the note plus the slot chord; later notes alone', () => {
     const r = run([pick(62), pick(65), pick(69), pick(72), pick(67)], { onArrival: 'chord' });
     expect(r.per.map(show)).toEqual([['note 62', 'chord D'], ['note 65'], ['note 69'], ['note 72'], ['note 67', 'chord G']]);
@@ -114,43 +144,103 @@ describe('Write: On arrival sounds with the first entry of a slot', () => {
   });
 });
 
-describe('Play', () => {
-  const play = (more: Intent[], onArrival: OnArrival = 'chord') => run([{ type: 'mode', mode: 'play' }, ...more], { onArrival });
+describe('Improvise (stopped)', () => {
+  const improvise = (more: Intent[], onArrival: OnArrival = 'chord') => run([{ type: 'mode', mode: 'improvise' }, ...more], { onArrival });
 
-  it('picks audition only; nothing is recorded', () => {
-    const r = play([pick(62)]);
-    expect(r.p.melody).toEqual([]);
-  });
-
-  it('arriving is silent; the first note played there brings the arrival sound, later ones play alone', () => {
-    const r = play([{ type: 'browse', dir: 1 }, pick(67), pick(71)]);
+  it('arriving is silent; the first note played there (hex or mic) brings the arrival sound, later ones play alone', () => {
+    const r = improvise([{ type: 'browse', dir: 1 }, pick(67), pick(71)]);
     expect(r.per.map(show)).toEqual([[], [], ['note 67', 'chord G'], ['note 71']]);
+    expect(improvise([{ type: 'heard' }, { type: 'heard' }]).per.map(show)).toEqual([[], ['chord D'], []]);
   });
 
-  it('entering Play is an arrival too', () => {
-    expect(show(play([pick(62)]).per[1])).toEqual(['note 62', 'chord D']);
+  it('← / → and < > step slots, wrapping; clicking a slot makes it current', () => {
+    expect(improvise([{ type: 'step', dir: -1 }]).state.slot).toBe(3);
+    expect(improvise([{ type: 'step', dir: -1 }, { type: 'browse', dir: 1 }]).state.slot).toBe(0);
+    expect(improvise([{ type: 'slot-click', index: 2 }]).state.slot).toBe(2);
   });
 
-  it('← / → and < > step slots, wrapping', () => {
-    const r = play([{ type: 'step', dir: -1 }]);
-    expect(r.state.playIndex).toBe(3);
-    expect(play([{ type: 'step', dir: -1 }, { type: 'browse', dir: 1 }]).state.playIndex).toBe(0);
+  it('edits the lead sheet\'s form: time signature, undo, "+" and the trash can — not the bar menu', () => {
+    expect(improvise([{ type: 'append-bar' }]).p.bars).toHaveLength(5);
+    expect(improvise([{ type: 'bar-action', bar: 3, action: 'delete' }]).p.bars).toHaveLength(3);
+    expect(improvise([{ type: 'bar-action', bar: 1, action: 'duplicate' }]).p.bars).toHaveLength(4);
+    expect(improvise([{ type: 'time-signature', text: '3/4' }]).p.timeSignature).toBe('3/4');
+    expect(improvise([{ type: 'undo' }]).effects).toEqual([{ type: 'history', dir: 'undo' }]);
   });
 
-  it('clicking a note in another slot arrives there and sounds with that note', () => {
-    const p = { ...prog(), melody: [{ pitch: 62, d: 'w' as const }, { pitch: 67, d: 'w' as const }] };
-    const r = run([{ type: 'mode', mode: 'play' }, { type: 'event-click', event: { ev: p.melody[1], i: 1, start: W, end: 2 * W } }], { p, onArrival: 'chord' });
-    expect(r.state.playIndex).toBe(1);
-    expect(show(r.per[1])).toEqual(['note 67', 'chord G']);
-  });
-
-  it('leaving Play puts the caret at the start of the current slot', () => {
-    const r = play([{ type: 'browse', dir: 1 }, { type: 'mode', mode: 'write' }]);
-    expect(r.state).toMatchObject({ playIndex: null, caret: W, arrival: null });
+  it('deleting the current slot\'s bar keeps the current slot in the form', () => {
+    const r = improvise([{ type: 'step', dir: -1 }, { type: 'bar-action', bar: 3, action: 'delete' }]);
+    expect(r.state.slot).toBe(2);
   });
 });
 
-describe('Write: stepwise playback (` / ~)', () => {
+describe('the transport (Improvise, Read etude)', () => {
+  const improvise = (more: Intent[], opts: { onArrival?: OnArrival; state?: Partial<SessionState> } = {}) =>
+    run([{ type: 'mode', mode: 'improvise' }, ...more], { onArrival: opts.onArrival ?? 'chord', state: opts.state });
+
+  it('running: each chord sounds as it begins; nothing waits for a note; played notes don\'t bring it', () => {
+    const r = improvise([{ type: 'transport', run: true }, { type: 'transport-chord', index: 0 }, { type: 'transport-chord', index: 1 }, pick(62)]);
+    expect(r.per.map(show)).toEqual([[], [], ['chord D'], ['chord G'], ['note 62']]);
+    expect(r.state).toMatchObject({ running: true, slot: 1, arrival: null });
+  });
+
+  it('running: slots aren\'t moved by hand and the form isn\'t edited', () => {
+    const r = improvise([{ type: 'transport', run: true }, { type: 'step', dir: 1 }, { type: 'slot-click', index: 3 }, { type: 'append-bar' }, { type: 'time-signature', text: '3/4' }, { type: 'undo' }]);
+    expect(r.state.slot).toBe(0);
+    expect(r.p.bars).toHaveLength(4);
+    expect(r.p.timeSignature).toBe('4/4');
+    expect(r.effects).toEqual([]);
+  });
+
+  it('the end (no Loop) stops it on the first chord — of the looped bars, if any; rewind goes there too', () => {
+    expect(improvise([{ type: 'transport', run: true }, { type: 'transport-chord', index: 3 }, { type: 'transport-end' }]).state).toMatchObject({ running: false, slot: 0 });
+    const sel = improvise([{ type: 'bar-select', bar: 1, extend: false }, { type: 'bar-select', bar: 2, extend: true }, { type: 'step', dir: 1 }, { type: 'rewind' }]);
+    expect(sel.state.slot).toBe(1);
+  });
+
+  it('starts from the current slot — or, outside the looped bars, from their first', () => {
+    expect(improvise([{ type: 'browse', dir: 1 }, { type: 'transport', run: true }]).state.slot).toBe(1);
+    const r = run([{ type: 'bar-select', bar: 2, extend: false }, { type: 'mode', mode: 'read' }, { type: 'slot-click', index: 0 }, { type: 'transport', run: true }]);
+    expect(r.state).toMatchObject({ slot: 2, running: true });
+  });
+
+  it('stopping: in Improvise, the current slot\'s sound waits for the next note played', () => {
+    const r = improvise([{ type: 'transport', run: true }, { type: 'transport', run: false }, { type: 'heard' }]);
+    expect(show(r.per[3])).toEqual(['chord D']);
+  });
+
+  it('Write etude and Tuner have no transport', () => {
+    expect(run([{ type: 'transport', run: true }]).state.running).toBe(false);
+    expect(run([{ type: 'mode', mode: 'tuner' }, { type: 'transport', run: true }]).state.running).toBe(false);
+  });
+});
+
+describe('Read etude', () => {
+  const read = (more: Intent[], p = prog()) => run([{ type: 'mode', mode: 'read' }, ...more], { p, onArrival: 'chord', state: { caret: 0 } });
+  const two = { ...prog(), melody: [{ pitch: 62, d: 'w' as const }, { pitch: 67, d: 'w' as const }] };
+
+  it('stopped: clicking a slot moves the playhead there, silently; a note auditions and moves it to its slot', () => {
+    const r = read([{ type: 'slot-click', index: 2 }]);
+    expect(r.state.slot).toBe(2);
+    expect(r.effects).toEqual([]);
+    const n = read([{ type: 'event-click', event: { ev: two.melody[1], i: 1, start: W, end: 2 * W } }], two);
+    expect(n.state.slot).toBe(1);
+    expect(show(n.per[1])).toEqual(['note 67']);
+  });
+
+  it('▶ Chord / Bass / Scale preview the current slot; nothing edits', () => {
+    const r = read([{ type: 'slot-click', index: 1 }, { type: 'sound', what: 'chord' }, { type: 'append-bar' }, { type: 'time-signature', text: '3/4' }, { type: 'bar-action', bar: 0, action: 'delete' }]);
+    expect(show(r.per[2])).toEqual(['chord G']);
+    expect(r.p).toEqual(prog());
+  });
+
+  it('running: chart clicks do nothing — slots, notes, bar numbers', () => {
+    const r = read([{ type: 'transport', run: true }, { type: 'slot-click', index: 2 }, { type: 'event-click', event: { ev: two.melody[1], i: 1, start: W, end: 2 * W } }, { type: 'bar-select', bar: 1, extend: false }], two);
+    expect(r.state).toMatchObject({ slot: 0, selection: null });
+    expect(r.effects).toEqual([]);
+  });
+});
+
+describe('Write etude: stepwise playback (` / ~)', () => {
   const melody = { ...prog(), melody: [{ pitch: 62, d: 'h' as const }, { d: 'h' as const }, { pitch: 67, d: 'w' as const }] };
   const step: Intent = { type: 'step-play' };
 
@@ -174,55 +264,13 @@ describe('Write: stepwise playback (` / ~)', () => {
     expect(run([back, step], { p: melody, state: { caret: W } }).per.map(show)).toEqual([[], []]); // back onto the rest, then over it
   });
 
-  it('an empty melody or Play mode: nothing', () => {
+  it('an empty melody, or another mode: nothing', () => {
     expect(run([step]).effects).toEqual([]);
-    expect(run([{ type: 'mode', mode: 'play' }, step], { p: melody }).per[1]).toEqual([]);
+    expect(run([{ type: 'mode', mode: 'improvise' }, step], { p: melody }).per[1]).toEqual([]);
   });
 });
 
-describe('Practice (SPEC §3.7)', () => {
-  it('input: hex panel by default; the dropdown switches it (kept across modes)', () => {
-    expect(run([]).state.input).toBe('hex');
-    const r = run([{ type: 'input', how: 'instrument' }, { type: 'mode', mode: 'practice' }, { type: 'mode', mode: 'write' }, { type: 'mode', mode: 'practice' }]);
-    expect(r.state).toMatchObject({ practice: true, input: 'instrument' });
-  });
-
-  it('a hex pick in Practice auditions and is never written', () => {
-    const r = run([{ type: 'mode', mode: 'practice' }, pick(62)]);
-    expect(r.p.melody).toEqual([]);
-    expect(show(r.per[1])).toContain('note 62');
-  });
-
-  it('is Play with the mic: entering, switching with Play, and leaving', () => {
-    const r = run([{ type: 'mode', mode: 'practice' }]);
-    expect(r.state).toMatchObject({ playIndex: 0, practice: true });
-    expect(run([{ type: 'mode', mode: 'practice' }, { type: 'mode', mode: 'play' }]).state).toMatchObject({ playIndex: 0, practice: false });
-    expect(run([{ type: 'mode', mode: 'practice' }, { type: 'mode', mode: 'write' }]).state).toMatchObject({ playIndex: null, practice: false });
-  });
-  it('entering Practice is silent: the first slot\'s On arrival waits for the first note played', () => {
-    const r = run([{ type: 'mode', mode: 'practice' }, { type: 'practice-note' }, { type: 'practice-note' }], { onArrival: 'chord' });
-    expect(r.per.map(show)).toEqual([[], ['chord D'], []]);
-  });
-
-  it('On arrival sounds when the form moves on (landed: with that note)', () => {
-    const r = run([{ type: 'mode', mode: 'practice' }, { type: 'practice-advance', index: 1, landed: true }], { onArrival: 'bass-chord' });
-    expect(r.per.map(show)).toEqual([[], ['chord G', 'bass G']]);
-    expect(r.state.arrival).toBeNull(); // landed on the next chord: it sounded with that note
-  });
-
-  it('finishing a slot (note count, Follow): the arrival waits for the next note played — the new slot\'s first', () => {
-    const r = run([{ type: 'mode', mode: 'practice' }, { type: 'practice-advance', index: 1, landed: false }, { type: 'practice-note' }, { type: 'practice-note' }], { onArrival: 'chord' });
-    expect(r.per.map(show)).toEqual([[], [], ['chord G'], []]); // silent entry and finishing note; then with the next
-  });
-
-  it('the mic moves the form on; a length choice there never inserts a rest', () => {
-    const r = run([{ type: 'mode', mode: 'practice' }, { type: 'practice-advance', index: 2, landed: true }, { type: 'toggle-rest' }, { type: 'length', d: 'e' }]);
-    expect(r.state).toMatchObject({ playIndex: 2, length: 'e' });
-    expect(r.p.melody).toEqual([]);
-  });
-});
-
-describe('browsing in Write', () => {
+describe('browsing in Write etude', () => {
   it('< > move the caret to the slot start, wrapping', () => {
     expect(run([{ type: 'browse', dir: -1 }]).state.caret).toBe(3 * W);
     expect(run([{ type: 'browse', dir: 1 }]).state.caret).toBe(W);
@@ -286,39 +334,16 @@ describe('editing commands', () => {
   });
 });
 
-describe('the Mode dropdown (modeOf / chooseMode)', () => {
-  it('shows the mode the session is in; Play (unreachable) shows as Write', () => {
-    expect(modeOf(run([]).state)).toBe('write');
-    expect(modeOf(run([{ type: 'mode', mode: 'explore' }]).state)).toBe('explore');
-    expect(modeOf(run([{ type: 'mode', mode: 'practice' }]).state)).toBe('practice');
-    expect(modeOf(run([{ type: 'mode', mode: 'play' }]).state)).toBe('write');
-    expect(modeOf(run([{ type: 'stand', on: true }]).state)).toBe('read');
-  });
-  it('choosing a mode gets there — leaving Read first; choosing Read only enters it', () => {
-    for (const m of ['explore', 'practice', 'write'] as const) {
-      const s = run([{ type: 'stand', on: true }]).state;
-      const r = run(chooseMode(s, m), { state: s });
-      expect(modeOf(r.state)).toBe(m);
-    }
-    expect(chooseMode(run([]).state, 'read')).toEqual([{ type: 'stand', on: true }]);
-  });
-});
-
-describe('Practice over selected bars', () => {
-  it('starts on the first selected bar, loops those bars, and gives the selection back on leaving', () => {
-    const r = run([{ type: 'bar-select', bar: 1, extend: false }, { type: 'bar-select', bar: 2, extend: true }, { type: 'mode', mode: 'practice' }]);
-    expect(r.state.practiceBars).toEqual({ anchor: 1, from: 1, to: 2 });
-    expect(r.state.selection).toBeNull();
-    expect(r.state.playIndex).toBe(1);
+describe('looped bars = the bar selection', () => {
+  it('entering Improvise with bars selected starts on their first bar (when the caret is outside them)', () => {
+    const r = run([{ type: 'bar-select', bar: 1, extend: false }, { type: 'bar-select', bar: 2, extend: true }, { type: 'mode', mode: 'improvise' }]);
+    expect(r.state).toMatchObject({ slot: 1, selection: { anchor: 1, from: 1, to: 2 } });
     const back = run([{ type: 'mode', mode: 'write' }], { p: r.p, state: r.state });
-    expect(back.state.practiceBars).toBeNull();
-    expect(back.state.selection).toEqual({ anchor: 1, from: 1, to: 2 });
+    expect(back.state.selection).toEqual({ anchor: 1, from: 1, to: 2 }); // the same selection in Write etude
   });
-  it('without a selection: the whole form; ✕ goes back to the whole form', () => {
-    expect(run([{ type: 'mode', mode: 'practice' }]).state.practiceBars).toBeNull();
-    const r = run([{ type: 'bar-select', bar: 3, extend: false }, { type: 'mode', mode: 'practice' }, { type: 'practice-all-bars' }]);
-    expect(r.state.practiceBars).toBeNull();
-    expect(r.state.practice).toBe(true);
+  it('× (clear-selection) goes back to the whole form', () => {
+    const r = run([{ type: 'bar-select', bar: 3, extend: false }, { type: 'mode', mode: 'improvise' }, { type: 'clear-selection' }]);
+    expect(r.state.selection).toBeNull();
   });
 });
 
@@ -329,20 +354,20 @@ describe('bar selection: ⇧ extends', () => {
   });
 });
 
-describe('Practice: bar numbers pick the bars to loop', () => {
-  const practising = () => run([{ type: 'mode', mode: 'practice' }], { state: { caret: 0 } });
-  it('a click loops that bar (moving there), ⇧ extends, the only one again: the whole form', () => {
-    const r0 = practising();
-    const r = run([{ type: 'bar-select', bar: 2, extend: false }], { p: r0.p, state: r0.state });
-    expect(r.state.practiceBars).toEqual({ anchor: 2, from: 2, to: 2 });
-    expect(r.state.playIndex).toBe(2);
-    expect(r.state.selection).toBeNull();
-    const ext = run([{ type: 'bar-select', bar: 3, extend: true }], { p: r.p, state: r.state });
-    expect(ext.state.practiceBars).toEqual({ anchor: 2, from: 2, to: 3 });
-    expect(ext.state.playIndex).toBe(2);
-    const off = run([{ type: 'bar-select', bar: 2, extend: false }], { p: r.p, state: r.state });
-    expect(off.state.practiceBars).toBeNull();
-  });
+describe('Improvise / Read etude: bar numbers pick the bars to loop', () => {
+  for (const mode of ['improvise', 'read'] as const) {
+    it(`${mode}: a click loops that bar (moving there), ⇧ extends, the only one again: the whole form`, () => {
+      const r0 = run([{ type: 'mode', mode }], { state: { caret: 0 } });
+      const r = run([{ type: 'bar-select', bar: 2, extend: false }], { p: r0.p, state: r0.state });
+      expect(r.state.selection).toEqual({ anchor: 2, from: 2, to: 2 });
+      expect(r.state.slot).toBe(2);
+      const ext = run([{ type: 'bar-select', bar: 3, extend: true }], { p: r.p, state: r.state });
+      expect(ext.state.selection).toEqual({ anchor: 2, from: 2, to: 3 });
+      expect(ext.state.slot).toBe(2);
+      const off = run([{ type: 'bar-select', bar: 2, extend: false }], { p: r.p, state: r.state });
+      expect(off.state.selection).toBeNull();
+    });
+  }
 });
 
 describe('deselecting', () => {
@@ -350,8 +375,8 @@ describe('deselecting', () => {
     const r = run([{ type: 'bar-select', bar: 1, extend: false }, { type: 'bar-select', bar: 3, extend: true }, { type: 'bar-select', bar: 2, extend: false }]);
     expect(r.state.selection).toBeNull();
   });
-  it('Practice: a plain click on any looped bar goes back to the whole form', () => {
-    const r = run([{ type: 'mode', mode: 'practice' }, { type: 'bar-select', bar: 1, extend: false }, { type: 'bar-select', bar: 3, extend: true }, { type: 'bar-select', bar: 3, extend: false }], { state: { caret: 0 } });
-    expect(r.state.practiceBars).toBeNull();
+  it('Improvise: a plain click on any looped bar goes back to the whole form', () => {
+    const r = run([{ type: 'mode', mode: 'improvise' }, { type: 'bar-select', bar: 1, extend: false }, { type: 'bar-select', bar: 3, extend: true }, { type: 'bar-select', bar: 3, extend: false }], { state: { caret: 0 } });
+    expect(r.state.selection).toBeNull();
   });
 });

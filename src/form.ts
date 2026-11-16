@@ -62,7 +62,7 @@ export function slotAt(slots: FormSlot[], t: number): FormSlot | undefined {
   return slots.find((s) => t >= s.start && t < s.end) ?? slots[slots.length - 1];
 }
 
-/** Play mode ← / → (SPEC §3.3): previous / next slot, wrapping at both ends (the form loops). */
+/** Improvise / Read etude ← / → (SPEC §3.3): previous / next slot, wrapping at both ends (the form loops). */
 export function stepSlot(index: number, dir: -1 | 1, count: number): number {
   if (count <= 0) return 0;
   return (((index + dir) % count) + count) % count;

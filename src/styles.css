@@ -18,7 +18,7 @@
   --panel-glow: inset 0 0 28px color-mix(in srgb, var(--grid-glow) 38%, transparent);
   --line: #1d1b19;
   --divider: #8c8680;
-  /* Groups (SPEC §3.1): every outlined pill — the header's sound, editing, practice, mode and Ins: pills. Tweak here. */
+  /* Groups (SPEC §3.1): every outlined pill — the header's sound, editing, form, transport, mode and Ins: pills. Tweak here. */
   --group-height: 28px;
   --group-radius: 14px;
   --group-pad-x: 8px;
@@ -185,7 +185,7 @@ body,
     transform: scale(1);
   }
 }
-/* Still (Practice's metronome): chord changes land at once — no fades or slides. */
+/* Still (Improvise with the transport running): chord changes land at once — no fades or slides. */
 .docked-hex.still .hex-bg,
 .docked-hex.still .hex-name,
 .docked-hex.still .hex-ball,
@@ -306,7 +306,7 @@ button.dock-label {
   min-width: 0;
 }
 
-/* Play mode's current slot (SPEC §3.3): a solid highlight, distinct from Write's tint. */
+/* The current slot in Improvise and Read etude (SPEC §3.3, §3.4): a solid highlight, distinct from Write etude's tint. */
 .slot.active.playing {
   background: rgba(255, 190, 40, 0.32);
 }
@@ -989,45 +989,7 @@ button.dock-label {
   pointer-events: none;
 }
 
-/* An on / off switch (Audio input): a track with a knob that slides right; on, the track fills in the light ink colour
-   (like Grid's on state). */
-.switch {
-  position: relative;
-  flex: none;
-  width: 30px;
-  height: 16px;
-  padding: 0;
-  border: none;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.25);
-  cursor: pointer;
-  transition: background 120ms ease;
-}
-.switch-knob {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #f3eee6;
-  transition: transform 120ms ease;
-}
-.switch.on {
-  background: #f3eee6;
-}
-.switch.on .switch-knob {
-  transform: translateX(14px);
-  background: var(--dock-bg);
-}
-@media (prefers-reduced-motion: reduce) {
-  .switch,
-  .switch-knob {
-    transition: none;
-  }
-}
-
-/* The mode panel (SPEC §3.1): Input: and Mode:, two labelled dropdowns, always visible. */
+/* The mode panel (SPEC §3.1): the Mode dropdown, always visible. */
 .mode-panel {
   flex: none;
 }
@@ -1084,36 +1046,21 @@ button.dock-label {
   font-weight: 400;
 }
 
-/* Etude view (SPEC §3.4; `stand` in code): thin header + the whole form fitted to the page. */
-.stand-layout {
-  display: grid;
-  grid-template-rows: auto 1fr;
-  height: 100vh;
+/* Read etude (SPEC §3.4): no hex — the chart takes the whole main area, every bar fitted to it (no zoom floor). */
+.main.read {
+  grid-template-rows: minmax(0, 1fr);
+}
+.main.read > .chart-area {
+  overflow: hidden;
+  padding-bottom: 16px;
 }
 
-.stand-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 4px 12px;
-  border-bottom: 1px solid #e0ddd6;
-  background: var(--rail-bg);
-  font-size: 13px;
+/* Tuner (SPEC §3.8): the chart pane keeps its height, empty — the chart is laid out but never shown. */
+.chart-pane-empty {
+  visibility: hidden;
+  pointer-events: none;
 }
-
-.stand-title {
-  font-weight: 600;
-}
-
-.stand-instrument {
-  color: var(--muted);
-}
-
-.stand-spacer {
-  flex: 1;
-}
-
-.stand-chart {
+.main.tuner-mode > .chart-area {
   overflow: hidden;
 }
 
@@ -1459,19 +1406,15 @@ textarea {
   border: var(--group-border);
   background: var(--group-bg);
 }
-/* Group text in lowercase (labels, buttons, dropdown values and their options) — except note names, which keep their
-   letter case (the practice panel's targets). */
+/* Group text in lowercase (labels, buttons, dropdown values and their options). */
 .group,
 .group button,
 .group select,
 .group option {
   text-transform: lowercase;
 }
-.group .practice-target {
-  text-transform: none;
-}
-/* Every group and well flashes when it appears (a mode switch swaps the editing pill for the practice panel; the
-   practice panel re-appears each time the form moves on) and when one of its controls is used (App replays it). */
+/* Every group and well flashes when it appears (a mode switch swaps the editing pill for the form group or the
+   transport bar) and when one of its controls is used (App replays it). */
 .group,
 .well {
   animation: group-flash 600ms ease-out;
@@ -1601,7 +1544,7 @@ select {
   padding-block: 1px;
 }
 
-/* The header's second row (SPEC §3.1): the editing pill / practice panel centred, clef + Ins: right. */
+/* The header's second row (SPEC §3.1): the mode's groups centred, clef + Ins: right. */
 .topbar-row {
   flex-basis: 100%;
   display: flex;
@@ -1906,16 +1849,28 @@ select {
   min-width: 0;
 }
 
-/* Wide screens: row 2 is three columns — the editing pill (or, in Practice, the practice panel) centred, the
-   clef + Ins: pill at the right end. Below 900px everything in the row is centred together. */
+/* Row 2's centre: the mode's groups (editing pill; form group + transport bar; transport bar), side by side. */
+.mode-groups {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+.mode-groups:empty {
+  display: none;
+}
+
+/* Wide screens: row 2 is three columns — the mode's groups centred, the clef + Ins: pill at the right end. Below
+   900px everything in the row is centred together. */
 @media (min-width: 901px) {
   .topbar .topbar-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   }
-  .topbar .topbar-row > .edit-pill,
-  .topbar .topbar-row > .practice-panel {
+  .topbar .topbar-row > .mode-groups {
     grid-column: 2;
+    display: flex;
   }
   .topbar .topbar-row > .topbar-file {
     grid-column: 1;
@@ -1927,14 +1882,6 @@ select {
   }
 }
 
-/* Listen couldn't start (mic blocked / missing): the hex panel's top left corner. */
-.listen-error {
-  position: absolute;
-  left: 12px;
-  top: 10px;
-  z-index: 2;
-  font-size: 11px;
-}
 /* While listening: the input level control and meter, in a pill as tall as the tuner (30px). */
 .listen-levels {
   display: inline-flex;
@@ -2026,33 +1973,42 @@ select {
 .listen-count {
   opacity: 0.85;
 }
-.listen-error {
+/* The tuner's place when there is no tuner to show (SPEC §3.0): tap to start listening, or why the mic can't be used. */
+.tuner.tuner-message {
+  display: block;
+  padding: 0 16px;
+  line-height: 30px;
+  font-size: 12px;
+  text-align: center;
+  color: #f3eee6;
+}
+.tuner.tuner-message[role='alert'] {
   color: #ffb4a8;
 }
 
-/* Practice (SPEC §3.7): the panel at the bottom left of the header, and the target rings on the hex. */
-.practice-panel {
+/* The transport bar (SPEC §3.7), centred in the header's second row; and the target rings on the hex. */
+.transport-bar {
   color: #f3eee6;
   font-size: 12px;
   color-scheme: dark;
 }
-.practice-rule-field {
+.transport-field {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   white-space: nowrap;
 }
-.practice-rule-label {
+.transport-label {
   opacity: 0.75;
 }
-/* The metronome's tempo field (bpm): no spinner, so three digits fit. */
-.practice-bpm::-webkit-outer-spin-button,
-.practice-bpm::-webkit-inner-spin-button {
+/* The transport's tempo field (bpm): no spinner, so three digits fit. */
+.transport-bpm::-webkit-outer-spin-button,
+.transport-bpm::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
-/* The metronome's tempo field (bpm). */
-.practice-bpm {
+/* The transport's tempo field (bpm). */
+.transport-bpm {
   width: 3.2em;
   -moz-appearance: textfield;
   appearance: textfield;
@@ -2065,28 +2021,19 @@ select {
   color: inherit;
   text-align: center;
 }
-.practice-rule {
+.transport-select {
   font: inherit;
   font-size: 12px;
   padding-block: 1px;
 }
-.practice-count {
-  font-weight: 700;
-  font-size: 14px;
-  min-width: 40px;
-}
-.practice-target {
-  color: var(--grid-glow);
-  font-weight: 600;
-}
-.practice-loop {
+.transport-loop {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   cursor: pointer;
 }
-/* Looping selected bars: a chip after Loop, × back to the whole form. */
-.practice-bars {
+/* The looped bars: a chip after Loop, × back to the whole form. */
+.transport-bars {
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -2096,7 +2043,7 @@ select {
   font-size: 12px;
   white-space: nowrap;
 }
-.practice-bars-clear {
+.transport-bars-clear {
   border: none;
   background: none;
   color: inherit;
@@ -2107,7 +2054,7 @@ select {
   border-radius: 8px;
   cursor: pointer;
 }
-.practice-bars-clear:hover {
+.transport-bars-clear:hover {
   background: rgba(255, 255, 255, 0.18);
 }
 .hex-target {

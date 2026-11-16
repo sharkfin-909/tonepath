@@ -1,5 +1,5 @@
 // Bar number + ⋯ bar handle (SPEC §4.1): in Write, click the number to select the bar (⇧ extends to a run; a selected
-// bar again deselects) and ⋯ opens the bar menu, shown on the active bar and on hover. In Practice (§3.7) the number
+// bar again deselects) and ⋯ opens the bar menu, shown on the active bar and on hover. In Improvise and Read etude (§3.7) the number
 // alone picks the bars to loop.
 import { useEffect, useRef, useState } from 'react';
 
@@ -8,7 +8,7 @@ export type { BarAction };
 
 export interface BarHandleProps {
   bar: number;
-  /** The ⋯ bar menu (Write); Practice shows the number only, to pick bars to loop. */
+  /** The ⋯ bar menu (Write etude); Improvise and Read etude show the number only, to pick bars to loop. */
   menu?: boolean;
   selected: boolean;
   split: boolean;

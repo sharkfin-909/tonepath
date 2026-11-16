@@ -1,7 +1,8 @@
 // Microphone listening (SPEC §9.2): the mic → an AnalyserNode, read every animation frame, run through the pure
 // detectors in `pitch.ts`. Reports a held note (two-frame lock, kept through brief unlocks), display cents from an
-// adaptive EMA needle (not used for Practice counts), attacks, and played notes (`noteStart`, from NoteTracker).
-// Analysis window (fftSize + minHz) follows the instrument's concert low. The browser asks for the mic once.
+// adaptive EMA needle (display only), attacks, and played notes (`noteStart`, from NoteTracker).
+// Analysis window (fftSize + minHz) follows the instrument's concert low. The browser asks for the mic once; the audio
+// may be held until the first user gesture (an open straight into Tuner), which the caller is told about.
 
 import {
   AdaptiveEma,
@@ -33,6 +34,8 @@ export interface Heard {
 
 export interface Listening {
   stop: () => void;
+  /** Resume the audio after a user gesture, when the browser held it (`onAudioState(false)`). */
+  resume: () => void;
   /** The input level control: gain before the detectors, in dB (SPEC §9.2). */
   setGainDb: (db: number) => void;
   /** Retune the analysis window when the instrument changes (issues/064). */
@@ -44,6 +47,21 @@ export interface ListenOptions {
   gainDb?: number;
   /** Concert MIDI of the instrument's practical low, or null for Concert (2048 / 55 Hz). */
   concertLowMidi?: number | null;
+  /**
+   * The audio is running (true) or held until a user gesture (false) — opening straight into Tuner, the browser may
+   * keep it suspended (SPEC §3.0). Called once at the start and on every change.
+   */
+  onAudioState?: (running: boolean) => void;
+}
+
+/** Why the mic can't be used: no secure page (HTTPS / localhost), permission refused, or no input device. */
+export type MicProblem = 'insecure' | 'blocked' | 'no-device';
+
+/** The mic problem behind a failed `startListening` (SPEC §3.0). */
+export function micProblem(err: unknown): MicProblem {
+  if (typeof window !== 'undefined' && (!window.isSecureContext || !navigator.mediaDevices)) return 'insecure';
+  if (err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'SecurityError')) return 'blocked';
+  return 'no-device';
 }
 
 /** The input level control's range, in dB. */
@@ -64,7 +82,12 @@ export async function startListening(onFrame: (h: Heard) => void, opts: ListenOp
     audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false },
   });
   const ctx = new AudioContext();
-  if (ctx.state === 'suspended') await ctx.resume(); // started from the Listen click, so this is allowed
+  // Not awaited: with no user gesture yet (an open straight into Tuner) the browser may hold the audio, and resume()
+  // would wait for one. The caller hears about it (`onAudioState`) and resumes on the first gesture.
+  const report = () => options.onAudioState?.(ctx.state === 'running');
+  ctx.onstatechange = report;
+  if (ctx.state === 'suspended') void ctx.resume().catch(() => {});
+  report();
   const source = ctx.createMediaStreamSource(stream);
   const gain = ctx.createGain(); // the input level control
   gain.gain.value = 10 ** (gainDb / 20);
@@ -113,13 +136,19 @@ export async function startListening(onFrame: (h: Heard) => void, opts: ListenOp
   };
   raf = requestAnimationFrame(tick);
 
+  const resume = () => {
+    if (ctx.state === 'suspended') void ctx.resume().catch(() => {});
+  };
+
   const stop = () => {
     cancelAnimationFrame(raf);
+    ctx.onstatechange = null;
     stream.getTracks().forEach((t) => t.stop());
     void ctx.close();
   };
   return {
     stop,
+    resume,
     setGainDb: (db) => gain.gain.setTargetAtTime(10 ** (db / 20), ctx.currentTime, 0.02),
     setConcertLowMidi: applyWindow,
   };

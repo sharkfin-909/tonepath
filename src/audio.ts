@@ -41,7 +41,7 @@ export function scaleRun(h: SlotHarmony): number[] {
   return [...steps.map((s) => root + s), root + 12];
 }
 
-/** Play mode's Root note: the chord's bass (the slash bass if any) in concert octave 3. Null without a chord. */
+/** *Audio on chord*'s Root note: the chord's bass (the slash bass if any) in concert octave 3. Null without a chord. */
 export function rootNote(h: SlotHarmony): number | null {
   if (h.kind !== 'chord') return null;
   return OCTAVE_3 + pc(h.bass ?? h.root);
@@ -154,7 +154,7 @@ export function playScale(h: SlotHarmony): void {
   scaleRun(h).forEach((m, i) => tone(m, c.currentTime + i * SCALE_GAP, NOTE));
 }
 
-/** Play mode *On arrival: Root note*. */
+/** *Audio on chord* (*On arrival*): Root note. */
 export function playRoot(h: SlotHarmony): void {
   const c = ready();
   const m = rootNote(h);
@@ -189,7 +189,7 @@ function noise(c: AudioContext): AudioBuffer {
 }
 
 /**
- * One metronome click at audio time `at` (Practice with the metronome, SPEC §3.7): synthesised, dry (no reverb), louder
+ * One metronome click at audio time `at` (the transport, SPEC §3.7): synthesised, dry (no reverb), louder
  * and higher on a bar's first beat (`accent`).
  */
 export function playClick(sound: ClickSound, accent: boolean, at: number): void {

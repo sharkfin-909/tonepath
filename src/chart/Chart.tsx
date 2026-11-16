@@ -41,16 +41,16 @@ export interface ChartProps {
   onBarAction: (bar: number, action: BarAction) => void;
   onAppendBar: () => void;
   canPaste: boolean;
-  /** Practice, Follow the etude (SPEC §3.7): show the written melody in Play after all, the notes already played green. */
-  follow?: { played: ReadonlySet<number> } | null;
-  /** Practice: bar numbers (no menu) pick the bars to loop; `selection` is those bars. */
-  practiceBars?: boolean;
-  /** Play mode (SPEC §3.3): the current slot. The caret, bar handles and "+" are hidden; chords and scales stay editable. */
-  playIndex?: number | null;
-  /** Explore (SPEC §3.2): empty staves like Play, and no caret, bar handles or "+"; chords and scales stay editable. */
-  explore?: boolean;
-  /** Etude view (SPEC §3.4; `stand` in code): read-only, nothing highlighted or clickable, fit the page with no zoom floor. */
-  stand?: boolean;
+  /**
+   * The chart's mode (SPEC §3.0): Write etude (the caret, the bar menu); Improvise (a lead sheet — empty staves,
+   * chords, scales and the form editable while stopped; bar numbers pick the looped bars); Read etude (the etude,
+   * fitted to the page with no zoom floor; nothing edits; bar numbers pick the looped bars).
+   */
+  mode?: 'improvise' | 'write' | 'read';
+  /** Improvise / Read etude: the current slot (the playhead), highlighted. */
+  current?: number | null;
+  /** The transport is running: nothing on the chart edits; in Read etude nothing is clickable. */
+  running?: boolean;
   /**
    * Height budget (rendered px) to fit the rows into, when the chart's own area sizes to its content (the chart
    * screen: the hex takes whatever the chart leaves). Without it the chart fits its parent's height.
@@ -86,15 +86,18 @@ function useParentSize<T extends HTMLElement>() {
   return [ref, size] as const;
 }
 
-export function Chart({ progression, view, caret, onSlotClick, onEventClick, onTimeClick, onChordCommit, onScaleChange, editRequest, selection, onBarSelect, onBarAction, onAppendBar, canPaste, playIndex = null, explore = false, stand = false, maxHeight, follow = null, practiceBars = false }: ChartProps) {
-  const playing = playIndex !== null;
-  /** Play, Explore and Etude view hide the caret, bar handles, trash cans and "+" (Play keeps chord and scale entry; Practice keeps bar numbers, to pick bars to loop). */
-  const readOnly = playing || stand || explore;
+export function Chart({ progression, view, caret, onSlotClick, onEventClick, onTimeClick, onChordCommit, onScaleChange, editRequest, selection, onBarSelect, onBarAction, onAppendBar, canPaste, mode = 'write', current = null, running = false, maxHeight }: ChartProps) {
+  const writing = mode === 'write';
+  const read = mode === 'read';
+  /** Read etude while running: nothing on the chart answers a click. */
+  const inert = read && running;
+  /** Chords, scales, "+" and the trash cans: Write etude, and Improvise while stopped. */
+  const editsForm = writing || (mode === 'improvise' && !running);
   const { bars, barsPerRow } = progression;
   const [fitRef, area] = useParentSize<HTMLDivElement>();
   const chartRef = useRef<HTMLDivElement>(null);
   const { slots, meter: layout, clef, usedChords } = view;
-  const activeSlot = stand ? -1 : playing ? playIndex : view.slotAt(caret).index;
+  const activeSlot = writing ? view.slotAt(caret).index : (current ?? -1);
   const [editing, setEditing] = useState<{ bar: number; part: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -103,7 +106,7 @@ export function Chart({ progression, view, caret, onSlotClick, onEventClick, onT
 
   // Chart zoom (SPEC §3.1): lay out at logical width area/z, scale by z. Fit every row, capped at 1.4×, floor 0.5.
   const staveHeight = staveMetrics().height;
-  const { zoom, scrolls } = fitZoom(rows.length, staveHeight, maxHeight ?? area.height, stand ? 0 : undefined);
+  const { zoom, scrolls } = fitZoom(rows.length, staveHeight, maxHeight ?? area.height, read ? 0 : undefined);
   const header = headerPx(zoom);
   const zoomStyle = {
     width: area.width / zoom,
@@ -117,7 +120,7 @@ export function Chart({ progression, view, caret, onSlotClick, onEventClick, onT
   useEffect(() => {
     if (!scrolls) return;
     chartRef.current?.querySelector('.slot.active')?.scrollIntoView({ block: 'nearest' });
-  }, [scrolls, caret, zoom, playIndex]);
+  }, [scrolls, caret, zoom, current]);
 
   const startEditing = (target: { bar: number; part: number } | null) => {
     setError(null);
@@ -164,22 +167,22 @@ export function Chart({ progression, view, caret, onSlotClick, onEventClick, onT
               slot={slot}
               view={view}
               active={slot.index === activeSlot}
-              onActivate={stand ? () => {} : () => onSlotClick(slot)}
+              onActivate={inert ? () => {} : () => onSlotClick(slot)}
               clef={clef}
               melody={progression.melody}
-              caret={!readOnly && slot.index === activeSlot ? caret : undefined}
-              playing={playing || explore}
-              follow={follow}
-              onEventClick={stand ? undefined : onEventClick}
-              onTimeClick={stand ? undefined : onTimeClick}
+              caret={writing && slot.index === activeSlot ? caret : undefined}
+              playing={!writing}
+              hideMelody={mode === 'improvise'}
+              onEventClick={inert ? undefined : onEventClick}
+              onTimeClick={inert ? undefined : onTimeClick}
               span={2 / bars[slot.bar].length}
               layout={layout}
               header={header}
               showTimeSignature={slot.index === 0}
               barTools={
-                (!readOnly || practiceBars) && slot.part === 0
+                !inert && slot.part === 0
                   ? {
-                      menu: !readOnly,
+                      menu: writing,
                       selected: !!selection && slot.bar >= selection.from && slot.bar <= selection.to,
                       split: bars[slot.bar].length === 2,
                       canPaste,
@@ -190,22 +193,22 @@ export function Chart({ progression, view, caret, onSlotClick, onEventClick, onT
                   : null
               }
               inSelection={!!selection && slot.bar >= selection.from && slot.bar <= selection.to}
-              onShiftSelect={!readOnly || practiceBars ? () => onBarSelect(slot.bar, true) : undefined}
-              onDeleteBar={!readOnly && slot.barEnd && bars.length > 1 ? () => onBarAction(slot.bar, 'delete') : undefined}
-              onAppend={!readOnly && slot.index === slots.length - 1 ? onAppendBar : undefined}
+              onShiftSelect={!inert ? () => onBarSelect(slot.bar, true) : undefined}
+              onDeleteBar={editsForm && slot.barEnd && bars.length > 1 ? () => onBarAction(slot.bar, 'delete') : undefined}
+              onAppend={editsForm && slot.index === slots.length - 1 ? onAppendBar : undefined}
               editing={editing?.bar === slot.bar && editing.part === slot.part}
               error={error}
               usedChords={usedChords}
               onEdit={
-                stand
-                  ? undefined
-                  : () => {
-                      if (playing) onSlotClick(slot); // Play: the slot becomes current too
-                      startEditing({ bar: slot.bar, part: slot.part }); // chord entry in Write and Play
+                editsForm
+                  ? () => {
+                      if (!writing) onSlotClick(slot); // Improvise: the slot becomes current too
+                      startEditing({ bar: slot.bar, part: slot.part }); // chord entry in Write etude and Improvise
                     }
+                  : undefined
               }
               onCommit={(text, move) => commit(slot, text, move)}
-              onScaleChange={stand ? undefined : (scale) => onScaleChange(slot.bar, slot.part, scale)} // Write and Play
+              onScaleChange={editsForm ? (scale) => onScaleChange(slot.bar, slot.part, scale) : undefined} // Write etude and Improvise
             />
           ))}
         </div>
@@ -223,9 +226,10 @@ interface SlotViewProps {
   clef: Clef;
   melody: Progression['melody'];
   caret?: number;
-  /** Play mode: the active slot gets the solid "current slot" highlight. */
+  /** Improvise / Read etude: the active slot gets the solid "current slot" highlight. */
   playing: boolean;
-  follow: { played: ReadonlySet<number> } | null;
+  /** Improvise: an empty stave to play over (the lead sheet). */
+  hideMelody: boolean;
   onEventClick?: (e: TimedEvent) => void;
   onTimeClick?: (t: number) => void;
   span: number;
@@ -254,7 +258,7 @@ interface SlotViewProps {
 
 const NO_EVENTS: TimedEvent[] = [];
 
-function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing, follow, onEventClick, onTimeClick, span, layout, header, barTools, inSelection, onShiftSelect, onDeleteBar, onAppend, showTimeSignature, editing, error, usedChords, onEdit, onCommit, onScaleChange }: SlotViewProps) {
+function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing, hideMelody, onEventClick, onTimeClick, span, layout, header, barTools, inSelection, onShiftSelect, onDeleteBar, onAppend, showTimeSignature, editing, error, usedChords, onEdit, onCommit, onScaleChange }: SlotViewProps) {
   // Everything shown runs against the written chord; the stored melody stays concert (SPEC §5.3, §10).
   const { chord, harmony } = slot;
   const spell = (midi: number) => view.name(midi, slot);
@@ -313,9 +317,8 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
           clef={clef}
           start={slot.start}
           end={slot.end}
-          // Play: an empty stave to play over (SPEC §3.3) — unless Practice follows the etude (§3.7).
-          events={playing && !follow ? NO_EVENTS : eventsForSlot(melody, slot)}
-          played={follow?.played}
+          // Improvise: an empty stave to play over (SPEC §3.3).
+          events={hideMelody ? NO_EVENTS : eventsForSlot(melody, slot)}
           spell={spell}
           caret={caret}
           onEventClick={onEventClick}
