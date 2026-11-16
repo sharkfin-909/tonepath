@@ -1,7 +1,7 @@
 // Improvise's lead sheet (SPEC §3.3): in place of the stave, a little hex of the slot's scale, spelled from its root —
 // rows [1 2] [3 4] [5 6 7] from the bottom, each half a cell left of the one below (the docked hex's geometry: right =
 // the next step, up-left = a third). Coloured as the docked hex: triad tones and the guide tone in their degree colour,
-// the rest neutral. Sized to the stave's height so rows keep their size and the zoom is unchanged.
+// the rest neutral. It fills the height it is given (the slot's), so rows keep their size and the zoom is unchanged.
 import { DEGREE_COLOURS, inkOn } from '../hex';
 import { leadRows, leadTones } from '../leadSheet';
 import type { SlotHarmony } from '../harmony';
@@ -16,8 +16,8 @@ function hexPoints(cx: number, cy: number, r: number): string {
   }).join(' ');
 }
 
-export function LeadTones({ harmony }: { harmony: SlotHarmony }) {
-  const { height } = staveMetrics();
+/** `height`: the space to fill; default the stave's (Improvise's 3-column slot centres it vertically). */
+export function LeadTones({ harmony, height = staveMetrics().height }: { harmony: SlotHarmony; height?: number }) {
   const tones = leadTones(harmony);
   const rows = tones ? leadRows(tones) : [];
   // Cell geometry: rows overlap by a quarter of a cell's height; each row sits half a cell left of the one below.

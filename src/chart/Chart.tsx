@@ -294,7 +294,7 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
   const { chord, harmony } = slot;
   const spell = (midi: number) => view.name(midi, slot);
   const [ref, width] = useWidth<HTMLDivElement>();
-  const { staffTop, staffBottom } = staveMetrics();
+  const { staffTop, staffBottom, height: staveHeight } = staveMetrics();
   // Unparseable time signatures are shown in the header as typed; the stave shows (and beams by) the layout meter.
   const meter = showTimeSignature ? layout : undefined;
   /** Marks against this (owning) slot's written harmony (SPEC §7.2). */
@@ -302,9 +302,10 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
 
   return (
     <div
-      className={['slot', active && 'active', keyMate && 'key-mate', (active || keyMate) && playing && 'playing', inSelection && !loop && 'bar-selected', loop && 'looped', loop?.start && 'loop-start', loop?.end && 'loop-end'].filter(Boolean).join(' ')}
+      className={['slot', active && 'active', keyMate && 'key-mate', (active || keyMate) && playing && 'playing', inSelection && !loop && 'bar-selected', loop && 'looped', loop?.start && 'loop-start', loop?.end && 'loop-end', hideMelody && 'lead'].filter(Boolean).join(' ')}
       // --staff-top: where the stave's top line sits in the slot; the bar number sits just above it (CSS .bar-handle).
-      style={{ gridColumn: `span ${span}`, ['--staff-top' as string]: `${header + staffTop}px` }}
+      // Improvise's 3-column slot keeps the usual slot height (labels + stave), so rows and the zoom stay as they were.
+      style={{ gridColumn: `span ${span}`, ['--staff-top' as string]: `${header + staffTop}px`, ...(hideMelody ? { minHeight: header + staveHeight } : {}) }}
       data-slot={slot.index}
       // ⇧-click (Write): extend the bar selection to this bar — caught before notes, the stave or the chord see it.
       onClickCapture={(e) => {

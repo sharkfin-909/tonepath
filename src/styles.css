@@ -1359,6 +1359,41 @@ button.dock-label {
   padding-inline: 26px 6px;
   overflow: hidden;
 }
+/* Improvise's slot (SPEC §3.3): three columns — chord, scale and bar number on the left; the hex in the middle, the
+   slot's full height; the key pill on the right. */
+.slot.lead {
+  display: grid;
+  /* Equal side columns: the hex sits in the slot's middle; the key pill at the right column's end. */
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  column-gap: 4px;
+  align-items: start;
+}
+/* The key pill takes the right column (in flow here, not over the slot), so the left column gets the rest. */
+.slot.lead > .key-pill {
+  position: static;
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+  max-width: none;
+  margin: 2px 4px 0 0;
+}
+.slot.lead > .key-pill.beside-append {
+  margin-right: 26px;
+}
+.slot.lead > .slot-header {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+}
+.slot.lead > .slot-body {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+}
+.slot.lead .lead-tones {
+  padding-inline: 0;
+  justify-content: center;
+}
 .lead-hex {
   display: block;
   overflow: visible;
