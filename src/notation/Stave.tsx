@@ -7,6 +7,7 @@ import type { NoteMark } from '../marks';
 import { beamsFor } from './beaming';
 import { TICKS, fillDurations, type TimedEvent } from '../melody';
 import type { Duration } from '../progression';
+import { HIGHLIGHT } from '../theme';
 
 /** Fixed headroom of 3 ledger lines above and below on every row (SPEC §7.1). */
 const STAVE_OPTIONS = { spaceAboveStaffLn: 3, spaceBelowStaffLn: 3 };
@@ -98,7 +99,7 @@ function vexKey(name: string): string {
 }
 
 const VEX_DURATION: Record<Duration, string> = { w: 'w', h: 'h', q: 'q', e: '8', s: '16' };
-const CARET = '#2f6fdb';
+const CARET = HIGHLIGHT;
 /** Mark colours (SPEC §7.2). */
 const OUT_OF_SCALE = '#C8650A'; // orange
 const OUT_OF_RANGE = '#B5B5B5';

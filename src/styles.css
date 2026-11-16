@@ -31,7 +31,12 @@
   --well-pad-x: 12px;
   --well-bg: rgba(0, 0, 0, 0.22);
   --well-edge: rgba(255, 255, 255, 0.12);
-  --focus: #2f6fdb;
+  /* Active slot, playhead, loop band, caret, key pills — every mode (`src/theme.ts`). */
+  --highlight: #dca021;
+  --focus: var(--highlight);
+  /* Slot card overlay (`--slot-tint` gradient layer). */
+  --highlight-overlay: color-mix(in srgb, var(--highlight) 16%, transparent);
+  --highlight-overlay-subtle: color-mix(in srgb, var(--highlight) 8%, transparent);
   font-family: 'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif;
   color: var(--ink);
   background: var(--bg);
@@ -55,6 +60,7 @@ body,
 
 /* Chart screen: a header of controls over the chart, above a fixed 50% dock (full width for the hex). */
 .layout-c {
+  position: relative;
   display: grid;
   grid-template-rows: auto 1fr;
   height: 100vh;
@@ -315,14 +321,14 @@ button.dock-label {
   background-image: linear-gradient(var(--slot-tint), var(--slot-tint));
 }
 
-/* The current slot in Improvise and Read etude (SPEC §3.3, §3.4): Write etude's active-slot blue. */
+/* The current slot in Improvise and Read etude (SPEC §3.3, §3.4): the same tint as Write etude's active slot. */
 .slot.active.playing {
-  --slot-tint: rgba(47, 111, 219, 0.08); /* the same blue as Write etude's active slot */
+  --slot-tint: var(--highlight-overlay);
 }
 
 /* Active slot (drives the docked hex): a light tint across the slot. Its key mates light only their key pills. */
 .slot.active {
-  --slot-tint: rgba(47, 111, 219, 0.08);
+  --slot-tint: var(--highlight-overlay);
 }
 
 /* The key pill (SPEC §3.1): top right of each slot, the key its scale belongs to (C, B♭, A♭ mel, dim…). Sized with the
@@ -347,8 +353,8 @@ button.dock-label {
   white-space: nowrap;
   padding: 0 0.5em;
   border-radius: 1em;
-  border: 1px solid color-mix(in srgb, #ffdd57 70%, #1d1b19);
-  background: color-mix(in srgb, #ffdd57 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--highlight) 70%, #1d1b19);
+  background: color-mix(in srgb, var(--highlight) 18%, transparent);
   font-size: calc(var(--scale-px) * 1.1);
   font-weight: 600;
   line-height: 1.45;
@@ -358,11 +364,11 @@ button.dock-label {
 .key-pill.beside-append {
   margin-right: 20px;
 }
-/* Lit (the current slot and its key mates): solid warm yellow, dark ink — every mode. */
+/* Lit (the current slot and its key mates): solid highlight, dark ink — every mode. */
 .slot.active .key-pill,
 .slot.key-mate .key-pill {
-  border-color: #e8bf1f;
-  background: #ffdd57;
+  border-color: color-mix(in srgb, var(--highlight) 85%, #1d1b19);
+  background: var(--highlight);
   color: #1d1b19;
 }
 
@@ -1015,7 +1021,7 @@ button.dock-label {
 }
 
 .slot.bar-selected {
-  box-shadow: inset 0 0 0 2px rgba(47, 111, 219, 0.45);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--highlight) 45%, transparent);
 }
 
 /* Write etude / Read etude: one card per bar — a split bar's halves join (no inner border, no gap, square inner
@@ -1038,13 +1044,13 @@ button.dock-label {
    rounded only at its start and end, bridged across the gaps between cards (not past a row's end: a wrapped loop
    stays open there). */
 .slot.looped {
-  --loop: #2f6fdb;
+  --loop: var(--highlight);
   border-color: var(--loop);
   border-width: 2px 0;
   border-radius: 0;
 }
 .slot.looped:not(.active) {
-  --slot-tint: rgba(47, 111, 219, 0.04);
+  --slot-tint: var(--highlight-overlay-subtle);
 }
 .slot.looped.loop-start {
   border-left-width: 2px;
@@ -1066,7 +1072,7 @@ button.dock-label {
   width: var(--slot-gap);
   box-sizing: border-box;
   border-block: 2px solid var(--loop);
-  background: rgba(47, 111, 219, 0.04);
+  background: var(--highlight-overlay-subtle);
   pointer-events: none;
 }
 /* Across a bar line the outside gap is slot-gap + line + slot-gap. */
@@ -1077,7 +1083,7 @@ button.dock-label {
   position: absolute;
   z-index: 3;
   width: 20px;
-  fill: var(--loop, #2f6fdb);
+  fill: var(--loop, var(--highlight));
   pointer-events: none;
 }
 .repeat-sign.start {
@@ -1107,8 +1113,8 @@ button.dock-label {
   padding: 0;
   border: none;
   border-radius: 50%;
-  background: var(--loop, #2f6fdb);
-  color: #fff;
+  background: var(--loop, var(--highlight));
+  color: #1d1b19;
   cursor: pointer;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
 }
@@ -1151,7 +1157,7 @@ button.dock-label {
 
 .bar-menu-item:hover:not(:disabled),
 .bar-menu-item:focus-visible {
-  background: rgba(47, 111, 219, 0.1);
+  background: color-mix(in srgb, var(--highlight) 10%, transparent);
   outline: none;
 }
 
@@ -1350,7 +1356,7 @@ button.dock-label {
 }
 .mode-panel .dropdown-trigger {
   background: none;
-  padding: 0 2px;
+  padding: 0 6px;
 }
 .dropdown-prefix {
   opacity: 0.75;
@@ -1526,8 +1532,17 @@ button.dock-label {
 .slot.lead {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   align-items: center;
+  max-height: var(--lead-slot-max, 200px); /* logical at this zoom — renders ≤ `LEAD_SLOT_MAX_PX` on screen (`zoom.ts`) */
+  min-height: 0;
+  /* Bar numbers / trash sit in the row gap (`.bar-handle`, etc.): clip only the card innards below. */
+}
+.slot.lead > .slot-header,
+.slot.lead > .slot-body {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 /* Improvise's 3-row card: [chord · scale] on top, the hex, [slot trash · key pill (· add-chord "+")] at the bottom. */
 .slot.lead > .key-pill {
@@ -2144,10 +2159,79 @@ select {
   background: var(--dock-bg);
   border-color: var(--dock-bg);
 }
+.main.improvise.hex-hidden .dock {
+  box-shadow: none;
+}
+.main.improvise.hex-hidden .hex-hide-toggle {
+  background: var(--dock-bg);
+  border-color: var(--dock-bg);
+}
 
-/* The sound section: ▶ buttons and *On arrival*, together in a pill at the right end of the first row. */
+/* The sound section: ▶ buttons and *On arrival*, in a pill centred at the bottom of the screen (every mode). */
+.sound-bar {
+  --ink: #f3eee6;
+  --muted: #b8afa3;
+  /* Centred by left / right + auto margins, not left: 50% + translate: that would cap its width at half the screen,
+     so the pills in it wrap before they fill the width. */
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  right: 10px;
+  margin-inline: auto;
+  width: fit-content;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  pointer-events: auto;
+}
+/* Tablet and down: form group, edit pill, and transport share one row above the sound pill. */
+.sound-bar-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+}
+.sound-bar .edit-pill,
+.sound-bar .transport-bar {
+  flex-wrap: wrap;
+  justify-content: center;
+  height: auto;
+  max-width: 100%;
+  min-width: 0;
+}
+.sound-bar .clear-menu {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
 .sound-section {
   flex-wrap: nowrap;
+  background: var(--dock-bg);
+}
+.sound-bar .sound-section,
+.sound-bar .sound-section .rail-button,
+.sound-bar .sound-section .rail-label,
+.sound-bar .sound-section select {
+  font-weight: 100;
+  font-size: 12px;
+}
+.sound-bar .sound-section .audio-controls .rail-button {
+  padding: 3px 4px;
+}
+.sound-bar .on-arrival select {
+  width: 132px;
+}
+.sound-bar .rail-button:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+/* The menu opens upward: the pill sits on the bottom edge of the screen. */
+.sound-bar .dropdown-menu {
+  top: auto;
+  bottom: calc(100% + 8px);
 }
 
 /* The header's editing controls (note lengths, Rest, time, bars per row, undo / redo, Clear) in a pill like the
@@ -2196,23 +2280,9 @@ select {
   font-weight: 100;
 }
 
-/* The sound section (▶ Chord / Bass / Scale, On arrival) in Outfit Thin, like the title. */
-.topbar .sound-section,
-.topbar .sound-section .rail-button,
-.topbar .sound-section .rail-label,
-.topbar .sound-section select {
-  font-weight: 100;
-}
-
-/* Fit the sound pill on the first row: narrower dropdowns, tighter spacing. */
+/* Fit the instrument picker on the first row. */
 .topbar .instrument-picker select {
   max-width: 124px;
-}
-.topbar .on-arrival select {
-  width: 132px;
-}
-.topbar .sound-section .audio-controls .rail-button {
-  padding: 3px 4px;
 }
 
 /* The mode panel: top right of the header (row 1), in a pill like the sound pill. */
@@ -2377,7 +2447,7 @@ select {
     text-overflow: ellipsis;
     overflow-wrap: normal;
   }
-  .topbar .sound-section,
+  .sound-bar .sound-section,
   .topbar .mode-groups {
     flex-wrap: wrap;
   }
@@ -2416,26 +2486,26 @@ select {
 /* Clef (Concert) and Ins:, in a pill like the others, as tall as the editing pill. */
 
 
-/* Header grid (SPEC §3.1): 3 columns × 2 rows; wordmark and ☰ outside the grid, vertically centred. */
+/* Header grid (SPEC §3.1): 3 columns × 2 rows. The wordmark is row 1 centre (the sound pill's old cell).
+   ☰ stays in the right gutter, vertically centred. */
 .topbar {
   position: relative;
-  --topbar-gutter-start: 10.75em;
   --topbar-gutter-end: 3.75rem; /* room for the 44px ☰ icon, its padding, and a gap from the grid */
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   grid-template-rows: auto auto;
   align-items: center;
   row-gap: 8px;
   column-gap: 8px;
-  padding-left: calc(12px + var(--topbar-gutter-start));
+  padding-left: 12px;
   padding-right: calc(12px + var(--topbar-gutter-end));
 }
 .topbar .topbar-brand {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
+  grid-row: 1;
+  grid-column: 2;
+  justify-self: center;
+  position: static;
+  transform: none;
   z-index: 1;
-  padding-right: 4px;
 }
 .topbar > .hamburger {
   position: absolute;
@@ -2480,49 +2550,6 @@ select {
   grid-column: 3;
   justify-self: end;
 }
-/* The sound pill's text, a step smaller. */
-.topbar .sound-section,
-.topbar .sound-section .rail-button,
-.topbar .sound-section .rail-label,
-.topbar .sound-section select {
-  font-size: 12px;
-}
-
-/* Row 1 no longer fits title + sound pill + mode switch below ~900px: the sound pill drops to a row of its own,
-   under the editing controls. */
-@media (max-width: 900px) {
-  /* Three content rows: row 1 = chord sequence · mode; row 2 = sound (centred); row 3 = etude · controls · Ins:. */
-  .topbar {
-    grid-template-rows: auto auto auto;
-  }
-  .topbar .topbar-seq {
-    grid-row: 1;
-    grid-column: 1;
-  }
-  .topbar .mode-corner {
-    grid-row: 1;
-    grid-column: 3;
-  }
-  .topbar .topbar-center {
-    grid-row: 2;
-    grid-column: 1 / -1;
-    justify-self: center;
-  }
-  .topbar .topbar-file {
-    grid-row: 3;
-    grid-column: 1;
-  }
-  .topbar .mode-groups {
-    grid-row: 3;
-    grid-column: 2;
-    justify-self: center;
-  }
-  .topbar .ins-group {
-    grid-row: 3;
-    grid-column: 3;
-  }
-}
-
 /* The wordmark (SPEC §3.1), in Firjar. */
 .brand {
   font-family: 'Firjar', 'Outfit', system-ui, sans-serif;
@@ -2690,8 +2717,8 @@ select {
   color: inherit;
   text-align: center;
 }
-/* Loop (SPEC §3.7): a switch — the loop icon, then a small track whose knob slides right when on. */
-.transport-loop {
+/* Switch (SPEC §3.7 loop): label or icon, then a track whose knob slides right when on. */
+.switch {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -2700,25 +2727,10 @@ select {
   border-radius: 10px;
   background: none;
   color: inherit;
+  font: inherit;
   cursor: pointer;
 }
-.transport-loop:focus-visible {
-  outline: 2px solid var(--grid-glow);
-  outline-offset: 1px;
-}
-/* Read etude: optional scale names on the chart. */
-.transport-scales {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 2px 4px;
-  border: none;
-  border-radius: 10px;
-  background: none;
-  color: inherit;
-  cursor: pointer;
-}
-.transport-scales:focus-visible {
+.switch:focus-visible {
   outline: 2px solid var(--grid-glow);
   outline-offset: 1px;
 }
@@ -2755,13 +2767,11 @@ select {
   background: #f3eee6;
   transition: transform 120ms ease;
 }
-/* On: the header's light tone (not the grid glow's yellow), the knob dark. Loop and Read etude's scales alike. */
-.transport-loop.on .switch-track,
-.transport-scales.on .switch-track {
+/* On: the header's light tone (not the grid glow's yellow), the knob dark. */
+.switch.on .switch-track {
   background: var(--ink);
 }
-.transport-loop.on .switch-knob,
-.transport-scales.on .switch-knob {
+.switch.on .switch-knob {
   transform: translateX(12px);
   background: var(--dock-bg);
 }
@@ -2855,24 +2865,54 @@ select {
   display: none;
 }
 
-/* Improvise: the tuner bar sits between chart and hex, so the chart's scrollport ends at the bar (nothing scrolls
-   under it). Chart and hex still share the space evenly. */
-.main.improvise:not(.hex-hidden) {
-  grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr);
+/* Improvise / Tune: chart scrollport (absolute inset); bottom overlay = tuner bar + hex (`hex-dock-wrap`). */
+.main.improvise,
+.main.tuner-mode {
+  display: block;
+  position: relative;
+  height: 100%;
+  min-height: 0;
 }
-.main.improvise.hex-hidden {
-  grid-template-rows: minmax(0, 1fr) auto 0;
+.hex-dock-wrap {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  pointer-events: none;
 }
-.main.improvise > .chart-area {
-  grid-row: 1;
+.hex-dock-wrap > * {
+  pointer-events: auto;
 }
-.main.improvise > .listen-row {
-  grid-row: 2;
+.main.improvise .hex-dock-wrap:has(.dock),
+.main.tuner-mode .hex-dock-wrap:has(.dock) {
+  height: 50%;
+  max-height: 50%;
+}
+.hex-dock-wrap .listen-row {
+  position: static;
   transform: none;
+  flex: none;
   align-self: stretch;
+  width: 100%;
+  box-sizing: border-box;
+  grid-row: unset;
+  grid-column: unset;
 }
-.main.improvise > .dock {
-  grid-row: 3;
+.hex-dock-wrap .dock {
+  flex: 1 1 0;
+  min-height: 0;
+  position: relative;
+  box-sizing: border-box;
+}
+.hex-dock-wrap .hex-hide-toggle {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 6;
 }
 .tuner-slot {
   grid-column: 2;
@@ -2899,25 +2939,16 @@ select {
   white-space: nowrap;
 }
 .chord-bump-toggle {
-  display: inline-flex;
-  align-items: center;
   gap: 8px;
-  border: none;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
   padding: 0;
 }
 .chord-bump-label {
   font-weight: 100;
 }
-.chord-bump-toggle.on .switch-track {
-  background: var(--ink);
-}
-.chord-bump-toggle.on .switch-knob {
-  transform: translateX(12px);
-  background: var(--dock-bg);
+/* notes: picker stays in the layout when off so the row doesn't jump on toggle (SPEC §9.2). */
+.chord-bump:not(.on) .chord-bump-notes {
+  visibility: hidden;
+  pointer-events: none;
 }
 .chord-bump .chord-bump-notes .dropdown-trigger {
   font-size: 12px;

@@ -58,7 +58,7 @@ export const midiToHz = (m: number) => 440 * 2 ** ((m - 69) / 12);
 // ---------------------------------------------------------------- engine
 
 const NOTE = { gain: 0.22, attack: 0.01, decay: 0.9 };
-const CHORD = { gain: 0.1, attack: 0.01, decay: 3.2 };
+const CHORD = { gain: 0.06, attack: 0.04, decay: 3.2 };
 const SCALE_GAP = 0.15;
 
 let ctx: AudioContext | null = null;
@@ -69,7 +69,7 @@ let muted = false;
  * out exponentially over `seconds`. Every tone goes to the output bus, which splits into the dry signal and the
  * reverb (`wet`), both to the speakers.
  */
-const REVERB = { seconds: 2.2, decay: 3, wet: 0.28 };
+const REVERB = { seconds: 2.2, decay: 3, wet: 0.16 };
 let bus: AudioNode | null = null;
 
 function output(c: AudioContext): AudioNode {

@@ -108,7 +108,7 @@ export function TransportBar({
         role="switch"
         aria-checked={loop}
         aria-label="Loop"
-        className={loop ? 'transport-loop on' : 'transport-loop'}
+        className={loop ? 'switch transport-loop on' : 'switch transport-loop'}
         title={bars ? 'Loop: round the looped bars again at their end' : 'Loop: round the form again at its end (click bar numbers to loop just them)'}
         onClick={() => onLoop(!loop)}
       >
@@ -128,7 +128,7 @@ export function TransportBar({
           role="switch"
           aria-checked={!!showScales}
           aria-label="Show scales"
-          className={showScales ? 'transport-scales on' : 'transport-scales'}
+          className={showScales ? 'switch transport-scales on' : 'switch transport-scales'}
           title={showScales ? 'Hide scale names above each chord' : 'Show scale names above each chord'}
           onClick={() => onShowScales(!showScales)}
         >

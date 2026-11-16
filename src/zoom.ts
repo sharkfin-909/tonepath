@@ -36,8 +36,11 @@ export const CHART_PAD_TOP_PX = 16;
 export const READ_PAD_BOTTOM_PX = 16;
 /** Improvise's 3-row slot: the hex never shrinks below this. */
 export const LEAD_HEX_MIN_PX = 24;
-/** Improvise's cards (the lead sheet) are at most this tall (logical px), unless their labels need more. */
-export const LEAD_SLOT_MAX_PX = 128;
+/** Improvise lead cards: max height on screen after chart `scale(z)` (DevTools / layout); logical cap is ÷ z. */
+export const LEAD_SLOT_MAX_PX = 200;
+
+/** Logical slot height that renders at most `LEAD_SLOT_MAX_PX` at zoom z. */
+export const leadSlotCapLogicalPx = (z: number) => LEAD_SLOT_MAX_PX / z;
 
 /** How the chart is drawn: its kind, and (Read etude) whether scale names sit beside the chords. */
 export interface ChartLook {
@@ -72,13 +75,15 @@ export function headerPx(z: number, look: ChartLook): number {
 const leadLabelsPx = (z: number) => 1.595 * labelPx(SCALE_PX, MIN_SCALE_PX, z) + 6 + (1.25 * labelPx(CHORD_PX, MIN_CHORD_PX, z) + 8);
 
 /**
- * A card's logical height at zoom z: header + stave + chrome; Improvise's lead sheet caps it at `LEAD_SLOT_MAX_PX`
- * (never so low that its labels and the smallest hex don't fit).
+ * A card's logical height at zoom z: header + stave + chrome. Improvise's lead sheet caps **rendered** height at
+ * `LEAD_SLOT_MAX_PX` (logical cap ÷ z); the hex shrinks when the label rows need more room at a low zoom.
  */
 export function slotHeightPx(z: number, staveHeight: number, look: ChartLook): number {
   const natural = headerPx(z, look) + staveHeight + slotChromePx(look);
   if (look.kind !== 'lead') return natural;
-  return Math.max(Math.min(natural, LEAD_SLOT_MAX_PX), slotChromePx(look) + leadLabelsPx(z) + LEAD_HEX_MIN_PX);
+  const cap = leadSlotCapLogicalPx(z);
+  const floor = slotChromePx(look) + leadLabelsPx(z) + LEAD_HEX_MIN_PX;
+  return Math.min(cap, Math.max(Math.min(natural, cap), floor));
 }
 
 /** Rendered height of `rows` rows at zoom z. */
@@ -160,6 +165,7 @@ export function chartLayout(rows: number, staveHeight: number, height: number, l
       '--bar-line': `${BAR_LINE_PX}px`,
       '--chord-px': `${chordPx}px`,
       '--scale-px': `${scalePx}px`,
+      ...(look.kind === 'lead' ? { '--lead-slot-max': `${slotHeight}px` } : {}),
     },
   };
 }
@@ -168,10 +174,23 @@ export function chartLayout(rows: number, staveHeight: number, height: number, l
  * The chart area under the header (SPEC §3.1 Split): its padding, the cap on its own height, and the height budget
  * the chart fits its rows into — or none, when the chart fits the area the grid gives it (`fill`).
  */
-export function chartArea(budget: ChartBudget, kind: ChartKind, mainHeight: number): { padTop: number; padBottom: number; maxHeight?: number; fitHeight?: number } {
+export function chartArea(
+  budget: ChartBudget,
+  kind: ChartKind,
+  mainHeight: number,
+  /** Improvise / Tune: measured height of the bottom overlay (listen row + hex). */
+  dockReserve = 0,
+): { padTop: number; padBottom: number; maxHeight?: number; fitHeight?: number } {
   const padTop = CHART_PAD_TOP_PX;
   const padBottom = kind === 'read' ? READ_PAD_BOTTOM_PX : 0;
-  if (!mainHeight || budget === 'fill') return { padTop, padBottom };
+  if (!mainHeight) return { padTop, padBottom };
+  if (budget === 'fill') {
+    if (kind === 'lead' && dockReserve > 0) {
+      const chartBand = Math.max(0, mainHeight - dockReserve);
+      return { padTop, padBottom, maxHeight: chartBand, fitHeight: chartBand - padTop };
+    }
+    return { padTop, padBottom };
+  }
   if (budget === 'full') return { padTop, padBottom, fitHeight: mainHeight - padTop - padBottom };
-  return { padTop, padBottom, maxHeight: mainHeight / 2, fitHeight: mainHeight / 2 - padTop - padBottom };
+  return { padTop, padBottom, maxHeight: mainHeight / 2, fitHeight: mainHeight / 2 - padTop };
 }

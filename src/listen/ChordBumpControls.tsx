@@ -18,13 +18,13 @@ export function ChordBumpControls({
 }) {
   if (!slot) return null;
   return createPortal(
-    <div className="chord-bump well group">
+    <div className={on ? 'chord-bump well group on' : 'chord-bump well group'}>
       <button
         type="button"
         role="switch"
         aria-checked={on}
         aria-label="Chord bump"
-        className={on ? 'chord-bump-toggle on' : 'chord-bump-toggle'}
+        className={on ? 'switch chord-bump-toggle on' : 'switch chord-bump-toggle'}
         title={on ? 'Chord bump: advance the form after hex note picks' : 'Chord bump off'}
         onClick={() => onToggle(!on)}
       >
@@ -33,16 +33,15 @@ export function ChordBumpControls({
           <span className="switch-knob" />
         </span>
       </button>
-      {on && (
-        <Dropdown
-          className="chord-bump-notes"
-          label="Chord bump notes"
-          prefix="notes:"
-          value={notes}
-          options={CHORD_BUMP_NOTES_OPTIONS.map((n) => ({ value: n, label: String(n) }))}
-          onChange={onNotes}
-        />
-      )}
+      <Dropdown
+        className="chord-bump-notes"
+        label="Chord bump notes"
+        prefix="notes:"
+        value={notes}
+        disabled={!on}
+        options={CHORD_BUMP_NOTES_OPTIONS.map((n) => ({ value: n, label: String(n) }))}
+        onChange={onNotes}
+      />
     </div>,
     slot,
   );

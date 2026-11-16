@@ -4,7 +4,7 @@
 // (`modeProfile.ts`), the editing session (`session.ts`, run by `useChartSession`), the keyboard table (`keymap.ts`),
 // the chart layout (`zoom.ts`), what lights the hex (`hexLighting.ts`), the instrument view (`view.ts`), the transport
 // (`transport.ts`, `metronomeRun.ts`, run by `useTransport`) and the mic intake (`micIntake.ts`). This file renders them.
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { LengthLatch } from './rail/LengthLatch';
 import { Chart } from './chart/Chart';
 import { BarsPerRow, ClearMenu, TimeSignatureField, TitleField } from './rail/RailSettings';
@@ -87,12 +87,17 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
     ro.observe(el);
     return () => ro.disconnect();
   }, [mode]);
+  /** Improvise / Tune: bottom overlay (tuner bar + hex) — chart scrollport sits above it. */
+  const dockWrapRef = useRef<HTMLDivElement>(null);
+  const [dockWrapHeight, setDockWrapHeight] = useState(0);
   // Linear (SPEC §8.5): the dock as one row, switched by octave. The layout is a device setting; the octave isn't
   // saved (it starts mid-range and is kept within the instrument's range).
   const [linearSetting, setLinear] = useDeviceSetting(HEX_LINEAR);
   const [hexHidden, setHexHidden] = useDeviceSetting(HEX_HIDDEN);
   // Phones (SPEC §3.6): the honeycomb is too small there, so the dock is always Linear; the saved setting is kept.
   const narrow = useMediaQuery('(max-width: 640px)');
+  /** Tablet and phone: the edit pill and the transport bar leave the header for the bottom stack. */
+  const tablet = useMediaQuery('(max-width: 1024px)');
   const linear = linearSetting || narrow;
   const [octaveWanted, setOctave] = useState<number | null>(null);
   const toggleLinear = () => setLinear(!linearSetting);
@@ -202,8 +207,6 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
     sounded: chart.sounded,
     halo: haloPitch,
   });
-  const area = chartArea(profile.chartBudget, profile.chart, mainHeight);
-
   // The mode panel (SPEC §3.1): Mode; after a choice, keys go back to the hex.
   const modeSwitch = (
     <ModePanel
@@ -234,6 +237,165 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
   const improvise = mode === 'improvise';
   /** Hide hex: Improvise only (SPEC §3.1); Read etude has no hex at all. */
   const hideHex = profile.hexHideable && hexHidden;
+  const dockedBottom = improvise || tune;
+  const area = chartArea(profile.chartBudget, profile.chart, mainHeight, dockedBottom ? dockWrapHeight : 0);
+  useLayoutEffect(() => {
+    if (!dockedBottom) {
+      setDockWrapHeight(0);
+      return;
+    }
+    const el = dockWrapRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setDockWrapHeight(Math.floor(e.borderBoxSize?.[0]?.blockSize ?? e.contentRect.height)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [dockedBottom, hideHex, linear, mode]);
+
+  const formControls = profile.formGroup && (
+    <div className="edit-pill form-group group">
+      <TimeSignatureField value={progression.timeSignature} onChange={(text) => dispatch({ type: 'time-signature', text })} />
+      <BarsPerRow value={progression.barsPerRow} onChange={(n) => dispatch({ type: 'bars-per-row', n })} />
+      {undoRedo}
+    </div>
+  );
+
+  const transportControls = profile.transportBar && (
+    <TransportBar
+      bpm={transport.bpm}
+      onBpm={transport.setBpm}
+      sound={transport.sound}
+      onSound={transport.setSound}
+      running={running}
+      onStartStop={() => dispatch({ type: 'transport', run: !running })}
+      onRewind={() => dispatch({ type: 'rewind' })}
+      loop={transport.loop}
+      onLoop={transport.setLoop}
+      bars={session.selection}
+      onAllBars={() => dispatch({ type: 'clear-selection' })}
+      showScales={read ? showReadScales : undefined}
+      onShowScales={read ? setShowReadScales : undefined}
+    />
+  );
+
+  const editControls = profile.editPill && (
+    <div className="edit-pill group">
+      <LengthLatch
+        value={session.length}
+        onChange={(d) => dispatch({ type: 'length', d })}
+        rest={session.rest}
+        onToggleRest={() => dispatch({ type: 'toggle-rest' })}
+        refusal={session.refusal}
+        onRefusalShown={onRefusalShown}
+      />
+      <TimeSignatureField value={progression.timeSignature} onChange={(text) => dispatch({ type: 'time-signature', text })} />
+      <BarsPerRow value={progression.barsPerRow} onChange={(n) => dispatch({ type: 'bars-per-row', n })} />
+      <div className="step-controls">
+        <button
+          type="button"
+          className="rail-button icon-button"
+          title="Nudge the note at the caret down a scale step (↓) · ⇧-click / ⇧↓ a semitone · ⌥↓ an octave"
+          aria-label="Nudge down"
+          onClick={(e) =>
+            dispatch({
+              type: 'nudge',
+              dir: -1,
+              octave: false,
+              scale: !e.shiftKey,
+            })
+          }
+        >
+          <svg viewBox="0 0 12 12" width="16" height="16" aria-hidden>
+            <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          className="rail-button icon-button"
+          title="Nudge the note at the caret up a scale step (↑) · ⇧-click / ⇧↑ a semitone · ⌥↑ an octave"
+          aria-label="Nudge up"
+          onClick={(e) =>
+            dispatch({
+              type: 'nudge',
+              dir: 1,
+              octave: false,
+              scale: !e.shiftKey,
+            })
+          }
+        >
+          <svg viewBox="0 0 12 12" width="16" height="16" aria-hidden>
+            <path d="M2.5 7.5 6 4l3.5 3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      </div>
+      <div className="step-controls">
+        <button type="button" className="rail-button icon-button" title="Step back: play the note before the caret, and move the caret to it" aria-label="Step back" onClick={() => dispatch({ type: 'step-play', dir: -1 })}>
+          <svg viewBox="0 0 12 12" width="16" height="16" aria-hidden>
+            <path d="M7.5 2.5 4 6l3.5 3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+        <button type="button" className="rail-button icon-button" title="Step forward: play the note at the caret, and move past it (` or ~)" aria-label="Step forward" onClick={() => dispatch({ type: 'step-play' })}>
+          <svg viewBox="0 0 12 12" width="16" height="16" aria-hidden>
+            <path d="M4.5 2.5 8 6 4.5 9.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      </div>
+      {undoRedo}
+      <ClearMenu
+        canClearNotes={etude.melody.length > 0}
+        canClearAll={etude.melody.length > 0 || progression.bars.some((b) => b.some((s) => s.chord !== '' || s.scale !== undefined))}
+        onClearNotes={() => dispatch({ type: 'clear-notes' })}
+        onClearAll={() => dispatch({ type: 'clear-all' })}
+      />
+    </div>
+  );
+
+  const soundSection = (
+    <div
+      className="sound-bar"
+      onClick={(e) => {
+        const el = e.target as Element;
+        if (el.closest('.dropdown-option') || (el.closest('button') && !el.closest('.inline-value') && !el.closest('.dropdown'))) focusHex();
+      }}
+    >
+      {tablet && (formControls || editControls || transportControls) && (
+        <div className="sound-bar-row">
+          {formControls}
+          {editControls}
+          {transportControls}
+        </div>
+      )}
+      <div className="sound-section group">
+        <AudioControls
+          muted={muted}
+          onToggleMute={() => dispatch({ type: 'toggle-mute' })}
+          onChord={() => dispatch({ type: 'sound', what: 'chord' })}
+          onBass={() => dispatch({ type: 'sound', what: 'bass' })}
+          onScale={() => dispatch({ type: 'sound', what: 'scale' })}
+          noChord={profile.noChord}
+        />
+        <div className="rail-setting on-arrival">
+          <span className="rail-label">Audio on chord</span>
+          <Dropdown
+            value={session.onArrival}
+            label="Audio on chord"
+            disabled={profile.noChord}
+            options={(Object.keys(ON_ARRIVAL_LABELS) as OnArrival[]).map((v) => ({ value: v, label: ON_ARRIVAL_LABELS[v] }))}
+            onChange={(how) => dispatch({ type: 'set-arrival', how })}
+          />
+        </div>
+      </div>
+    </div>
+  );
+
+  const chartAreaStyle: CSSProperties = {
+    paddingTop: area.padTop,
+    paddingBottom: area.padBottom,
+    ...(dockedBottom
+      ? { position: 'absolute', top: 0, left: 0, right: 0, bottom: dockWrapHeight, overflowY: 'auto', minHeight: 0 }
+      : area.maxHeight != null
+        ? { height: area.maxHeight, maxHeight: area.maxHeight }
+        : {}),
+  };
 
   return (
     <div className="layout-c">
@@ -248,11 +410,11 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
           if (el.closest('.dropdown-option') || (el.closest('button') && !el.closest('.inline-value') && !el.closest('.dropdown'))) focusHex();
         }}
       >
-        {/* 3×2 content grid (SPEC §3.1); wordmark and ☰ sit outside it, vertically centred. */}
+        {/* Row 1, centre: the wordmark (where the sound pill was). ☰ stays in the right gutter. */}
         <div className="topbar-brand">
           <span className="brand">TONEPATH</span>
         </div>
-        {/* Row 1, col beside the wordmark: chord sequence (etude sits in row 2 of this column). */}
+        {/* Row 1, left: chord sequence (etude sits in row 2 of this column). */}
         <div className="topbar-seq">
           <span className="seq-group group">
             <span className="rail-label">chord sequence:</span>
@@ -260,28 +422,6 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
               <TitleField title={progression.title} editing={renameOnOpen} onRename={(text) => dispatch({ type: 'title', text })} />
             </h1>
           </span>
-        </div>
-        {/* Row 1, centred: sound and *Audio on chord* (*On arrival*), in a pill. */}
-        <div className="sound-section group topbar-center">
-          <AudioControls
-            muted={muted}
-            onToggleMute={() => dispatch({ type: 'toggle-mute' })}
-            onChord={() => dispatch({ type: 'sound', what: 'chord' })}
-            onBass={() => dispatch({ type: 'sound', what: 'bass' })}
-            onScale={() => dispatch({ type: 'sound', what: 'scale' })}
-            noChord={profile.noChord}
-          />
-          {/* In every mode (SPEC §3.0); Tune has no chord, so it is greyed there. */}
-          <div className="rail-setting on-arrival">
-            <span className="rail-label">Audio on chord</span>
-            <Dropdown
-              value={session.onArrival}
-              label="Audio on chord"
-              disabled={profile.noChord}
-              options={(Object.keys(ON_ARRIVAL_LABELS) as OnArrival[]).map((v) => ({ value: v, label: ON_ARRIVAL_LABELS[v] }))}
-              onChange={(how) => dispatch({ type: 'set-arrival', how })}
-            />
-          </div>
         </div>
         {/* Row 1, right: the mode panel (Mode:), in a pill. */}
         {/* Row 1, right: the mode panel. */}
@@ -304,107 +444,10 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
         </div>
         {/* Row 2, centre: the mode's own groups (SPEC §3.0) — none in Tune. */}
         <div className="mode-groups">
-            {/* Improvise (SPEC §3.3): the lead sheet's form group — time, bars per row, undo / redo — while stopped. */}
-            {profile.formGroup && (
-              <div className="edit-pill form-group group">
-                <TimeSignatureField value={progression.timeSignature} onChange={(text) => dispatch({ type: 'time-signature', text })} />
-                <BarsPerRow value={progression.barsPerRow} onChange={(n) => dispatch({ type: 'bars-per-row', n })} />
-                {undoRedo}
-              </div>
-            )}
-            {/* The transport (SPEC §3.7): Improvise and Read etude. */}
-            {profile.transportBar && (
-              <TransportBar
-                bpm={transport.bpm}
-                onBpm={transport.setBpm}
-                sound={transport.sound}
-                onSound={transport.setSound}
-                running={running}
-                onStartStop={() => dispatch({ type: 'transport', run: !running })}
-                onRewind={() => dispatch({ type: 'rewind' })}
-                loop={transport.loop}
-                onLoop={transport.setLoop}
-                bars={session.selection}
-                onAllBars={() => dispatch({ type: 'clear-selection' })}
-                showScales={read ? showReadScales : undefined}
-                onShowScales={read ? setShowReadScales : undefined}
-              />
-            )}
-            {/* The editing controls, in a pill: Write etude only (SPEC §3.2). */}
-            {profile.editPill && (
-              <div className="edit-pill group">
-                <LengthLatch
-                  value={session.length}
-                  onChange={(d) => dispatch({ type: 'length', d })}
-                  rest={session.rest}
-                  onToggleRest={() => dispatch({ type: 'toggle-rest' })}
-                  refusal={session.refusal}
-                  onRefusalShown={onRefusalShown}
-                />
-                <TimeSignatureField value={progression.timeSignature} onChange={(text) => dispatch({ type: 'time-signature', text })} />
-                <BarsPerRow value={progression.barsPerRow} onChange={(n) => dispatch({ type: 'bars-per-row', n })} />
-                {/* Nudge (SPEC §6.2): the note at the caret up / down a scale step (↑ / ↓); ⇧ a semitone, ⌥ an octave. */}
-                <div className="step-controls">
-                  <button
-                    type="button"
-                    className="rail-button icon-button"
-                    title="Nudge the note at the caret down a scale step (↓) · ⇧-click / ⇧↓ a semitone · ⌥↓ an octave"
-                    aria-label="Nudge down"
-                    onClick={(e) =>
-                      dispatch({
-                        type: 'nudge',
-                        dir: -1,
-                        octave: false,
-                        scale: !e.shiftKey,
-                      })
-                    }
-                  >
-                    <svg viewBox="0 0 12 12" width="16" height="16" aria-hidden>
-                      <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    className="rail-button icon-button"
-                    title="Nudge the note at the caret up a scale step (↑) · ⇧-click / ⇧↑ a semitone · ⌥↑ an octave"
-                    aria-label="Nudge up"
-                    onClick={(e) =>
-                      dispatch({
-                        type: 'nudge',
-                        dir: 1,
-                        octave: false,
-                        scale: !e.shiftKey,
-                      })
-                    }
-                  >
-                    <svg viewBox="0 0 12 12" width="16" height="16" aria-hidden>
-                      <path d="M2.5 7.5 6 4l3.5 3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </button>
-                </div>
-                {/* Stepwise playback (SPEC §6.2): ‹ back, › forward (`) — play the note and move the caret past it. */}
-                <div className="step-controls">
-                  <button type="button" className="rail-button icon-button" title="Step back: play the note before the caret, and move the caret to it" aria-label="Step back" onClick={() => dispatch({ type: 'step-play', dir: -1 })}>
-                    <svg viewBox="0 0 12 12" width="16" height="16" aria-hidden>
-                      <path d="M7.5 2.5 4 6l3.5 3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </button>
-                  <button type="button" className="rail-button icon-button" title="Step forward: play the note at the caret, and move past it (` or ~)" aria-label="Step forward" onClick={() => dispatch({ type: 'step-play' })}>
-                    <svg viewBox="0 0 12 12" width="16" height="16" aria-hidden>
-                      <path d="M4.5 2.5 8 6 4.5 9.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </button>
-                </div>
-                {/* Undo / redo: at the end, just before Clear. */}
-                {undoRedo}
-                <ClearMenu
-                  canClearNotes={etude.melody.length > 0}
-                  canClearAll={etude.melody.length > 0 || progression.bars.some((b) => b.some((s) => s.chord !== '' || s.scale !== undefined))}
-                  onClearNotes={() => dispatch({ type: 'clear-notes' })}
-                  onClearAll={() => dispatch({ type: 'clear-all' })}
-                />
-              </div>
-            )}
+            {/* Tablet and down: form, edit, and transport sit in the bottom stack, above the sound pill. */}
+            {!tablet && formControls}
+            {!tablet && transportControls}
+            {!tablet && editControls}
         </div>
         {/* Row 2, right: clef (Concert) and instrument, in a pill (SPEC §3.1). */}
         <span className="ins-group group">
@@ -429,10 +472,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
           .filter(Boolean)
           .join(' ')}
       >
-        <section
-          className="chart-area"
-          style={{ paddingTop: area.padTop, paddingBottom: area.padBottom, maxHeight: area.maxHeight }}
-        >
+        <section className="chart-area" style={chartAreaStyle}>
           {profile.chartEmpty ? (
             // Tune (SPEC §3.8): the chart pane stays, empty, at the chart's height — nothing moves between modes.
             <div className="chart-pane-empty" aria-hidden>
@@ -486,7 +526,138 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
             {session.notice.text}
           </p>
         )}
-        {/* Listen (SPEC §9.2): on in Tune and Improvise (§3.0); its tuner and levels portal into the row above the hex. */}
+        {dockedBottom ? (
+          <div ref={dockWrapRef} className="hex-dock-wrap">
+            {profile.listens && (
+              <div className="listen-row">
+                <div className="levels-slot" ref={setLevelsSlot} />
+                <div className="tuner-slot" ref={setTunerSlot} />
+                {improvise && !hideHex && <div className="bump-slot" ref={setBumpSlot} />}
+              </div>
+            )}
+            {improvise && profile.listens && !hideHex && (
+              <ChordBumpControls
+                slot={bumpSlot}
+                on={session.chordBump}
+                notes={session.chordBumpNotes}
+                onToggle={(on) => dispatch({ type: 'set-chord-bump', on })}
+                onNotes={(notes) => dispatch({ type: 'set-chord-bump-notes', notes })}
+              />
+            )}
+            {profile.hex && !hideHex && (
+              <section ref={dockRef} className={linear ? 'dock linear' : 'dock'} aria-label="Docked hex" tabIndex={-1}>
+                {!narrow && (
+                  <button
+                    type="button"
+                    className={linear ? 'grid-toggle' : 'grid-toggle on'}
+                    aria-pressed={!linear}
+                    title={linear ? 'Grid: show the honeycomb' : 'Grid off: one row (Linear), by octave'}
+                    onClick={() => {
+                      toggleLinear();
+                      focusHex();
+                    }}
+                  >
+                    Grid
+                  </button>
+                )}
+                {linear && (
+                  <div className="octave-switch group" role="group" aria-label="Octave">
+                    <button type="button" className="octave-step" aria-label="Octave down" title="Octave down" disabled={octave <= octaves.min} onClick={() => setOctave(octave - 12)}>
+                      <svg viewBox="0 0 12 12" width="14" height="14" aria-hidden>
+                        <path d="M7.5 2.5 4 6l3.5 3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                    <span className="octave-name">{`oct ${octave / 12 - 1}`}</span>
+                    <button type="button" className="octave-step" aria-label="Octave up" title="Octave up" disabled={octave >= octaves.max} onClick={() => setOctave(octave + 12)}>
+                      <svg viewBox="0 0 12 12" width="14" height="14" aria-hidden>
+                        <path d="M4.5 2.5 8 6 4.5 9.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                <DockedHex
+                  dock={profile.noChord ? view.tunerDock(shape) : view.dock(active.index, shape)}
+                  onLabelClick={() =>
+                    setEditRequest((r) => ({
+                      bar: active.bar,
+                      part: active.part,
+                      n: (r?.n ?? 0) + 1,
+                    }))
+                  }
+                  onPick={(written) => dispatch({ type: 'pick', written })}
+                  onHoverPitch={(p) => {
+                    hovered.current = p;
+                  }}
+                  {...lighting}
+                />
+              </section>
+            )}
+            {profile.hexHideable && (
+              <button
+                type="button"
+                className="hex-hide-toggle"
+                aria-pressed={hexHidden}
+                title={hexHidden ? 'Show the hex panel' : 'Hide the hex panel'}
+                onClick={() => {
+                  setHexHidden(!hexHidden);
+                  focusHex();
+                }}
+              >
+                {hexHidden ? 'Show hex' : 'Hide hex'}
+              </button>
+            )}
+          </div>
+        ) : (
+          profile.hex && (
+            <section ref={dockRef} className={linear ? 'dock linear' : 'dock'} aria-label="Docked hex" tabIndex={-1}>
+              {!narrow && (
+                <button
+                  type="button"
+                  className={linear ? 'grid-toggle' : 'grid-toggle on'}
+                  aria-pressed={!linear}
+                  title={linear ? 'Grid: show the honeycomb' : 'Grid off: one row (Linear), by octave'}
+                  onClick={() => {
+                    toggleLinear();
+                    focusHex();
+                  }}
+                >
+                  Grid
+                </button>
+              )}
+              {linear && (
+                <div className="octave-switch group" role="group" aria-label="Octave">
+                  <button type="button" className="octave-step" aria-label="Octave down" title="Octave down" disabled={octave <= octaves.min} onClick={() => setOctave(octave - 12)}>
+                    <svg viewBox="0 0 12 12" width="14" height="14" aria-hidden>
+                      <path d="M7.5 2.5 4 6l3.5 3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                  <span className="octave-name">{`oct ${octave / 12 - 1}`}</span>
+                  <button type="button" className="octave-step" aria-label="Octave up" title="Octave up" disabled={octave >= octaves.max} onClick={() => setOctave(octave + 12)}>
+                    <svg viewBox="0 0 12 12" width="14" height="14" aria-hidden>
+                      <path d="M4.5 2.5 8 6 4.5 9.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+              <DockedHex
+                dock={view.dock(active.index, shape)}
+                onLabelClick={() =>
+                  setEditRequest((r) => ({
+                    bar: active.bar,
+                    part: active.part,
+                    n: (r?.n ?? 0) + 1,
+                  }))
+                }
+                onPick={(written) => dispatch({ type: 'pick', written })}
+                onHoverPitch={(p) => {
+                  hovered.current = p;
+                }}
+                {...lighting}
+              />
+            </section>
+          )
+        )}
+        {/* Listen (SPEC §9.2): portals tuner UI into `.listen-row` when Improvise / Tune. */}
         <ListenPill
           onHeard={setHeardConcert}
           nameOf={(m) => (tune ? view.plainName(m) : view.name(m, active))}
@@ -496,91 +667,8 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
           levelsSlot={levelsSlot}
           concertLowMidi={view.inst.range ? view.toConcert(view.inst.range.lo) : null}
         />
-        {profile.hex && (
-          <section ref={dockRef} className={linear ? 'dock linear' : 'dock'} aria-label="Docked hex" tabIndex={-1}>
-            {/* Grid on = the 3-row honeycomb; off = Linear (one row, by octave). SPEC §8.5. Not on phones (always Linear).
-                Absolutely positioned at the panel's bottom left. */}
-            {!narrow && (
-              <button
-              type="button"
-              className={linear ? 'grid-toggle' : 'grid-toggle on'}
-              aria-pressed={!linear}
-              title={linear ? 'Grid: show the honeycomb' : 'Grid off: one row (Linear), by octave'}
-              onClick={() => {
-                toggleLinear();
-                focusHex();
-              }}
-            >
-              Grid
-            </button>
-            )}
-            {/* Linear (SPEC §8.5): the octave switch, under the row, centred at the panel's bottom. */}
-            {linear && (
-              <div className="octave-switch group" role="group" aria-label="Octave">
-                <button type="button" className="octave-step" aria-label="Octave down" title="Octave down" disabled={octave <= octaves.min} onClick={() => setOctave(octave - 12)}>
-                  <svg viewBox="0 0 12 12" width="14" height="14" aria-hidden>
-                    <path d="M7.5 2.5 4 6l3.5 3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-                <span className="octave-name">{`oct ${octave / 12 - 1}`}</span>
-                <button type="button" className="octave-step" aria-label="Octave up" title="Octave up" disabled={octave >= octaves.max} onClick={() => setOctave(octave + 12)}>
-                  <svg viewBox="0 0 12 12" width="14" height="14" aria-hidden>
-                    <path d="M4.5 2.5 8 6 4.5 9.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-              </div>
-            )}
-            <DockedHex
-              dock={profile.noChord ? view.tunerDock(shape) : view.dock(active.index, shape)}
-              onLabelClick={() =>
-                setEditRequest((r) => ({
-                  bar: active.bar,
-                  part: active.part,
-                  n: (r?.n ?? 0) + 1,
-                }))
-              }
-              onPick={(written) => dispatch({ type: 'pick', written })}
-              onHoverPitch={(p) => {
-                hovered.current = p;
-              }}
-              {...lighting}
-            />
-          </section>
-        )}
-        {/* While listening (Listen, §9.2): Tune — a row on the hex panel's top edge, overlaying the chart. Improvise —
-            between chart and hex so the chart scrolls above it. Tuner centred; input level at the left. */}
-        {profile.listens && (
-          <div className="listen-row">
-            <div className="levels-slot" ref={setLevelsSlot} />
-            <div className="tuner-slot" ref={setTunerSlot} />
-            {improvise && <div className="bump-slot" ref={setBumpSlot} />}
-          </div>
-        )}
-        {improvise && profile.listens && (
-          <ChordBumpControls
-            slot={bumpSlot}
-            on={session.chordBump}
-            notes={session.chordBumpNotes}
-            onToggle={(on) => dispatch({ type: 'set-chord-bump', on })}
-            onNotes={(notes) => dispatch({ type: 'set-chord-bump-notes', notes })}
-          />
-        )}
-        {/* Hide / show the hex panel (SPEC §3.1): Improvise only; the screen's bottom right corner, remembered on the device. */}
-        {profile.hexHideable && (
-          <button
-            type="button"
-            className="hex-hide-toggle"
-            aria-pressed={hexHidden}
-            title={hexHidden ? 'Show the hex panel' : 'Hide the hex panel (the chart takes the screen)'}
-            onClick={() => {
-              setHexHidden(!hexHidden);
-              focusHex();
-            }}
-          >
-            {hexHidden ? 'Show hex' : 'Hide hex'}
-          </button>
-        )}
       </main>
+      {soundSection}
     </div>
   );
 }

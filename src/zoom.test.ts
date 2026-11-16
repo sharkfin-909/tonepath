@@ -93,13 +93,13 @@ describe('chart layout', () => {
     expect(l.vars['--bar-line']).toBe('2.5px');
   });
 
-  it("Improvise's cards are at most 128px tall; the hex gets what the label rows leave", () => {
+  it("Improvise's cards are at most LEAD_SLOT_MAX_PX on screen; the hex gets what the label rows leave", () => {
     const l = chartLayout(1, STAVE, 360, LEAD);
-    expect(l.slotHeight).toBe(LEAD_SLOT_MAX_PX);
+    expect(l.slotHeight * l.zoom).toBeLessThanOrEqual(LEAD_SLOT_MAX_PX + 1e-9);
     expect(chartLayout(1, STAVE, 360, WRITE).slotHeight).toBe(headerPx(ZOOM_CAP, WRITE) + STAVE + slotChromePx(WRITE)); // others uncapped
     expect(l.leadHexHeight).toBeGreaterThan(24);
-    expect(l.leadHexHeight).toBeLessThan(LEAD_SLOT_MAX_PX);
-    expect(l.height).toBeCloseTo(l.zoom * (LEAD_SLOT_MAX_PX + 30 + 14)); // the rows are sized to the capped cards
+    expect(l.leadHexHeight).toBeLessThan(l.slotHeight);
+    expect(l.height).toBeCloseTo(l.zoom * (l.slotHeight + 30 + 14)); // the rows are sized to the capped cards
     // At a tiny zoom the labels grow; the hex never goes below its minimum.
     expect(chartLayout(40, STAVE, 100, LEAD).leadHexHeight).toBeGreaterThanOrEqual(24);
   });
@@ -118,8 +118,15 @@ describe('chart area', () => {
     });
   });
 
-  it('Improvise: the chart fits the grid row it is given (no budget)', () => {
-    expect(chartArea('fill', 'lead', 800)).toEqual({ padTop: CHART_PAD_TOP_PX, padBottom: 0 });
+  it('Improvise / Tune: chart scrollport = main minus measured bottom overlay', () => {
+    const reserve = 320;
+    expect(chartArea('fill', 'lead', 800, reserve)).toEqual({
+      padTop: CHART_PAD_TOP_PX,
+      padBottom: 0,
+      maxHeight: 480,
+      fitHeight: 480 - CHART_PAD_TOP_PX,
+    });
+    expect(chartArea('fill', 'lead', 800, 0).fitHeight).toBeUndefined();
   });
 
   it('before the screen is measured: no budget', () => {

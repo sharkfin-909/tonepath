@@ -78,8 +78,8 @@ export async function startListening(onFrame: (h: Heard) => void, opts: ListenOp
   let concertLow = options.concertLowMidi === undefined ? null : options.concertLowMidi;
 
   const stream = await navigator.mediaDevices.getUserMedia({
-    // Echo cancellation keeps the app's own sounds out; the other two would colour or pump an instrument's tone.
-    audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false },
+    // Echo cancellation off: it can colour tone through speakers; the app's echo guard handles its own sounds (SPEC §3.3).
+    audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
   });
   const ctx = new AudioContext();
   // Not awaited: with no user gesture yet (an open straight into Tune) the browser may hold the audio, and resume()
