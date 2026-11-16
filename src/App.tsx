@@ -1,5 +1,5 @@
 // Chart screen (SPEC §3.1): the two-row control header over the chart, above the docked hex (which takes the height
-// the chart leaves). Modes (§3.0): Tuner (§3.8) · Improvise (§3.3) · Write etude (§3.2) · Read etude (§3.4); the
+// the chart leaves). Modes (§3.0): Tune (§3.8) · Improvise (§3.3) · Write etude (§3.2) · Read etude (§3.4); the
 // transport (§3.7) and Listen (§9.2). The rules live in pure modules: the editing session (`session.ts`), the keyboard
 // table (`keymap.ts`), the progression document (`document.ts`: undo + saving), the instrument view (`view.ts`), chord
 // entry (`chordEntry.ts`), the transport (`transport.ts`, `metronomeRun.ts`) and the mic intake (`micIntake.ts`). This
@@ -153,7 +153,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
   };
 
   const perform = (effects: Effect[]) => {
-    // Listening (Tuner, Improvise): the mic will hear these sounds — guard against taking them for the player (SPEC §3.3).
+    // Listening (Tune, Improvise): the mic will hear these sounds — guard against taking them for the player (SPEC §3.3).
     if (listens(sessionRef.current.mode)) {
       const sounds = effects.filter(
         (e): e is Extract<Effect, { type: 'chord' | 'root' | 'bass' | 'note' }> =>
@@ -379,7 +379,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
           </button>
         </div>
   );
-  const tuner = mode === 'tuner';
+  const tune = mode === 'tune';
   const read = mode === 'read';
   const improvise = mode === 'improvise';
   /** Hide hex: Improvise only (SPEC §3.1); Read etude has no hex at all. */
@@ -411,15 +411,15 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
             onChord={() => dispatch({ type: 'sound', what: 'chord' })}
             onBass={() => dispatch({ type: 'sound', what: 'bass' })}
             onScale={() => dispatch({ type: 'sound', what: 'scale' })}
-            noChord={tuner}
+            noChord={tune}
           />
-          {/* In every mode (SPEC §3.0); Tuner has no chord, so it is greyed there. */}
+          {/* In every mode (SPEC §3.0); Tune has no chord, so it is greyed there. */}
           <div className="rail-setting on-arrival">
             <span className="rail-label">Audio on chord</span>
             <Dropdown
               value={session.onArrival}
               label="Audio on chord"
-              disabled={tuner}
+              disabled={tune}
               options={(Object.keys(ON_ARRIVAL_LABELS) as OnArrival[]).map((v) => ({ value: v, label: ON_ARRIVAL_LABELS[v] }))}
               onChange={(how) => dispatch({ type: 'set-arrival', how })}
             />
@@ -444,7 +444,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
               </h1>
             </div>
           </div>
-          {/* Row 2, centred: the mode's own groups, side by side (SPEC §3.0) — none in Tuner. */}
+          {/* Row 2, centred: the mode's own groups, side by side (SPEC §3.0) — none in Tune. */}
           <div className="mode-groups">
             {/* Improvise (SPEC §3.3): the lead sheet's form group — time, bars per row, undo / redo — while stopped. */}
             {improvise && !running && (
@@ -558,15 +558,15 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
           </span>
         </div>
       </header>
-      <main ref={mainRef} className={read ? 'main read' : tuner ? 'main tuner-mode' : hideHex ? 'main hex-hidden' : 'main'}>
+      <main ref={mainRef} className={read ? 'main read' : tune ? 'main tuner-mode' : hideHex ? 'main hex-hidden' : 'main'}>
         <section
           className="chart-area"
           style={{
             maxHeight: read || hideHex ? undefined : mainHeight / 2 || undefined,
           }}
         >
-          {tuner ? (
-            // Tuner (SPEC §3.8): the chart pane stays, empty, at the chart's height — nothing moves between modes.
+          {tune ? (
+            // Tune (SPEC §3.8): the chart pane stays, empty, at the chart's height — nothing moves between modes.
             <div className="chart-pane-empty" aria-hidden>
               <Chart
                 progression={progression}
@@ -617,10 +617,10 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
             {session.notice.text}
           </p>
         )}
-        {/* Listen (SPEC §9.2): on in Tuner and Improvise (§3.0); its tuner and levels portal into the row above the hex. */}
+        {/* Listen (SPEC §9.2): on in Tune and Improvise (§3.0); its tuner and levels portal into the row above the hex. */}
         <ListenPill
           onHeard={setHeardConcert}
-          nameOf={(m) => (tuner ? view.plainName(m) : view.name(m, active))}
+          nameOf={(m) => (tune ? view.plainName(m) : view.name(m, active))}
           onNote={onMicNote}
           auto={listens(mode)}
           tunerSlot={tunerSlot}
@@ -662,7 +662,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
               </div>
             )}
             <DockedHex
-              dock={tuner ? view.tunerDock(shape) : view.dock(active.index, shape)}
+              dock={tune ? view.tunerDock(shape) : view.dock(active.index, shape)}
               onLabelClick={() =>
                 setEditRequest((r) => ({
                   bar: active.bar,
@@ -675,8 +675,8 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
                 hovered.current = p;
               }}
               halo={writing && haloPitch !== null ? view.toWritten(haloPitch) : null}
-              // Heard notes light the hex in Tuner, and in Improvise while the transport is stopped (SPEC §3.3, §3.8).
-              heard={heardConcert !== null && (tuner || (improvise && !running)) ? view.toWritten(heardConcert) : null}
+              // Heard notes light the hex in Tune, and in Improvise while the transport is stopped (SPEC §3.3, §3.8).
+              heard={heardConcert !== null && (tune || (improvise && !running)) ? view.toWritten(heardConcert) : null}
               targets={targets && { pcs: targets, midi: null }}
               sounded={writing && sounded ? { midi: view.toWritten(sounded.midi), n: sounded.n } : null}
               still={improvise && running}

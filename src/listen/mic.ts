@@ -2,7 +2,7 @@
 // detectors in `pitch.ts`. Reports a held note (two-frame lock, kept through brief unlocks), display cents from an
 // adaptive EMA needle (display only), attacks, and played notes (`noteStart`, from NoteTracker).
 // Analysis window (fftSize + minHz) follows the instrument's concert low. The browser asks for the mic once; the audio
-// may be held until the first user gesture (an open straight into Tuner), which the caller is told about.
+// may be held until the first user gesture (an open straight into Tune), which the caller is told about.
 
 import {
   AdaptiveEma,
@@ -48,7 +48,7 @@ export interface ListenOptions {
   /** Concert MIDI of the instrument's practical low, or null for Concert (2048 / 55 Hz). */
   concertLowMidi?: number | null;
   /**
-   * The audio is running (true) or held until a user gesture (false) — opening straight into Tuner, the browser may
+   * The audio is running (true) or held until a user gesture (false) — opening straight into Tune, the browser may
    * keep it suspended (SPEC §3.0). Called once at the start and on every change.
    */
   onAudioState?: (running: boolean) => void;
@@ -82,7 +82,7 @@ export async function startListening(onFrame: (h: Heard) => void, opts: ListenOp
     audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false },
   });
   const ctx = new AudioContext();
-  // Not awaited: with no user gesture yet (an open straight into Tuner) the browser may hold the audio, and resume()
+  // Not awaited: with no user gesture yet (an open straight into Tune) the browser may hold the audio, and resume()
   // would wait for one. The caller hears about it (`onAudioState`) and resumes on the first gesture.
   const report = () => options.onAudioState?.(ctx.state === 'running');
   ctx.onstatechange = report;

@@ -25,18 +25,18 @@ describe('keymap (SPEC §11)', () => {
 
   it('Space clicks under the pointer in every mode (no repeat); A picks the hovered pitch; ⇧Space plays the scale', () => {
     const over = ctx('write', { hovered: 67 });
-    for (const mode of ['tuner', 'improvise', 'write', 'read'] as const) {
+    for (const mode of ['tune', 'improvise', 'write', 'read'] as const) {
       expect(keyIntent(key(' '), ctx(mode, { hovered: 67 }))).toEqual({ intent: null, handled: true, click: true });
     }
     expect(intent(key('a'), over)).toEqual({ type: 'pick', written: 67 });
     expect(keyIntent(key(' ', { repeat: true }), over)).toEqual({ intent: null, handled: true });
     expect(intent(key(' ', { shiftKey: true }), over)).toEqual({ type: 'sound', what: 'scale' });
     expect(intent(key('a'), ctx('improvise', { hovered: 60 }))).toEqual({ type: 'pick', written: 60 });
-    expect(intent(key('a'), ctx('tuner', { hovered: 60 }))).toEqual({ type: 'pick', written: 60 });
+    expect(intent(key('a'), ctx('tune', { hovered: 60 }))).toEqual({ type: 'pick', written: 60 });
     expect(intent(key('a'), ctx('read', { hovered: 60 }))).toBeNull(); // no hex in Read etude
   });
 
-  it('C / B / S sound the chord / bass / scale; < > (and , .) browse — not in Tuner (no chord)', () => {
+  it('C / B / S sound the chord / bass / scale; < > (and , .) browse — not in Tune (no chord)', () => {
     for (const mode of ['improvise', 'write', 'read'] as const) {
       expect(intent(key('c'), ctx(mode))).toEqual({ type: 'sound', what: 'chord' });
       expect(intent(key('B', { shiftKey: true }), ctx(mode))).toEqual({ type: 'sound', what: 'bass' });
@@ -45,8 +45,8 @@ describe('keymap (SPEC §11)', () => {
       expect(intent(key('s'), ctx(mode))).toEqual({ type: 'sound', what: 'scale' });
     }
     expect(keyIntent(key('c', { repeat: true }), ctx('write'))).toEqual({ intent: null, handled: true });
-    for (const k of ['c', 'b', 's']) expect(intent(key(k), ctx('tuner'))).toBeNull();
-    expect(keyIntent(key(' ', { shiftKey: true }), ctx('tuner'))).toEqual({ intent: null, handled: true });
+    for (const k of ['c', 'b', 's']) expect(intent(key(k), ctx('tune'))).toBeNull();
+    expect(keyIntent(key(' ', { shiftKey: true }), ctx('tune'))).toEqual({ intent: null, handled: true });
   });
 
   it('Improvise / Read etude: ← / → step slots while stopped; editing keys do nothing but are swallowed', () => {
@@ -64,7 +64,7 @@ describe('keymap (SPEC §11)', () => {
   });
 
   it('[ / ] previous / next mode, \\ Write etude ↔ Read etude — in every mode; P does nothing; ⇧M mutes', () => {
-    for (const mode of ['tuner', 'improvise', 'write', 'read'] as const) {
+    for (const mode of ['tune', 'improvise', 'write', 'read'] as const) {
       expect(intent(key('['), ctx(mode))).toEqual({ type: 'mode', mode: 'prev' });
       expect(intent(key(']'), ctx(mode))).toEqual({ type: 'mode', mode: 'next' });
       expect(intent(key('\\'), ctx(mode))).toEqual({ type: 'mode', mode: 'toggle-read' });
@@ -75,8 +75,8 @@ describe('keymap (SPEC §11)', () => {
     expect(intent(key('m'), ctx('write'))).toBeNull(); // plain M: nothing
   });
 
-  it('Tuner: no chart keys — arrows / ⌫ swallowed, lengths nothing', () => {
-    const t = ctx('tuner');
+  it('Tune: no chart keys — arrows / ⌫ swallowed, lengths nothing', () => {
+    const t = ctx('tune');
     expect(keyIntent(key('ArrowLeft'), t)).toEqual({ intent: null, handled: true });
     expect(intent(key('3'), t)).toBeNull();
     expect(intent(key('<', { shiftKey: true }), t)).toBeNull();

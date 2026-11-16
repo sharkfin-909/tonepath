@@ -15,7 +15,7 @@ assignee:
 
 In Improvise, with the transport stopped: chord and scale entry as in Write etude (editing a chord makes its slot
 current), the **form group** (time signature, bars per row, undo / redo), the "+" after the last bar and each bar's
-trash can. Bar numbers pick the looped bars (no ⋯ menu). All of it hides or does nothing while the transport runs.
+trash can. Bar numbers pick the looped bars; the ⋯ bar menu is as in Write etude (added after build). All of it hides or does nothing while the transport runs.
 **Hide hex** is offered in Improvise only.
 
 ## Acceptance criteria

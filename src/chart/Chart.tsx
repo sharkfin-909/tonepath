@@ -209,7 +209,7 @@ export function Chart({ progression, view, caret, onSlotClick, onEventClick, onT
               barTools={
                 !inert && slot.part === 0
                   ? {
-                      menu: writing,
+                      menu: editsForm,
                       selected: !!selection && slot.bar >= selection.from && slot.bar <= selection.to,
                       split: bars[slot.bar].length === 2,
                       canPaste,

@@ -1,5 +1,5 @@
 // Pure `session` module: the **editing session** of the chart screen (SPEC §3.0–3.8, §6.2, §9, §11).
-// One function, `reduce(state, progression, intent)`, holds every mode's rules — Tuner, Improvise, Write etude,
+// One function, `reduce(state, progression, intent)`, holds every mode's rules — Tune, Improvise, Write etude,
 // Read etude: the caret and latches, entry with wrap-around, switching modes, the current slot and the transport's
 // start / stop, stepwise playback, browsing slots, *On arrival*, the bar selection (= the looped bars) and clipboard,
 // Clear notes / Clear all. The transport's timing is `metronomeRun.ts`.
@@ -33,17 +33,17 @@ export interface Selection {
 }
 
 /** The four modes, in the Mode dropdown's order (SPEC §3.0). */
-export type Mode = 'tuner' | 'improvise' | 'write' | 'read';
-export const MODES: readonly Mode[] = ['tuner', 'improvise', 'write', 'read'];
-export const MODE_LABELS: Record<Mode, string> = { tuner: 'Tuner', improvise: 'Improvise', write: 'Write etude', read: 'Read etude' };
+export type Mode = 'tune' | 'improvise' | 'write' | 'read';
+export const MODES: readonly Mode[] = ['tune', 'improvise', 'write', 'read'];
+export const MODE_LABELS: Record<Mode, string> = { tune: 'Tune', improvise: 'Improvise', write: 'Write etude', read: 'Read etude' };
 
 /** The modes that listen to the mic (SPEC §3.0). */
-export const listens = (m: Mode): boolean => m === 'tuner' || m === 'improvise';
+export const listens = (m: Mode): boolean => m === 'tune' || m === 'improvise';
 /** The modes with a transport (SPEC §3.7). */
 export const hasTransport = (m: Mode): boolean => m === 'improvise' || m === 'read';
 
 export interface SessionState {
-  /** The mode (SPEC §3.0). Every open starts in Tuner. */
+  /** The mode (SPEC §3.0). Every open starts in Tune. */
   mode: Mode;
   /** A time position in the form (SPEC §6.2); clamped to the form end when read (`caretOf`). Write etude's. */
   caret: number;
@@ -51,7 +51,7 @@ export interface SessionState {
   length: Duration;
   rest: boolean;
   /**
-   * The current slot outside Write etude (Improvise's and Read etude's playhead; kept unseen in Tuner). Write etude
+   * The current slot outside Write etude (Improvise's and Read etude's playhead; kept unseen in Tune). Write etude
    * uses the caret's slot instead; switching modes carries one to the other (SPEC §3.0).
    */
   slot: number;
@@ -142,7 +142,7 @@ export interface Outcome {
 export function initialSession(p: Progression, device: { muted?: boolean; onArrival: OnArrival }): SessionState {
   const caret = melodyEnd(p.melody); // opens at the melody's end; not saved
   return {
-    mode: 'tuner', // every open and reload starts in Tuner (SPEC §3.0)
+    mode: 'tune', // every open and reload starts in Tune (SPEC §3.0)
     caret,
     length: 'q',
     rest: false,
@@ -199,13 +199,13 @@ function allowed(s: SessionState, intent: Intent): boolean {
   const t = intent.type;
   if (s.mode === 'write') return t !== 'transport' && t !== 'transport-chord' && t !== 'transport-end' && t !== 'rewind' && t !== 'heard';
   if (WRITE_ONLY.includes(t)) return false;
-  if (s.mode === 'tuner') {
-    // Tuner: the hex, mute, the modes; no chord to sound, no chart to click.
+  if (s.mode === 'tune') {
+    // Tune: the hex, mute, the modes; no chord to sound, no chart to click.
     return t === 'pick' || t === 'heard' || t === 'mode' || t === 'toggle-mute' || t === 'restored' || t === 'refusal-shown' || t === 'notice-done';
   }
   if (SLOT_MOVES.includes(t)) return !s.running;
   if (FORM_EDITS.includes(t)) return s.mode === 'improvise' && !s.running;
-  if (t === 'bar-action') return s.mode === 'improvise' && !s.running && intent.action === 'delete'; // the trash can
+  if (t === 'bar-action') return s.mode === 'improvise' && !s.running; // ⋯ menu and trash (SPEC §3.3)
   if (t === 'bar-select' || t === 'clear-selection') return !(s.mode === 'read' && s.running); // Read etude running: chart clicks do nothing
   if (t === 'pick') return s.mode === 'improvise';
   return true;

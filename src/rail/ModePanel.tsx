@@ -1,4 +1,4 @@
-// The mode panel (SPEC §3.0, §3.1): top right of the header, a group — the mode dropdown: the four modes (Tuner ·
+// The mode panel (SPEC §3.0, §3.1): top right of the header, a group — the mode dropdown: the four modes (Tune ·
 // Improvise · Write etude · Read etude), each with what it is for and what it uses or edits, and the keys to switch.
 // The mode alone decides whether the mic listens (no Audio input switch).
 import { MODES, MODE_LABELS, type Mode } from '../session';
@@ -6,7 +6,7 @@ import { Dropdown } from './Dropdown';
 
 /** What each mode is for, and what it uses or lets you edit (SPEC §3.0): the tags beside its name. */
 export const MODE_INFO: Record<Mode, { blurb: string; uses: string[] }> = {
-  tuner: {
+  tune: {
     blurb: 'Warm up and tune. The hex lights every note you play; no chart, no chords. Every open starts here.',
     uses: ['mic'],
   },

@@ -6,7 +6,7 @@ export interface AudioControlsProps {
   onChord: () => void;
   onBass: () => void;
   onScale: () => void;
-  /** Tuner (SPEC §3.8): no chord — ▶ Chord / Bass / Scale greyed. */
+  /** Tune (SPEC §3.8): no chord — ▶ Chord / Bass / Scale greyed. */
   noChord?: boolean;
 }
 

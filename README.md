@@ -3,7 +3,7 @@
 A static web app for writing **practice etudes over chord changes** and **practising improvisation** on them.
 Type chord symbols into a bar grid; each slot gets a scale and a fragment of one continuous melody, entered on the
 **docked hex** — a honeycomb of the slot's scale where right is the next step and up-left a third, coloured by
-degree. Four modes: **Tuner** (the hex lights whatever you play into the microphone), **Improvise** (play over a lead
+degree. Four modes: **Tune** (the hex lights whatever you play into the microphone), **Improvise** (play over a lead
 sheet with a click and the hex showing the chords), **Write etude** (note entry) and **Read etude** (the etude on one
 page, with a click and playhead).
 
@@ -20,7 +20,7 @@ npm run typecheck
 npm run build      # typecheck + static build into dist/
 ```
 
-The microphone (Listen: Tuner and Improvise) works on `localhost` and over HTTPS.
+The microphone (Listen: Tune and Improvise) works on `localhost` and over HTTPS.
 
 ## Where things are
 
@@ -36,7 +36,7 @@ The microphone (Listen: Tuner and Improvise) works on `localhost` and over HTTPS
 ## State of play
 
 - **Built**: chord grid with autosuggest (incl. the key's simple chords), scales and overrides, in-slot notation,
-  hex entry (honeycomb or Linear), the four modes — Tuner · Improvise · Write etude · Read etude
+  hex entry (honeycomb or Linear), the four modes — Tune · Improvise · Write etude · Read etude
   ([Mode menu](issues/068-mode-menu.md)) — with the mic following the mode, the transport (tempo, click, Loop, looping
   selected bars) in Improvise and Read etude, stepwise playback, nudges, bar editing, undo, instruments (written pitch),
   library with import / export, a hideable hex panel (Improvise), responsive header, generated reverb.

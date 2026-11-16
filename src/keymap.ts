@@ -66,8 +66,8 @@ export function keyIntent(e: KeyPress, ctx: KeyContext): KeyResult {
   if (plain && e.key === '\\') return handled({ type: 'mode', mode: 'toggle-read' });
   if (plain && (e.key === '[' || e.key === ']')) return handled(e.repeat ? null : { type: 'mode', mode: e.key === '[' ? 'prev' : 'next' });
 
-  if (ctx.mode === 'tuner') {
-    // Tuner: Space = click, A picks, ⇧M; no chord to sound (C, B, S do nothing), no chart.
+  if (ctx.mode === 'tune') {
+    // Tune: Space = click, A picks, ⇧M; no chord to sound (C, B, S do nothing), no chart.
     if (!plain) return NONE;
     if (e.key === ' ') return e.repeat || e.shiftKey ? handled() : CLICK;
     const k = e.key.toLowerCase();

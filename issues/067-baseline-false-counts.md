@@ -22,5 +22,5 @@ instrument-specific detector tuning. What is in scope for the next build vs left
 ## Resolution
 
 **Dropped** (2026-11-16) with its map ([061](061-map-listen-and-practice-next.md)): [Mode menu](068-mode-menu.md)
-removes note counting. Heard notes now only light the hex (Tuner, Improvise stopped); if baseline false note-starts
+removes note counting. Heard notes now only light the hex (Tune, Improvise stopped); if baseline false note-starts
 make that flicker, open a new ticket against SPEC §9.2.

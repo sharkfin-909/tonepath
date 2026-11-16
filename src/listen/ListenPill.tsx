@@ -1,4 +1,4 @@
-// 🎤 Listen (SPEC §9.2): no button of its own — on while `auto` (the mode listens: Tuner, Improvise; SPEC §3.0). On:
+// 🎤 Listen (SPEC §9.2): no button of its own — on while `auto` (the mode listens: Tune, Improvise; SPEC §3.0). On:
 // the mic is read every frame; a pill portalled to the row's left end shows the input level control and meter, and —
 // portalled into the row's middle — the tuner shows the note being played (written pitch, spelled by `nameOf`) and how
 // far off it is. Each played note goes to `onNote`. Where the mic can't be used, or the browser holds the audio until a
@@ -18,7 +18,7 @@ export interface ListenPillProps {
   nameOf: (concertMidi: number) => string;
   /** A note was played (an attack, or a slur to a new pitch): concert MIDI. */
   onNote?: (concertMidi: number, fromOnset: boolean) => void;
-  /** Listen while true (Tuner, Improvise); off again when it turns false. */
+  /** Listen while true (Tune, Improvise); off again when it turns false. */
   auto?: boolean;
   /** Where the big tuner goes (above the hex): rendered there while listening, so only it redraws every frame. */
   tunerSlot?: HTMLElement | null;
@@ -100,7 +100,7 @@ export function ListenPill({ onHeard, nameOf, onNote, auto = false, tunerSlot = 
     return false;
   };
 
-  // The listening modes turn it on — at once on an open into Tuner (the browser may ask for the mic straight away) —
+  // The listening modes turn it on — at once on an open into Tune (the browser may ask for the mic straight away) —
   // and off again when they end.
   useEffect(() => {
     if (auto && !on && !autoStarted.current) {
