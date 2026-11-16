@@ -805,11 +805,6 @@ button.dock-label {
   color: #b71c1c;
 }
 
-.rail-select {
-  font: inherit;
-  font-size: 13px;
-}
-
 .rail-heading {
   margin: 0;
   display: flex;
@@ -820,10 +815,6 @@ button.dock-label {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.instrument-select {
-  max-width: 100%;
 }
 
 /* Bar number + ⋯ bar handle (SPEC §4.1). */
@@ -999,89 +990,133 @@ button.dock-label {
   gap: 6px;
   white-space: nowrap;
 }
-.mode-picker {
+/* The dropdown (SPEC §3.1): every choice in the header. A button showing the value; a dark card under it. */
+.dropdown {
   position: relative;
+  display: inline-flex;
 }
-/* The trigger: "mode: improvise ▾", the group's own height. */
-.mode-trigger {
+.dropdown-trigger {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 100%;
-  padding: 0 2px;
-  border: none;
-  background: none;
+  gap: 5px;
+  min-height: 22px;
+  padding: 0 7px;
+  border-radius: 11px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.1);
   color: inherit;
   font: inherit;
   font-size: 12px;
   white-space: nowrap;
   cursor: pointer;
 }
-.mode-current {
+.dropdown-trigger:hover:not(:disabled),
+.dropdown-trigger[aria-expanded='true'] {
+  background: rgba(255, 255, 255, 0.18);
+}
+.dropdown-trigger:focus-visible {
+  outline: 2px solid var(--grid-glow);
+  outline-offset: 1px;
+}
+.dropdown-trigger:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.mode-panel .dropdown-trigger {
+  background: none;
+  padding: 0 2px;
+}
+.dropdown-prefix {
+  opacity: 0.75;
+}
+.dropdown-value {
   font-weight: 600;
 }
-.mode-caret {
+.dropdown-caret {
   opacity: 0.7;
   transition: transform 120ms ease;
 }
-.mode-caret.up {
+.dropdown-caret.up {
   transform: rotate(180deg);
 }
-/* The menu: a dark card under the pill, right-aligned with it; one row per mode — name, what it uses, what it is for. */
-.mode-menu {
+.dropdown-menu {
   position: absolute;
-  right: -1px;
-  top: calc(100% + 6px);
+  left: -1px;
+  top: calc(100% + 8px);
   z-index: 40;
-  width: min(380px, calc(100vw - 32px));
-  padding: 6px;
+  padding: 5px;
   border-radius: 12px;
   background: var(--dock-bg);
   color: #f3eee6;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.14);
-  text-transform: none;
-  animation: mode-menu-in 120ms ease-out;
+  animation: dropdown-in 120ms ease-out;
 }
-@keyframes mode-menu-in {
+.dropdown-menu.right {
+  left: auto;
+  right: -1px;
+}
+/* The mode panel sits at the right edge: its card always hangs to the left. */
+.mode-panel .dropdown-menu {
+  left: auto;
+  right: -9px;
+}
+.dropdown-menu.rich {
+  width: min(380px, calc(100vw - 32px));
+  text-transform: none;
+}
+.dropdown-menu.compact {
+  min-width: calc(100% + 16px);
+  max-width: calc(100vw - 32px);
+  max-height: min(340px, 60vh);
+  overflow-y: auto;
+}
+@keyframes dropdown-in {
   from {
     opacity: 0;
     transform: translateY(-4px);
   }
 }
-.mode-menu ul {
+.dropdown-menu ul {
   margin: 0;
   padding: 0;
   list-style: none;
   outline: none;
 }
-.mode-option {
+.dropdown-option {
   display: grid;
   gap: 3px;
-  padding: 9px 12px 10px;
   border-radius: 8px;
   border-left: 3px solid transparent;
   cursor: pointer;
 }
-.mode-option + .mode-option {
+.compact .dropdown-option {
+  padding: 5px 10px 5px 9px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.rich .dropdown-option {
+  padding: 9px 12px 10px;
+}
+.rich .dropdown-option + .dropdown-option {
   margin-top: 2px;
 }
-.mode-option.active {
+.dropdown-option.active {
   background: rgba(255, 255, 255, 0.09);
 }
-.mode-option.current {
+.dropdown-option.current {
   border-left-color: var(--grid-glow);
 }
-.mode-option-head {
+.dropdown-option-head {
   display: flex;
   align-items: center;
   gap: 6px;
 }
-.mode-option-name {
+.rich .dropdown-option-name {
   font-size: 14px;
   font-weight: 600;
   margin-right: 2px;
 }
-.mode-tag {
+.dropdown-tag {
   padding: 0 6px;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.28);
@@ -1090,23 +1125,26 @@ button.dock-label {
   letter-spacing: 0.02em;
   opacity: 0.8;
 }
-.mode-check {
+.dropdown-check {
   margin-left: auto;
+  padding-left: 10px;
   color: var(--grid-glow);
+  flex: none;
+  box-sizing: content-box;
 }
-.mode-option-blurb {
+.dropdown-option-blurb {
   font-size: 12px;
   line-height: 1.4;
   color: rgba(243, 238, 230, 0.72);
 }
-.mode-menu-keys {
+.dropdown-footer {
   margin: 6px 0 0;
   padding: 7px 12px 3px;
   border-top: 1px solid rgba(255, 255, 255, 0.12);
   font-size: 11px;
   color: rgba(243, 238, 230, 0.6);
 }
-.mode-menu kbd {
+.dropdown-menu kbd {
   display: inline-block;
   min-width: 15px;
   padding: 0 4px;
@@ -1118,8 +1156,8 @@ button.dock-label {
   text-align: center;
 }
 @media (prefers-reduced-motion: reduce) {
-  .mode-menu,
-  .mode-caret {
+  .dropdown-menu,
+  .dropdown-caret {
     animation: none;
     transition: none;
   }
@@ -1881,7 +1919,7 @@ select {
 }
 
 /* The selected instrument (and its Ins: label) in Outfit Thin, like the title and the sound pill. */
-.topbar .instrument-select,
+.topbar .instrument-select .dropdown-value,
 .topbar .ins-label {
   font-weight: 100;
 }
@@ -1890,8 +1928,10 @@ select {
 .topbar .topbar-row {
   gap: 6px 6px;
 }
-.topbar .instrument-picker select.instrument-select {
+.topbar .instrument-select .dropdown-value {
   max-width: 104px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .topbar .latch-button {
   padding: 4px 4px;
@@ -1944,10 +1984,10 @@ select {
 @media (hover: none) and (pointer: coarse) {
   .topbar .rail-button,
   .topbar .latch-button,
-  .topbar .mode-trigger {
+  .topbar .dropdown-trigger {
     min-height: 34px;
   }
-  .mode-option {
+  .dropdown-option {
     padding-block: 12px;
   }
   .octave-step {
@@ -2192,11 +2232,6 @@ select {
   color: inherit;
   text-align: center;
 }
-.transport-select {
-  font: inherit;
-  font-size: 12px;
-  padding-block: 1px;
-}
 .transport-loop {
   display: inline-flex;
   align-items: center;
@@ -2242,7 +2277,7 @@ select {
   grid-template-rows: minmax(0, 1fr);
 }
 /* While listening: a row sitting on the hex panel's top edge, over the bottom of the chart (the hex keeps its space):
-   the tuner centred, the input level at the right. Hidden when neither is shown. */
+   the tuner centred, the input level at the left. Hidden when neither is shown. */
 .main > .chart-area {
   grid-row: 1;
   grid-column: 1;
@@ -2272,9 +2307,11 @@ select {
 .tuner-slot {
   grid-column: 2;
 }
+/* The input level control and meter: the row's left end. */
 .levels-slot {
-  grid-column: 3;
-  justify-self: end;
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: start;
 }
 
 /* The big tuner (SPEC §9.2): note, a ±50 ¢ scale with a needle, the cents off. */

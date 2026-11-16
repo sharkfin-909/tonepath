@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import { BPM, METRONOME_SOUNDS } from '../metronome';
 import type { ClickSound } from '../audio';
+import { Dropdown } from './Dropdown';
 
 export interface TransportBarProps {
   bpm: number;
@@ -69,13 +70,7 @@ export function TransportBar({ bpm, onBpm, sound, onSound, running, onStartStop,
         <BpmField bpm={bpm} onBpm={onBpm} />
         <span className="transport-label">bpm</span>
       </label>
-      <select className="transport-select" value={sound} aria-label="Click sound" title="Click sound" onChange={(e) => onSound(e.target.value as ClickSound)}>
-        {METRONOME_SOUNDS.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.label}
-          </option>
-        ))}
-      </select>
+      <Dropdown value={sound} label="Click sound" options={METRONOME_SOUNDS.map((s) => ({ value: s.id, label: s.label }))} onChange={onSound} />
       <span className="step-controls">
         <button type="button" className="rail-button icon-button" aria-label="Rewind" title="Rewind to the first chord" onClick={onRewind}>
           {icon('M2 2h1.6v8H2zM10 2v8L4 6z')}

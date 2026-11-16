@@ -27,6 +27,7 @@ import { TransportBar } from './rail/TransportBar';
 import { HEX_HIDDEN, HEX_LINEAR, METRONOME_BPM, METRONOME_SOUND, TRANSPORT_LOOP } from './deviceSettings';
 import { useDeviceSetting } from './useDeviceSetting';
 import { ModePanel } from './rail/ModePanel';
+import { Dropdown } from './rail/Dropdown';
 import { NEW_INTAKE, appSounded, isPlayed, type MicIntake } from './micIntake';
 import { useMetronome } from './useMetronome';
 import { loopRange, transportForm, upcomingTargets } from './transport';
@@ -393,11 +394,8 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
         // time signature) keep it: clicking them starts editing.
         onClick={(e) => {
           const el = e.target as Element;
-          // The mode picker keeps focus while its menu is open (it hands focus back itself on a choice).
-          if (el.closest('button') && !el.closest('.inline-value') && !el.closest('.mode-picker')) focusHex();
-        }}
-        onChange={(e) => {
-          if (e.target instanceof HTMLSelectElement) focusHex();
+          // A dropdown's button keeps focus while its menu is open; a choice in the menu hands keys back to the hex.
+          if (el.closest('.dropdown-option') || (el.closest('button') && !el.closest('.inline-value') && !el.closest('.dropdown'))) focusHex();
         }}
       >
         {/* Row 1: title (left) · sound pill (centre) · mode panel (right); row 2: the editing controls (SPEC §3.1). */}
@@ -416,27 +414,16 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
             noChord={tuner}
           />
           {/* In every mode (SPEC §3.0); Tuner has no chord, so it is greyed there. */}
-          <p className="rail-setting on-arrival">
+          <div className="rail-setting on-arrival">
             <span className="rail-label">Audio on chord</span>
-            <select
-              className="rail-select"
-              aria-label="Audio on chord"
-              disabled={tuner}
+            <Dropdown
               value={session.onArrival}
-              onChange={(e) =>
-                dispatch({
-                  type: 'set-arrival',
-                  how: e.target.value as OnArrival,
-                })
-              }
-            >
-              {(Object.keys(ON_ARRIVAL_LABELS) as OnArrival[]).map((v) => (
-                <option key={v} value={v}>
-                  {ON_ARRIVAL_LABELS[v]}
-                </option>
-              ))}
-            </select>
-          </p>
+              label="Audio on chord"
+              disabled={tuner}
+              options={(Object.keys(ON_ARRIVAL_LABELS) as OnArrival[]).map((v) => ({ value: v, label: ON_ARRIVAL_LABELS[v] }))}
+              onChange={(how) => dispatch({ type: 'set-arrival', how })}
+            />
+          </div>
         </div>
         {/* Row 1, right: the mode panel (Mode:), in a pill. */}
         <div className="mode-corner">{modeSwitch}</div>
@@ -695,7 +682,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
           </section>
         )}
         {/* While listening (Listen, §9.2): a row on top of the hex panel's top edge, overlaying the chart (it takes
-            none of the hex's space) — the tuner centred, its input level and meter at the right. */}
+            none of the hex's space) — the tuner centred, its input level and meter at the left. */}
         {listens(mode) && (
           <div className="listen-row">
             <div className="tuner-slot" ref={setTunerSlot} />

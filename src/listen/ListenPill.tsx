@@ -1,5 +1,5 @@
 // 🎤 Listen (SPEC §9.2): no button of its own — on while `auto` (the mode listens: Tuner, Improvise; SPEC §3.0). On:
-// the mic is read every frame; a pill portalled to the row's right end shows the input level control and meter, and —
+// the mic is read every frame; a pill portalled to the row's left end shows the input level control and meter, and —
 // portalled into the row's middle — the tuner shows the note being played (written pitch, spelled by `nameOf`) and how
 // far off it is. Each played note goes to `onNote`. Where the mic can't be used, or the browser holds the audio until a
 // gesture, the tuner's place says so instead (and the first click or key resumes it).
@@ -22,7 +22,7 @@ export interface ListenPillProps {
   auto?: boolean;
   /** Where the big tuner goes (above the hex): rendered there while listening, so only it redraws every frame. */
   tunerSlot?: HTMLElement | null;
-  /** Where the input level control and meter go (the row's right end): rendered there while listening. */
+  /** Where the input level control and meter go (the row's left end): rendered there while listening. */
   levelsSlot?: HTMLElement | null;
   /** Concert MIDI of the instrument's practical low, or null for Concert — sets the analysis window (issues/064). */
   concertLowMidi?: number | null;
@@ -138,7 +138,7 @@ export function ListenPill({ onHeard, nameOf, onNote, auto = false, tunerSlot = 
     {on && held && tunerSlot && createPortal(<div className="tuner well tuner-message" role="status">tap to start listening</div>, tunerSlot)}
     {auto && !on && asking && tunerSlot && createPortal(<div className="tuner well tuner-message" role="status">allow the microphone to start listening</div>, tunerSlot)}
     {auto && !on && error && tunerSlot && createPortal(<div className="tuner well tuner-message" role="alert">{MIC_PROBLEM_TEXT[error]}</div>, tunerSlot)}
-    {/* While listening: the input level control and meter, in a pill as tall as the tuner, at the row's right end. */}
+    {/* While listening: the input level control and meter, in a pill as tall as the tuner, at the row's left end. */}
     {on && levelsSlot && createPortal(
       <div className="listen-levels well">
         <label className="listen-gain" title={`Input level ${gainDb > 0 ? '+' : ''}${gainDb} dB: playing should pass the mark, silence stay below it`}>

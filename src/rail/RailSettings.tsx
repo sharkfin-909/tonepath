@@ -1,4 +1,5 @@
 // Header settings (SPEC §3.1): inline title rename, time signature, bars per row, and the Clear ▾ menu (§6.2 item 10).
+import { Dropdown } from './Dropdown';
 import { useEffect, useRef, useState } from 'react';
 import { parseTimeSignature } from '../form';
 import { BARS_PER_ROW } from '../progression';
@@ -88,16 +89,10 @@ export function TimeSignatureField({ value, onChange }: { value: string; onChang
 
 export function BarsPerRow({ value, onChange }: { value: number; onChange: (n: number) => void }) {
   return (
-    <label className="rail-setting">
+    <div className="rail-setting">
       <span className="rail-label">Bars / row</span>
-      <select className="rail-select" value={value} onChange={(e) => onChange(Number(e.target.value))}>
-        {BARS_PER_ROW.map((n) => (
-          <option key={n} value={n}>
-            {n}
-          </option>
-        ))}
-      </select>
-    </label>
+      <Dropdown value={value} label="Bars per row" options={BARS_PER_ROW.map((n) => ({ value: n, label: String(n) }))} onChange={onChange} />
+    </div>
   );
 }
 
