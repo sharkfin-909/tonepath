@@ -2,9 +2,9 @@
 id: 83
 title: "Docs: etudes in a progression"
 labels: [ready-for-agent]
-status: open
+status: closed
 blocked_by: [80, 81, 82]
-assignee:
+assignee: claude
 ---
 
 ## Parent
@@ -27,12 +27,19 @@ Bring the docs in line with the built behaviour:
 
 ## Acceptance criteria
 
-- [ ] No doc says a progression has one melody or one instrument
-- [ ] §12.2's example is a v3 progression with two etudes
-- [ ] CONTEXT.md terms match the code's names (`etudes`, `Etude`, `openEtudeId`)
+- [x] No doc says a progression has one melody or one instrument
+- [x] §12.2's example is a v3 progression with two etudes
+- [x] CONTEXT.md terms match the code's names (`etudes`, `Etude`, `openEtudeId`)
 
 ## Blocked by
 
 - [080](080-session-open-etude.md)
 - [081](081-etude-picker.md)
 - [082](082-library-and-files-v3.md)
+
+## Resolution
+
+SPEC: new §3.9 *Etudes* (open etude, picker, switching, last open); §3.1, §3.4, §3.5, §4.1, §6.1, §6.2 item 10, §6.3,
+§7.3, §10, §12.2–12.5 and §14 (table 10) updated; §12.2 now shows a two-etude v3 progression. CONTEXT.md: *Etude*
+(stored, named, with its instrument), *Open etude*, *Etude picker*, *Progression* (no instrument, holds etudes),
+*Melody*, *Clear notes / all*, *Editing session*, *Instrument view*. README: the summary and the built list.

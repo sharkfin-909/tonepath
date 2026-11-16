@@ -36,3 +36,5 @@ Settled in a planning session (2026-11-16). Build slices: [078](078-schema-v3-et
    it into the open etude, the others get rests in the pasted bars. Chord edits never move notes.
 8. **Undo** stays whole-progression snapshots, so it covers etude edits (add, rename, delete, notes) and form edits
    alike.
+9. **Built** (2026-11-16): 078–083 closed. Deviations from the plan: etude ids are short and deterministic (`e1`,
+   `e2`, …), not UUIDs; 079 was built with 078; *Etude N* takes the lowest free N among the names.

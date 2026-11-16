@@ -1,7 +1,8 @@
 # Tonepath
 
 A static web app for writing **practice etudes over chord changes** and **practising improvisation** on them.
-Type chord symbols into a bar grid; each slot gets a scale and a fragment of one continuous melody, entered on the
+Type chord symbols into a bar grid; each slot gets a scale, and each of the progression's **etudes** (one or more,
+each for its own instrument) a fragment of one continuous melody, entered on the
 **docked hex** — a honeycomb of the slot's scale where right is the next step and up-left a third, coloured by
 degree. Four modes: **Tune** (the hex lights whatever you play into the microphone), **Improvise** (play over a lead
 sheet with a click and the hex showing the chords), **Write etude** (note entry) and **Read etude** (the etude on one
@@ -38,7 +39,8 @@ The microphone (Listen: Tune and Improvise) works on `localhost` and over HTTPS.
 - **Built**: chord grid with autosuggest (incl. the key's simple chords), scales and overrides, in-slot notation,
   hex entry (honeycomb or Linear), the four modes — Tune · Improvise · Write etude · Read etude
   ([Mode menu](issues/068-mode-menu.md)) — with the mic following the mode, the transport (tempo, click, Loop, looping
-  selected bars) in Improvise and Read etude, stepwise playback, nudges, bar editing, undo, instruments (written pitch),
+  selected bars) in Improvise and Read etude, stepwise playback, nudges, bar editing, undo, several etudes per progression (each with
+  its instrument, written pitch; [Etudes](issues/077-etudes-belong-to-a-progression.md)),
   library with import / export, a hideable hex panel (Improvise), responsive header, generated reverb.
 - **Not built / known limits**: Listen is one note at a time (no chords); very low notes (below ~E2) are slower to
   detect; nothing is recorded from the mic.
