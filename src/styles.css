@@ -1630,6 +1630,10 @@ button.dock-label {
 }
 /* …and the lead sheet's cards keep the original white paper on it (their highlights tint over it), lifted off the
    background by a light shadow. */
+/* Improvise's current slot: the same blue tint as Write etude's active slot (not Read etude's amber). */
+.main.improvise .slot.lead.active.playing {
+  --slot-tint: rgba(47, 111, 219, 0.08);
+}
 .main.improvise .slot.lead {
   --slot-paper: var(--bg);
   box-shadow: 0 1px 2px rgba(29, 27, 25, 0.06), 0 2px 8px rgba(29, 27, 25, 0.08);
