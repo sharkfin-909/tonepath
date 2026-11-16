@@ -1,13 +1,14 @@
-// 🎤 Listen (SPEC §9.2): no button of its own — on while `auto` (Practice, or Write's *Write with instrument audio*). On:
-// the mic is read every frame; a pill
-// portalled to the row's right end shows the input level control and meter, and — portalled into the row's middle — the tuner shows
-// the note being played (spelled for the active slot, written pitch) and how far off it is. Practice turns it on and off (`auto`) and receives each played note (`onNote`).
+// 🎤 Listen (SPEC §9.2): no button of its own — on while `auto` (the mode listens: Tune, Improvise; SPEC §3.0). On:
+// the mic is read every frame; a pill portalled to the row's left end shows the input level control and meter, and —
+// portalled into the row's middle — the tuner shows the note being played (written pitch, spelled by `nameOf`) and how
+// far off it is. Each played note goes to `onNote`. Where the mic can't be used, or the browser holds the audio until a
+// gesture, the tuner's place says so instead (and the first click or key resumes it).
 // Only a change of note is reported up (to light the hex), so the chart doesn't re-render 60 times a second.
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { prettyName } from '../spelling';
 import { readDevice, writeDevice } from '../device';
-import { INPUT_GAIN_DB, startListening, type Listening } from './mic';
+import { INPUT_GAIN_DB, micProblem, startListening, type Listening, type MicProblem } from './mic';
 import { ONSET_GATE, meterPosition } from './pitch';
 
 export interface ListenPillProps {
@@ -15,23 +16,32 @@ export interface ListenPillProps {
   onHeard: (concertMidi: number | null) => void;
   /** A concert note's written name in the active slot, e.g. `Eb4`. */
   nameOf: (concertMidi: number) => string;
-  /** A note was played (an attack, or a slur to a new pitch): concert MIDI. Write inserts; Practice counts (SPEC §3.7). */
+  /** A note was played (an attack, or a slur to a new pitch): concert MIDI. */
   onNote?: (concertMidi: number, fromOnset: boolean) => void;
-  /** Listen while true (Practice, or Write with instrument audio); off again when it turns false. */
+  /** Listen while true (Tune, Improvise); off again when it turns false. */
   auto?: boolean;
-  /** Mic on/off — App uses this in Write to mute note audition while listening. */
-  onListening?: (on: boolean) => void;
   /** Where the big tuner goes (above the hex): rendered there while listening, so only it redraws every frame. */
   tunerSlot?: HTMLElement | null;
-  /** Where the input level control and meter go (the row's right end): rendered there while listening. */
+  /** Where the input level control and meter go (the row's left end): rendered there while listening. */
   levelsSlot?: HTMLElement | null;
   /** Concert MIDI of the instrument's practical low, or null for Concert — sets the analysis window (issues/064). */
   concertLowMidi?: number | null;
 }
 
-export function ListenPill({ onHeard, nameOf, onNote, auto = false, onListening, tunerSlot = null, levelsSlot = null, concertLowMidi = null }: ListenPillProps) {
+/** What the tuner's place says when the mic can't be used (SPEC §3.0). */
+export const MIC_PROBLEM_TEXT: Record<MicProblem, string> = {
+  blocked: "Mic blocked: allow it in the browser's site settings",
+  'no-device': 'No microphone found',
+  insecure: 'The mic needs a secure page (HTTPS or localhost)',
+};
+
+export function ListenPill({ onHeard, nameOf, onNote, auto = false, tunerSlot = null, levelsSlot = null, concertLowMidi = null }: ListenPillProps) {
   const [on, setOn] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<MicProblem | null>(null);
+  /** The browser holds the audio until a gesture: *tap to start listening*. */
+  const [held, setHeld] = useState(false);
+  /** Asking for the mic (the browser's prompt may be open): say so in the tuner's place. */
+  const [asking, setAsking] = useState(false);
   const [frame, setFrame] = useState<{ midi: number | null; cents: number; level: number }>({ midi: null, cents: 0, level: 0 });
   const listening = useRef<Listening | null>(null);
   // The input level control (dB), remembered on the device: set it so playing passes the meter's mark and silence
@@ -60,13 +70,14 @@ export function ListenPill({ onHeard, nameOf, onNote, auto = false, onListening,
       listening.current?.stop();
       listening.current = null;
       setOn(false);
-      onListening?.(false);
+      setHeld(false);
       lastMidi.current = null;
       report.current(null);
       setFrame({ midi: null, cents: 0, level: 0 });
       return false;
     }
     setError(null);
+    setAsking(true);
     try {
       listening.current = await startListening(
         (h) => {
@@ -77,19 +88,20 @@ export function ListenPill({ onHeard, nameOf, onNote, auto = false, onListening,
             report.current(h.midi);
           }
         },
-        { gainDb, concertLowMidi },
+        { gainDb, concertLowMidi, onAudioState: (running) => setHeld(!running) },
       );
       setOn(true);
-      onListening?.(true);
       return true;
     } catch (err) {
-      setError(err instanceof DOMException && err.name === 'NotAllowedError' ? 'Microphone blocked' : 'No microphone');
+      setError(micProblem(err));
+    } finally {
+      setAsking(false);
     }
     return false;
   };
 
-  // Practice / Write with instrument audio turn listening on (the click or dropdown change is the user's gesture) and
-  // off again when they end.
+  // The listening modes turn it on — at once on an open into Tune (the browser may ask for the mic straight away) —
+  // and off again when they end.
   useEffect(() => {
     if (auto && !on && !autoStarted.current) {
       autoStarted.current = true;
@@ -101,6 +113,18 @@ export function ListenPill({ onHeard, nameOf, onNote, auto = false, onListening,
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reacts to `auto` turning on / off
   }, [auto]);
 
+  // Held audio: the first click or key anywhere resumes it.
+  useEffect(() => {
+    if (!held) return;
+    const go = () => listening.current?.resume();
+    window.addEventListener('pointerdown', go, true);
+    window.addEventListener('keydown', go, true);
+    return () => {
+      window.removeEventListener('pointerdown', go, true);
+      window.removeEventListener('keydown', go, true);
+    };
+  }, [held]);
+
   // Retune YIN's window when the instrument changes while listening (issues/064).
   useEffect(() => {
     listening.current?.setConcertLowMidi(concertLowMidi);
@@ -110,8 +134,11 @@ export function ListenPill({ onHeard, nameOf, onNote, auto = false, onListening,
   const mark = meterPosition(ONSET_GATE); // where a note starts to count
   return (
     <>
-    {on && tunerSlot && createPortal(<Tuner name={frame.midi === null ? null : nameOf(frame.midi)} cents={frame.cents} />, tunerSlot)}
-    {/* While listening: the input level control and meter, in a pill as tall as the tuner, at the row's right end. */}
+    {on && !held && tunerSlot && createPortal(<Tuner name={frame.midi === null ? null : nameOf(frame.midi)} cents={frame.cents} />, tunerSlot)}
+    {on && held && tunerSlot && createPortal(<div className="tuner well tuner-message" role="status">tap to start listening</div>, tunerSlot)}
+    {auto && !on && asking && tunerSlot && createPortal(<div className="tuner well tuner-message" role="status">allow the microphone to start listening</div>, tunerSlot)}
+    {auto && !on && error && tunerSlot && createPortal(<div className="tuner well tuner-message" role="alert">{MIC_PROBLEM_TEXT[error]}</div>, tunerSlot)}
+    {/* While listening: the input level control and meter, in a pill as tall as the tuner, at the row's left end. */}
     {on && levelsSlot && createPortal(
       <div className="listen-levels well">
         <label className="listen-gain" title={`Input level ${gainDb > 0 ? '+' : ''}${gainDb} dB: playing should pass the mark, silence stay below it`}>
@@ -135,7 +162,6 @@ export function ListenPill({ onHeard, nameOf, onNote, auto = false, onListening,
       </div>,
       levelsSlot,
     )}
-    {error && <span className="listen-error">{error}</span>}
     </>
   );
 }

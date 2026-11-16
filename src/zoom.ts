@@ -10,7 +10,17 @@ export const SCALE_PX = 11;
 export const HEADER_PX = 48;
 export const MIN_CHORD_PX = 11;
 export const MIN_SCALE_PX = 9;
-export const ROW_GAP_PX = 8;
+/** Logical gap above each chart row: the **bar strip** — each bar's number (left) and trash can (right) (SPEC §3.1). */
+export const ROW_GAP_PX = 30;
+/** Logical space under each row's cards, so a bar strip reads as belonging to the bar below it, not the one above. */
+export const ROW_AFTER_PX = 14;
+/** Logical gap between slots in a row (each slot a card); the bar line sits in the middle of the gap after a bar. */
+export const SLOT_GAP_PX = 10;
+/** Logical padding at the top of each slot card (above the chord name), and the card's border (1px each side). */
+export const SLOT_PAD_TOP_PX = 6;
+export const SLOT_BORDER_PX = 1;
+/** What a card adds to a row's height besides the header and stave: its top padding and top + bottom border. */
+export const SLOT_CHROME_PX = SLOT_PAD_TOP_PX + 2 * SLOT_BORDER_PX;
 
 /** Logical font size that renders at least `min` px at zoom z. */
 export const labelPx = (base: number, min: number, z: number) => Math.max(base, min / z);
@@ -24,7 +34,8 @@ export function headerPx(z: number): number {
 
 /** Rendered height of `rows` rows at zoom z. */
 export function chartHeight(rows: number, staveHeight: number, z: number): number {
-  return z * (rows * (headerPx(z) + staveHeight) + Math.max(0, rows - 1) * ROW_GAP_PX);
+  // A row gap above every row, the first too: each row's bar strip (SPEC §3.1).
+  return z * (rows * (headerPx(z) + staveHeight + SLOT_CHROME_PX) + rows * (ROW_GAP_PX + ROW_AFTER_PX));
 }
 
 export interface Fit {
@@ -35,7 +46,7 @@ export interface Fit {
 
 /**
  * The largest zoom in [min, max] at which every row fits `height` (rendered px). Below `min` the chart doesn't
- * shrink further and scrolls. Etude view passes min = 0 (no floor).
+ * shrink further and scrolls. Read etude passes min = 0 (no floor).
  */
 export function fitZoom(rows: number, staveHeight: number, height: number, min = ZOOM_FLOOR, max = ZOOM_CAP): Fit {
   if (rows <= 0 || height <= 0) return { zoom: max, scrolls: false };

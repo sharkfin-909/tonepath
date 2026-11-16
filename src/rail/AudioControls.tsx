@@ -6,9 +6,11 @@ export interface AudioControlsProps {
   onChord: () => void;
   onBass: () => void;
   onScale: () => void;
+  /** Tune (SPEC §3.8): no chord — ▶ Chord / Bass / Scale greyed. */
+  noChord?: boolean;
 }
 
-export function AudioControls({ muted, onToggleMute, onChord, onBass, onScale }: AudioControlsProps) {
+export function AudioControls({ muted, onToggleMute, onChord, onBass, onScale, noChord = false }: AudioControlsProps) {
   return (
     <div className="audio-controls">
       <button
@@ -20,13 +22,13 @@ export function AudioControls({ muted, onToggleMute, onChord, onBass, onScale }:
       >
         <span aria-hidden>{muted ? '🔇' : '🔊'}</span> {muted ? 'Muted' : 'Sound'}
       </button>
-      <button type="button" className="rail-button" title="Play the chord (C)" onClick={onChord}>
+      <button type="button" className="rail-button" title="Play the chord (C)" disabled={noChord} onClick={onChord}>
         ▶ Chord
       </button>
-      <button type="button" className="rail-button" title="Play the bass (B)" onClick={onBass}>
+      <button type="button" className="rail-button" title="Play the bass (B)" disabled={noChord} onClick={onBass}>
         ▶ Bass
       </button>
-      <button type="button" className="rail-button" title="Play the scale (S or ⇧Space)" onClick={onScale}>
+      <button type="button" className="rail-button" title="Play the scale (S or ⇧Space)" disabled={noChord} onClick={onScale}>
         ▶ Scale
       </button>
     </div>

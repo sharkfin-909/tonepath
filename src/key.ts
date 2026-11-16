@@ -28,6 +28,28 @@ export function keyOf(h: SlotHarmony): Key | null {
   return { pcs, names: spelled.map((s) => s.name), major };
 }
 
+/** Melodic and harmonic minor, from the tonic. */
+const MELODIC_STEPS = [0, 2, 3, 5, 7, 9, 11];
+const HARMONIC_STEPS = [0, 2, 3, 5, 7, 8, 11];
+
+/**
+ * The key pill's name (SPEC §3.1): the parent scale the notes come from. A mode of a major key → its tonic (`C`,
+ * `Bb`); a mode of melodic or harmonic minor → its tonic and a tag (`Ab mel`, `C harm`); whole-tone and diminished,
+ * which have no tonic → `whole-tone`, `dim`. The tonic is spelled as the slot's scale spells it. Null for anything else.
+ */
+export function keyName(key: Key): string | null {
+  const nameOf = (pc: number) => key.names[key.pcs.indexOf(pc)];
+  if (key.major !== null) return nameOf(key.major);
+  const parent = (steps: number[]) => (key.pcs.length === 7 ? key.pcs.find((t) => steps.every((s) => key.pcs.includes(mod12(t + s)))) : undefined);
+  const mel = parent(MELODIC_STEPS);
+  if (mel !== undefined) return `${nameOf(mel)} mel`;
+  const harm = parent(HARMONIC_STEPS);
+  if (harm !== undefined) return `${nameOf(harm)} harm`;
+  if (key.pcs.length === 6) return 'whole-tone';
+  if (key.pcs.length === 8) return 'dim';
+  return null;
+}
+
 /** Both slots use the same notes. */
 export function sameKey(a: Key | null, b: Key | null): boolean {
   return !!a && !!b && a.pcs.join() === b.pcs.join();

@@ -1,4 +1,4 @@
-// The docked hex (SPEC §8): React SVG for the active slot. Click = pick; a nudged pitch gets a dashed halo; Practice's
+// The docked hex (SPEC §8): React SVG for the active slot. Click = pick; a nudged pitch gets a dashed halo; Improvise's
 // targets get dashed rings; `still` (the metronome) skips the slot-change motion.
 // Slots without a scale (§8.4): the unchecked hex (no chord) or the chord-tones hex, each with a dock label.
 // Geometry and the travel plan come from `hexLayout`; colours from the CSS theme tokens (styles.css :root).
@@ -58,11 +58,11 @@ export interface DockedHexProps {
   onHoverPitch?: (written: number | null) => void;
   /** Listen (SPEC §9.2): the written pitch the mic hears; its cells light, or its border button if out of scale. */
   heard?: number | null;
-  /** Practice (SPEC §3.7): what moves the form on — pitch classes (written) or Follow's exact next note. Ringed. */
+  /** Improvise, transport running (SPEC §3.3): the upcoming chord's tones — pitch classes (written), or one exact note. Ringed. */
   targets?: { pcs: Set<number> | null; midi: number | null } | null;
   /** A note sounded elsewhere (Write: stepped with ` or a melody note selected): its cells light as if clicked. `n` replays. */
   sounded?: { midi: number; n: number } | null;
-  /** No slot-change motion (Practice's metronome, SPEC §3.7): no travel, no colour / ball / socket transitions. */
+  /** No slot-change motion (Improvise, transport running, SPEC §3.3): no travel, no colour / ball / socket transitions. */
   still?: boolean;
 }
 
@@ -306,7 +306,7 @@ interface CellProps {
   /** Same pitch as the hovered / just-clicked cell: colour shown and a white glow inside the cell edge. */
   lit: boolean;
   onHover: (target: HoverTarget | null) => void;
-  /** Practice: playing this note moves the form on — a dashed ring inside the cell. */
+  /** A target (the upcoming chord's tone): a dashed ring inside the cell. */
   target?: boolean;
 }
 

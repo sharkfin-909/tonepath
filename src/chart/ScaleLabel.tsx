@@ -61,7 +61,8 @@ export function ScaleLabel({ harmony: h, bar, onPick }: ScaleLabelProps) {
         aria-label={`Scale ${label}${h.overridden ? ' (override)' : ''}, bar ${bar + 1}. Change scale`}
         onClick={() => setOpen((o) => !o)}
       >
-        {label}
+        {/* The chord name already gives the root: just the scale's name (the full name is in the title). */}
+        {SCALES[h.scale].name}
       </button>
       {open && (
         <span className="scale-menu" role="menu" aria-label={`Scale for bar ${bar + 1}`}>
@@ -85,7 +86,7 @@ export function ScaleLabel({ harmony: h, bar, onPick }: ScaleLabelProps) {
               <span className="scale-check" aria-hidden>
                 {id === h.scale ? '✓' : ''}
               </span>
-              {h.root} {SCALES[id].name}
+              {SCALES[id].name}
               {i === 0 && <span className="scale-default"> · default</span>}
             </button>
           ))}

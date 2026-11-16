@@ -3,7 +3,7 @@
 //   threshold, parabolic interpolation. Returns the fundamental and how clear (periodic) the frame is.
 // - OnsetDetector: a note start = the level jumping well above its recent average, past a noise gate, with a lockout
 //   so one note isn't counted twice. Re-attacking the same pitch counts; a held note doesn't.
-// - NoteTracker: played notes from those readings — an attack, or a slur to a new pitch (what Practice counts).
+// - NoteTracker: played notes from those readings — an attack, or a slur to a new pitch (Improvise's played notes).
 // - SteadyHold: two equal MIDI frames to lock, then hold through brief unlocks; clear after real silence.
 // - AdaptiveEma: display-only cents needle smoother (fast on big Δ¢, slow on wobble).
 // - analysisWindow: fftSize + minHz from the instrument's concert low (or Concert defaults).
@@ -29,8 +29,8 @@ export interface PitchOptions {
 export const ONSET_GATE = 0.017;
 
 /**
- * Minimum YIN clarity to accept a pitch reading (0–1). Practice needs this low enough that real notes lock
- * readily; the tuner zones are separate. Was 0.85 — too strict for the Practice flow.
+ * Minimum YIN clarity to accept a pitch reading (0–1). Low enough that real notes lock
+ * readily; the tuner zones are separate. Was 0.85 — too strict for playing along.
  */
 export const CLARITY_MIN = 0.7;
 
@@ -277,7 +277,7 @@ export class OnsetDetector {
   }
 }
 
-/** A played-note event: from an attack, or a slur to a new pitch (what Practice counts). */
+/** A played-note event: from an attack, or a slur to a new pitch (Improvise's played notes). */
 export interface NoteStart {
   midi: number;
   /** True when this start is tied to an onset (re-attack); false for a slur. */

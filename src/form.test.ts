@@ -70,7 +70,7 @@ describe('slotsOf', () => {
   });
 });
 
-describe('stepSlot (Play mode)', () => {
+describe('stepSlot (Improvise, Read etude)', () => {
   it('steps slot by slot and wraps at both ends', () => {
     expect(stepSlot(0, 1, 5)).toBe(1);
     expect(stepSlot(4, 1, 5)).toBe(0);

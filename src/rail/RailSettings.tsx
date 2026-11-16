@@ -1,4 +1,5 @@
 // Header settings (SPEC §3.1): inline title rename, time signature, bars per row, and the Clear ▾ menu (§6.2 item 10).
+import { Dropdown } from './Dropdown';
 import { useEffect, useRef, useState } from 'react';
 import { parseTimeSignature } from '../form';
 import { BARS_PER_ROW } from '../progression';
@@ -66,10 +67,6 @@ function InlineField({
 }
 
 /** The etude name above the title (SPEC §3.1): blank shows a muted "Etude name". */
-export function EtudeNameField({ name, onRename }: { name: string; onRename: (text: string) => void }) {
-  return <InlineField value={name} label="Etude name" className="etude-name" onCommit={onRename} placeholder="Etude name" />;
-}
-
 export function TitleField({ title, onRename, editing = false }: { title: string; onRename: (text: string) => void; editing?: boolean }) {
   return <InlineField value={title} label="Title" className="rail-title" onCommit={onRename} startEditing={editing} />;
 }
@@ -88,16 +85,10 @@ export function TimeSignatureField({ value, onChange }: { value: string; onChang
 
 export function BarsPerRow({ value, onChange }: { value: number; onChange: (n: number) => void }) {
   return (
-    <label className="rail-setting">
+    <div className="rail-setting">
       <span className="rail-label">Bars / row</span>
-      <select className="rail-select" value={value} onChange={(e) => onChange(Number(e.target.value))}>
-        {BARS_PER_ROW.map((n) => (
-          <option key={n} value={n}>
-            {n}
-          </option>
-        ))}
-      </select>
-    </label>
+      <Dropdown value={value} label="Bars per row" options={BARS_PER_ROW.map((n) => ({ value: n, label: String(n) }))} onChange={onChange} />
+    </div>
   );
 }
 

@@ -18,7 +18,7 @@
   --panel-glow: inset 0 0 28px color-mix(in srgb, var(--grid-glow) 38%, transparent);
   --line: #1d1b19;
   --divider: #8c8680;
-  /* Groups (SPEC §3.1): every outlined pill — the header's sound, editing, practice, mode and Ins: pills. Tweak here. */
+  /* Groups (SPEC §3.1): every outlined pill — the header's sound, editing, form, transport, mode and Ins: pills. Tweak here. */
   --group-height: 28px;
   --group-radius: 14px;
   --group-pad-x: 8px;
@@ -185,7 +185,7 @@ body,
     transform: scale(1);
   }
 }
-/* Still (Practice's metronome): chord changes land at once — no fades or slides. */
+/* Still (Improvise with the transport running): chord changes land at once — no fades or slides. */
 .docked-hex.still .hex-bg,
 .docked-hex.still .hex-name,
 .docked-hex.still .hex-ball,
@@ -295,25 +295,78 @@ button.dock-label {
   display: flex;
   flex-direction: column;
   transform-origin: 0 0;
+  /* The bar strip above the first row (the row gap above every row is its bar strip; chartHeight counts it), and
+     the space under the last row's cards (--row-after: under every row, so a strip belongs to the bar below it). */
+  padding-top: var(--row-gap, 30px);
+  padding-bottom: var(--row-after, 14px);
 }
 
+/* Each slot is a card (SPEC §3.1): --slot-gap between slots, --row-gap between rows (set from zoom.ts). */
 .chart-row {
   display: grid;
+  column-gap: var(--slot-gap, 10px);
 }
 
 .slot {
   position: relative;
   min-width: 0;
+  /* A card: a light rounded border; the current slot's tint, the playhead and the selection fill it. */
+  box-sizing: border-box;
+  border: 1px solid rgba(29, 27, 25, 0.16);
+  border-radius: 10px;
+  /* A little room above the chord name (zoom.ts SLOT_PAD_TOP_PX; chartHeight counts it). */
+  padding-top: var(--slot-pad-top, 6px);
 }
 
-/* Play mode's current slot (SPEC §3.3): a solid highlight, distinct from Write's tint. */
+/* The current slot in Improvise and Read etude (SPEC §3.3, §3.4): a solid highlight, distinct from Write etude's tint. */
 .slot.active.playing {
   background: rgba(255, 190, 40, 0.32);
 }
 
-/* Active slot (drives the docked hex): a light tint across the slot. */
+/* Active slot (drives the docked hex): a light tint across the slot. Its key mates light only their key pills. */
 .slot.active {
   background: rgba(47, 111, 219, 0.08);
+}
+
+/* The key pill (SPEC §3.1): top right of each slot, the key its scale belongs to (C, B♭, A♭ mel, dim…). Sized with the
+   scale label so it stays readable at any zoom; filled on the current slot and its key mates. */
+/* The chord name's row: the chord (and its ×) at the left, the key pill at the right, centred on each other. */
+.slot-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  align-self: stretch;
+  min-width: 0;
+}
+.key-pill {
+  margin-left: auto;
+  flex: none;
+  z-index: 4;
+  max-width: 45%;
+  box-sizing: border-box;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 0.5em;
+  border-radius: 1em;
+  border: 1px solid color-mix(in srgb, #ffdd57 70%, #1d1b19);
+  background: color-mix(in srgb, #ffdd57 18%, transparent);
+  font-size: calc(var(--scale-px, 11px) * 1.1);
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--muted);
+  pointer-events: auto;
+}
+.key-pill.beside-append {
+  margin-right: 20px;
+}
+/* Lit (the current slot and its key mates): solid warm yellow, dark ink — every mode. */
+.slot.active .key-pill,
+.slot.key-mate .key-pill {
+  border-color: #e8bf1f;
+  background: #ffdd57;
+  color: #1d1b19;
 }
 
 .slot-header {
@@ -379,15 +432,15 @@ button.dock-label {
 }
 
 /* Bar lines span the staff only (no line between two chords in a bar). */
+/* A bar line at the end of each bar: the slot's full height, 2.5px, in the middle of the gap after the bar's card. */
 .bar-line {
   position: absolute;
-  right: 0;
-  pointer-events: none;
-}
-
-.bar-line {
-  width: 2px;
+  top: 0;
+  bottom: 0;
+  right: calc(-1px - var(--slot-gap, 10px) / 2 - 1.25px);
+  width: 2.5px;
   background: var(--line);
+  pointer-events: none;
 }
 
 
@@ -805,11 +858,6 @@ button.dock-label {
   color: #b71c1c;
 }
 
-.rail-select {
-  font: inherit;
-  font-size: 13px;
-}
-
 .rail-heading {
   margin: 0;
   display: flex;
@@ -822,15 +870,11 @@ button.dock-label {
   gap: 8px;
 }
 
-.instrument-select {
-  max-width: 100%;
-}
-
 /* Bar number + ⋯ bar handle (SPEC §4.1). */
 .bar-handle {
   position: absolute;
-  /* Just above the stave's top line, at the start of the bar (SPEC §3.1). */
-  top: calc(var(--staff-top, 0px) - 1.5em);
+  /* In the bar strip above the card (the row gap), at the start of the bar (SPEC §3.1): centred in the strip. */
+  top: calc(-1px - var(--row-gap, 30px) / 2 - 0.75em);
   left: 2px;
   z-index: 5;
   display: inline-flex;
@@ -875,6 +919,104 @@ button.dock-label {
 
 .slot.bar-selected {
   box-shadow: inset 0 0 0 2px rgba(47, 111, 219, 0.45);
+}
+
+/* Write etude / Read etude: one card per bar — a split bar's halves join (no inner border, no gap, square inner
+   corners); the second half reaches back over the gap. */
+.slot.bar-first {
+  border-right-width: 0;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.slot.bar-second {
+  margin-left: calc(-1 * var(--slot-gap, 10px));
+  border-left-width: 0;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+/* The loop (Improvise / Read etude, SPEC §3.7): one band round the looped bars — top and bottom edges throughout, closed
+   and rounded only at the loop's start and end (open where it wraps to the next row) — with repeat signs. */
+/* The loop (Improvise / Read etude): one band — the looped cards' top and bottom edges in the loop colour, closed and
+   rounded only at its start and end, bridged across the gaps between cards (not past a row's end: a wrapped loop
+   stays open there). */
+.slot.looped {
+  --loop: #2f6fdb;
+  border-color: var(--loop);
+  border-width: 2px 0;
+  border-radius: 0;
+}
+.slot.looped:not(.active) {
+  background: rgba(47, 111, 219, 0.04);
+}
+.slot.looped.loop-start {
+  border-left-width: 2px;
+  border-top-left-radius: 10px;
+  border-bottom-left-radius: 10px;
+}
+.slot.looped.loop-end {
+  border-right-width: 2px;
+  border-top-right-radius: 10px;
+  border-bottom-right-radius: 10px;
+}
+/* The bridge across the gap to the next looped card. */
+.slot.looped:not(.loop-end):not(.row-end):not(.bar-first)::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  left: 100%;
+  width: var(--slot-gap, 10px);
+  box-sizing: border-box;
+  border-block: 2px solid var(--loop);
+  background: rgba(47, 111, 219, 0.04);
+  pointer-events: none;
+}
+.repeat-sign {
+  position: absolute;
+  z-index: 3;
+  width: 20px;
+  fill: var(--loop, #2f6fdb);
+  pointer-events: none;
+}
+.repeat-sign.start {
+  left: 6px;
+}
+.repeat-sign.end {
+  right: 6px;
+}
+/* Room for the repeat signs: the lead sheet's tones start after [: and end before :]. */
+.slot.loop-start .lead-tones {
+  padding-left: 46px;
+}
+.slot.loop-end .lead-tones {
+  padding-right: 32px;
+}
+/* × at the end repeat: stop looping (back to the whole form). Sized with the chord label, so it stays clickable. */
+.loop-clear {
+  position: absolute;
+  right: 3px;
+  z-index: 6;
+  transform: translateY(calc(-100% - 3px));
+  display: grid;
+  place-items: center;
+  font-size: var(--chord-px, 14px);
+  width: 1.1em;
+  height: 1.1em;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--loop, #2f6fdb);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+.loop-clear svg {
+  width: 0.6em;
+  height: 0.6em;
+}
+.loop-clear:hover {
+  background: #b3261e;
 }
 
 .bar-menu {
@@ -947,15 +1089,18 @@ button.dock-label {
 }
 
 /* Delete bar (SPEC §3.1): a trash can at each bar's bottom right; faint until the bar is hovered or current. */
+/* The bar's trash can: in the bar strip above the card (the row gap), at the bar's end (it deletes the bar, not a slot). */
 .delete-bar {
   position: absolute;
-  right: 6px;
-  bottom: 2px;
+  right: -1px;
+  /* Centred in the row gap; sized with the chord label (zoom-proof), like the other small buttons. */
+  font-size: var(--chord-px, 14px);
+  top: calc(-1px - var(--row-gap, 30px) / 2 - 0.65em);
   z-index: 5;
   display: grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
+  width: 1.3em;
+  height: 1.3em;
   padding: 0;
   border: none;
   border-radius: 4px;
@@ -964,6 +1109,10 @@ button.dock-label {
   opacity: 0.35;
   cursor: pointer;
 }
+.delete-bar svg {
+  width: 0.9em;
+  height: 0.9em;
+}
 .slot:hover .delete-bar,
 .slot.active .delete-bar,
 .delete-bar:focus-visible {
@@ -971,6 +1120,41 @@ button.dock-label {
 }
 .delete-bar:hover {
   background: rgba(0, 0, 0, 0.07);
+  color: #b3261e;
+}
+
+/* × after a chord (SPEC §4.2): clears it. Faint until the slot is hovered or current, like the trash can. */
+.chord-clear {
+  align-self: center;
+  display: grid;
+  place-items: center;
+  flex: none;
+  /* Sized with the chord label (its zoom-proof size), so it stays clickable on a zoomed-out chart. */
+  font-size: var(--chord-px, 14px);
+  width: 1em;
+  height: 1em;
+  margin-left: 0.1em;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.slot:hover .chord-clear,
+.slot.active .chord-clear,
+.chord-clear:focus-visible {
+  opacity: 0.8;
+}
+.chord-clear svg {
+  width: 0.62em;
+  height: 0.62em;
+}
+.chord-clear:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.08);
   color: #b3261e;
 }
 
@@ -989,45 +1173,7 @@ button.dock-label {
   pointer-events: none;
 }
 
-/* An on / off switch (Audio input): a track with a knob that slides right; on, the track fills in the light ink colour
-   (like Grid's on state). */
-.switch {
-  position: relative;
-  flex: none;
-  width: 30px;
-  height: 16px;
-  padding: 0;
-  border: none;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.25);
-  cursor: pointer;
-  transition: background 120ms ease;
-}
-.switch-knob {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #f3eee6;
-  transition: transform 120ms ease;
-}
-.switch.on {
-  background: #f3eee6;
-}
-.switch.on .switch-knob {
-  transform: translateX(14px);
-  background: var(--dock-bg);
-}
-@media (prefers-reduced-motion: reduce) {
-  .switch,
-  .switch-knob {
-    transition: none;
-  }
-}
-
-/* The mode panel (SPEC §3.1): Input: and Mode:, two labelled dropdowns, always visible. */
+/* The mode panel (SPEC §3.1): the Mode dropdown, always visible. */
 .mode-panel {
   flex: none;
 }
@@ -1037,9 +1183,177 @@ button.dock-label {
   gap: 6px;
   white-space: nowrap;
 }
-.mode-select {
+/* The dropdown (SPEC §3.1): every choice in the header. A button showing the value; a dark card under it. */
+.dropdown {
+  position: relative;
+  display: inline-flex;
+}
+.dropdown-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 22px;
+  padding: 0 7px;
+  border-radius: 11px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.1);
+  color: inherit;
   font: inherit;
   font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.dropdown-trigger:hover:not(:disabled),
+.dropdown-trigger[aria-expanded='true'] {
+  background: rgba(255, 255, 255, 0.18);
+}
+.dropdown-trigger:focus-visible {
+  outline: 2px solid var(--grid-glow);
+  outline-offset: 1px;
+}
+.dropdown-trigger:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.mode-panel .dropdown-trigger {
+  background: none;
+  padding: 0 2px;
+}
+.dropdown-prefix {
+  opacity: 0.75;
+}
+.dropdown-value {
+  font-weight: 600;
+}
+.dropdown-caret {
+  opacity: 0.7;
+  transition: transform 120ms ease;
+}
+.dropdown-caret.up {
+  transform: rotate(180deg);
+}
+.dropdown-menu {
+  position: absolute;
+  left: -1px;
+  top: calc(100% + 8px);
+  z-index: 40;
+  padding: 5px;
+  border-radius: 12px;
+  background: var(--dock-bg);
+  color: #f3eee6;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.14);
+  animation: dropdown-in 120ms ease-out;
+}
+.dropdown-menu.right {
+  left: auto;
+  right: -1px;
+}
+/* The mode panel sits at the right edge: its card always hangs to the left. */
+.mode-panel .dropdown-menu {
+  left: auto;
+  right: -9px;
+}
+.dropdown-menu.rich {
+  width: min(380px, calc(100vw - 32px));
+  text-transform: none;
+}
+.dropdown-menu.compact {
+  min-width: calc(100% + 16px);
+  max-width: calc(100vw - 32px);
+  max-height: min(340px, 60vh);
+  overflow-y: auto;
+}
+@keyframes dropdown-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+.dropdown-menu ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  outline: none;
+}
+.dropdown-option {
+  display: grid;
+  gap: 3px;
+  border-radius: 8px;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+}
+.compact .dropdown-option {
+  padding: 5px 10px 5px 9px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.rich .dropdown-option {
+  padding: 9px 12px 10px;
+}
+.rich .dropdown-option + .dropdown-option {
+  margin-top: 2px;
+}
+.dropdown-option.active {
+  background: rgba(255, 255, 255, 0.09);
+}
+.dropdown-option.current {
+  border-left-color: var(--grid-glow);
+}
+.dropdown-option-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.rich .dropdown-option-name {
+  font-size: 14px;
+  font-weight: 600;
+  margin-right: 2px;
+}
+.dropdown-tag {
+  padding: 0 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  font-size: 10px;
+  line-height: 15px;
+  letter-spacing: 0.02em;
+  opacity: 0.8;
+}
+.dropdown-check {
+  margin-left: auto;
+  padding-left: 10px;
+  color: var(--grid-glow);
+  flex: none;
+  box-sizing: content-box;
+}
+.dropdown-option-blurb {
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(243, 238, 230, 0.72);
+}
+.dropdown-footer {
+  margin: 6px 0 0;
+  padding: 7px 12px 3px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 11px;
+  color: rgba(243, 238, 230, 0.6);
+}
+.dropdown-menu kbd {
+  display: inline-block;
+  min-width: 15px;
+  padding: 0 4px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  font: inherit;
+  font-size: 10px;
+  line-height: 15px;
+  text-align: center;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dropdown-menu,
+  .dropdown-caret {
+    animation: none;
+    transition: none;
+  }
 }
 
 .on-arrival {
@@ -1058,7 +1372,7 @@ button.dock-label {
   max-width: 220px;
 }
 
-/* The etude name above the title (SPEC §3.1): two stacked lines. */
+/* The title (SPEC §3.1), the progression's one name. */
 .title-stack {
   display: flex;
   flex-direction: column;
@@ -1066,17 +1380,10 @@ button.dock-label {
   min-width: 0;
   line-height: 1.15;
 }
-/* Two tight lines, together about a group's height. */
 .title-stack .inline-value,
 .title-stack .inline-field {
   padding-block: 0;
   line-height: 1.15;
-}
-.inline-value.etude-name,
-.inline-field.etude-name {
-  max-width: 220px;
-  font-size: 13px;
-  font-weight: 600;
 }
 .inline-value.placeholder {
   opacity: 0.5;
@@ -1084,36 +1391,100 @@ button.dock-label {
   font-weight: 400;
 }
 
-/* Etude view (SPEC §3.4; `stand` in code): thin header + the whole form fitted to the page. */
-.stand-layout {
-  display: grid;
-  grid-template-rows: auto 1fr;
-  height: 100vh;
-}
-
-.stand-header {
+/* Improvise's lead sheet (SPEC §3.3): the slot's scale in place of the stave — chord tones filled in their degree
+   colour, the guide tone ringed, other scale tones outlined. */
+.lead-tones {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 4px 12px;
-  border-bottom: 1px solid #e0ddd6;
-  background: var(--rail-bg);
-  font-size: 13px;
+  /* Clear of the bar number (top left, where the hex's top row leans). */
+  padding-inline: 26px 6px;
+  overflow: hidden;
+}
+/* Improvise's slot (SPEC §3.3): three rows — [bar number · key pill] [the hex, centred] [chord · scale]. */
+.slot.lead {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto 1fr auto;
+  align-items: center;
+}
+.slot.lead > .key-pill {
+  grid-row: 1;
+  grid-column: 1;
+  justify-self: end;
+  max-width: 60%;
+  margin: 0 6px 0 0;
+}
+.slot.lead > .key-pill.beside-append {
+  margin-right: 26px;
+}
+.slot.lead > .slot-body {
+  grid-row: 2;
+  grid-column: 1;
+  justify-self: center;
+}
+.slot.lead > .slot-header {
+  grid-row: 3;
+  grid-column: 1;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  padding-bottom: 4px;
+}
+.slot.lead .slot-title {
+  align-self: auto;
+  flex: 0 1 auto;
+}
+.slot.lead .scale-label-wrap {
+  flex: 0 1 auto;
+  justify-content: flex-end;
+}
+.slot.lead .chord-label {
+  line-height: 1.25;
+}
+/* The bar number: row 1's left, level with the key pill. */
+.slot.lead .lead-tones {
+  padding-inline: 0;
+  justify-content: center;
+}
+.lead-hex {
+  display: block;
+  overflow: visible;
+}
+/* Cells as the docked hex: neutral taupe, coloured on triad tones and the guide tone (set inline). */
+.lead-cell polygon {
+  fill: var(--cell-neutral);
+}
+.lead-cell.guide polygon {
+  stroke: var(--ink);
+  stroke-width: 1.6;
+}
+.lead-cell text {
+  fill: var(--ink);
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
 }
 
-.stand-title {
-  font-weight: 600;
+/* The bar line spans the tones' band as it spans the stave. */
+/* Read etude (SPEC §3.4): no hex — the chart takes the whole main area, every bar fitted to it (no zoom floor). */
+.main.read {
+  grid-template-rows: minmax(0, 1fr);
+}
+.main.read > .chart-area {
+  overflow: hidden;
+  padding-bottom: 16px;
 }
 
-.stand-instrument {
-  color: var(--muted);
+/* Tuner (SPEC §3.8): the chart pane keeps its height, empty — the chart is laid out but never shown. */
+.chart-pane-empty {
+  visibility: hidden;
+  pointer-events: none;
 }
-
-.stand-spacer {
-  flex: 1;
-}
-
-.stand-chart {
+.main.tuner-mode > .chart-area {
   overflow: hidden;
 }
 
@@ -1459,19 +1830,15 @@ textarea {
   border: var(--group-border);
   background: var(--group-bg);
 }
-/* Group text in lowercase (labels, buttons, dropdown values and their options) — except note names, which keep their
-   letter case (the practice panel's targets). */
+/* Group text in lowercase (labels, buttons, dropdown values and their options). */
 .group,
 .group button,
 .group select,
 .group option {
   text-transform: lowercase;
 }
-.group .practice-target {
-  text-transform: none;
-}
-/* Every group and well flashes when it appears (a mode switch swaps the editing pill for the practice panel; the
-   practice panel re-appears each time the form moves on) and when one of its controls is used (App replays it). */
+/* Every group and well flashes when it appears (a mode switch swaps the editing pill for the form group or the
+   transport bar) and when one of its controls is used (App replays it). */
 .group,
 .well {
   animation: group-flash 600ms ease-out;
@@ -1601,7 +1968,7 @@ select {
   padding-block: 1px;
 }
 
-/* The header's second row (SPEC §3.1): the editing pill / practice panel centred, clef + Ins: right. */
+/* The header's second row (SPEC §3.1): the mode's groups centred, clef + Ins: right. */
 .topbar-row {
   flex-basis: 100%;
   display: flex;
@@ -1770,7 +2137,7 @@ select {
 }
 
 /* The selected instrument (and its Ins: label) in Outfit Thin, like the title and the sound pill. */
-.topbar .instrument-select,
+.topbar .instrument-select .dropdown-value,
 .topbar .ins-label {
   font-weight: 100;
 }
@@ -1779,8 +2146,10 @@ select {
 .topbar .topbar-row {
   gap: 6px 6px;
 }
-.topbar .instrument-picker select.instrument-select {
+.topbar .instrument-select .dropdown-value {
   max-width: 104px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .topbar .latch-button {
   padding: 4px 4px;
@@ -1833,8 +2202,11 @@ select {
 @media (hover: none) and (pointer: coarse) {
   .topbar .rail-button,
   .topbar .latch-button,
-  .topbar .mode-select {
+  .topbar .dropdown-trigger {
     min-height: 34px;
+  }
+  .dropdown-option {
+    padding-block: 12px;
   }
   .octave-step {
     padding: 4px 12px;
@@ -1906,16 +2278,28 @@ select {
   min-width: 0;
 }
 
-/* Wide screens: row 2 is three columns — the editing pill (or, in Practice, the practice panel) centred, the
-   clef + Ins: pill at the right end. Below 900px everything in the row is centred together. */
+/* Row 2's centre: the mode's groups (editing pill; form group + transport bar; transport bar), side by side. */
+.mode-groups {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+.mode-groups:empty {
+  display: none;
+}
+
+/* Wide screens: row 2 is three columns — the mode's groups centred, the clef + Ins: pill at the right end. Below
+   900px everything in the row is centred together. */
 @media (min-width: 901px) {
   .topbar .topbar-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   }
-  .topbar .topbar-row > .edit-pill,
-  .topbar .topbar-row > .practice-panel {
+  .topbar .topbar-row > .mode-groups {
     grid-column: 2;
+    display: flex;
   }
   .topbar .topbar-row > .topbar-file {
     grid-column: 1;
@@ -1927,14 +2311,6 @@ select {
   }
 }
 
-/* Listen couldn't start (mic blocked / missing): the hex panel's top left corner. */
-.listen-error {
-  position: absolute;
-  left: 12px;
-  top: 10px;
-  z-index: 2;
-  font-size: 11px;
-}
 /* While listening: the input level control and meter, in a pill as tall as the tuner (30px). */
 .listen-levels {
   display: inline-flex;
@@ -2026,33 +2402,42 @@ select {
 .listen-count {
   opacity: 0.85;
 }
-.listen-error {
+/* The tuner's place when there is no tuner to show (SPEC §3.0): tap to start listening, or why the mic can't be used. */
+.tuner.tuner-message {
+  display: block;
+  padding: 0 16px;
+  line-height: 30px;
+  font-size: 12px;
+  text-align: center;
+  color: #f3eee6;
+}
+.tuner.tuner-message[role='alert'] {
   color: #ffb4a8;
 }
 
-/* Practice (SPEC §3.7): the panel at the bottom left of the header, and the target rings on the hex. */
-.practice-panel {
+/* The transport bar (SPEC §3.7), centred in the header's second row; and the target rings on the hex. */
+.transport-bar {
   color: #f3eee6;
   font-size: 12px;
   color-scheme: dark;
 }
-.practice-rule-field {
+.transport-field {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   white-space: nowrap;
 }
-.practice-rule-label {
+.transport-label {
   opacity: 0.75;
 }
-/* The metronome's tempo field (bpm): no spinner, so three digits fit. */
-.practice-bpm::-webkit-outer-spin-button,
-.practice-bpm::-webkit-inner-spin-button {
+/* The transport's tempo field (bpm): no spinner, so three digits fit. */
+.transport-bpm::-webkit-outer-spin-button,
+.transport-bpm::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
-/* The metronome's tempo field (bpm). */
-.practice-bpm {
+/* The transport's tempo field (bpm). */
+.transport-bpm {
   width: 3.2em;
   -moz-appearance: textfield;
   appearance: textfield;
@@ -2065,38 +2450,89 @@ select {
   color: inherit;
   text-align: center;
 }
-.practice-rule {
-  font: inherit;
-  font-size: 12px;
-  padding-block: 1px;
-}
-.practice-count {
-  font-weight: 700;
-  font-size: 14px;
-  min-width: 40px;
-}
-.practice-target {
-  color: var(--grid-glow);
-  font-weight: 600;
-}
-.practice-loop {
+/* Loop (SPEC §3.7): a switch — the loop icon, then a small track whose knob slides right when on. */
+.transport-loop {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
+  padding: 2px 4px;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  color: inherit;
   cursor: pointer;
 }
-/* Looping selected bars: a chip after Loop, × back to the whole form. */
-.practice-bars {
+.transport-loop:focus-visible {
+  outline: 2px solid var(--grid-glow);
+  outline-offset: 1px;
+}
+.transport-loop-icon {
+  opacity: 0.55;
+  transition: opacity 120ms ease;
+}
+.transport-loop.on .transport-loop-icon {
+  opacity: 1;
+}
+.switch-track {
+  position: relative;
+  width: 26px;
+  height: 14px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.22);
+  transition: background 120ms ease;
+}
+.switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #f3eee6;
+  transition: transform 120ms ease;
+}
+.transport-loop.on .switch-track {
+  background: var(--grid-glow);
+}
+.transport-loop.on .switch-knob {
+  transform: translateX(12px);
+  background: var(--dock-bg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .switch-track,
+  .switch-knob,
+  .transport-loop-icon {
+    transition: none;
+  }
+}
+/* The looped bars: a chip after Loop, × back to the whole form. */
+.transport-bars {
+  /* Fixed width (fits "bars 12–32 ×"): the transport bar keeps its length whether or not bars are looped. */
+  box-sizing: border-box;
+  width: 9.2em;
+  flex: none;
   display: inline-flex;
   align-items: center;
+  justify-content: space-between;
   gap: 2px;
   padding: 0 2px 0 8px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
   font-size: 12px;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.practice-bars-clear {
+.transport-bars-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.transport-bars:not(.looping) {
+  opacity: 0.55;
+}
+.transport-bars.looping {
+  background: rgba(255, 255, 255, 0.14);
+}
+.transport-bars-clear {
   border: none;
   background: none;
   color: inherit;
@@ -2107,7 +2543,7 @@ select {
   border-radius: 8px;
   cursor: pointer;
 }
-.practice-bars-clear:hover {
+.transport-bars-clear:hover {
   background: rgba(255, 255, 255, 0.18);
 }
 .hex-target {
@@ -2124,7 +2560,7 @@ select {
   grid-template-rows: minmax(0, 1fr);
 }
 /* While listening: a row sitting on the hex panel's top edge, over the bottom of the chart (the hex keeps its space):
-   the tuner centred, the input level at the right. Hidden when neither is shown. */
+   the tuner centred, the input level at the left. Hidden when neither is shown. */
 .main > .chart-area {
   grid-row: 1;
   grid-column: 1;
@@ -2154,9 +2590,11 @@ select {
 .tuner-slot {
   grid-column: 2;
 }
+/* The input level control and meter: the row's left end. */
 .levels-slot {
-  grid-column: 3;
-  justify-self: end;
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: start;
 }
 
 /* The big tuner (SPEC §9.2): note, a ±50 ¢ scale with a needle, the cents off. */
