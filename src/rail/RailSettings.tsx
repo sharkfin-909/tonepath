@@ -15,6 +15,7 @@ function InlineField({
   onCommit,
   startEditing = false,
   placeholder,
+  display,
 }: {
   value: string;
   label: string;
@@ -24,16 +25,24 @@ function InlineField({
   startEditing?: boolean;
   /** Shown (muted) while the value is blank. */
   placeholder?: string;
+  /** Shown when not editing; defaults to value (e.g. a truncated title). */
+  display?: string;
 }) {
   const [editing, setEditing] = useState(startEditing);
   const done = useRef(false);
   if (!editing) {
+    const shown = display ?? value;
     return (
-      <button type="button" className={`inline-value ${className}${!value && placeholder ? ' placeholder' : ''}`} title={`${label} (click to edit)`} onClick={() => {
-        done.current = false;
-        setEditing(true);
-      }}>
-        {value || placeholder || ' '}
+      <button
+        type="button"
+        className={`inline-value ${className}${!value && placeholder ? ' placeholder' : ''}`}
+        title={value ? `${value} (click to edit)` : `${label} (click to edit)`}
+        onClick={() => {
+          done.current = false;
+          setEditing(true);
+        }}
+      >
+        {shown || placeholder || ' '}
       </button>
     );
   }
@@ -66,9 +75,12 @@ function InlineField({
   );
 }
 
-/** The etude name above the title (SPEC §3.1): blank shows a muted "Etude name". */
+/** The progression's one name in the header (SPEC §3.1). Longer than 30 characters → ellipsis. */
 export function TitleField({ title, onRename, editing = false }: { title: string; onRename: (text: string) => void; editing?: boolean }) {
-  return <InlineField value={title} label="Title" className="rail-title" onCommit={onRename} startEditing={editing} />;
+  const display = title.length > 30 ? `${title.slice(0, 30)}…` : title;
+  return (
+    <InlineField value={title} display={display} label="Title" className="rail-title" onCommit={onRename} startEditing={editing} />
+  );
 }
 
 /** Stored and shown exactly as typed; an unparseable one lays out as 4/4 and says so. */

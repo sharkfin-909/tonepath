@@ -374,7 +374,7 @@ button.dock-label {
   flex-direction: column;
   justify-content: flex-end;
   align-items: flex-start;
-  padding: 0 6px 2px;
+  padding: 0 6px 4px; /* keep scale text clear of the stave */
 }
 
 .chord-label {
@@ -432,7 +432,7 @@ button.dock-label {
 }
 
 /* Bar lines span the staff only (no line between two chords in a bar). */
-/* A bar line at the end of each bar: the slot's full height, 2.5px, in the middle of the gap after the bar's card. */
+/* A bar line at the end of each bar: full card height in Write; staff height in Read (SPEC §3.1). */
 .bar-line {
   position: absolute;
   top: 0;
@@ -441,6 +441,90 @@ button.dock-label {
   width: 2.5px;
   background: var(--line);
   pointer-events: none;
+}
+
+/* Read etude (SPEC §3.4): continuous stave — borderless cards, staff-level bar lines, lines across gaps. */
+.main.read .slot:not(.lead) {
+  border: none;
+  border-radius: 0;
+  overflow: visible;
+}
+.main.read .slot.bar-first,
+.main.read .slot.bar-second {
+  border: none;
+  border-radius: 0;
+}
+.main.read .slot:not(.lead) .slot-body {
+  overflow: visible;
+  position: relative;
+  z-index: 1; /* staff bridges draw over the bar line, not under it */
+}
+/* After a bar: slot-gap + bar line + slot-gap (column-gap is already one slot-gap). */
+.main.read .slot.bar-end {
+  margin-right: calc(var(--slot-gap, 10px) + 2.5px);
+}
+.main.read .bar-line {
+  top: var(--staff-top, 0);
+  bottom: auto;
+  height: calc(var(--staff-bottom, 100%) - var(--staff-top, 0px));
+  right: calc(-1 * (var(--slot-gap, 10px) + 2.5px));
+  z-index: 0;
+}
+/* SVG staff bridges can spill into gaps; don’t clip them horizontally. */
+.main.read .chart-fit {
+  overflow-x: visible;
+}
+.main.read .clef-gutter {
+  overflow: visible;
+}
+.main.read .clef-gutter .vex-host {
+  position: relative;
+  z-index: 1;
+}
+
+/* Read etude: one chrome row (bar · chord · scale) — shorter header, more stave. */
+.main.read .slot-header--compact {
+  flex-direction: row;
+  align-items: center;
+  gap: 2px;
+  padding: 0 4px 3px;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.main.read .slot-header--compact .bar-handle {
+  position: relative;
+  top: auto;
+  left: auto;
+  flex: none;
+  margin-right: 0;
+}
+.main.read .slot-header--compact .bar-number {
+  padding-right: 8px;
+}
+.main.read .slot-header--compact .slot-title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* Chord keeps its natural width; scale shrinks with ellipsis when space is tight. */
+.main.read .slot-header--compact .slot-title > .chord-wrap {
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: none;
+}
+.main.read .slot-header--compact .chord-label {
+  flex: none;
+  max-width: none;
+}
+.main.read .slot-header--compact .scale-label-wrap {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: none;
+}
+
+.slot.lead .bar-line {
+  top: 0;
+  bottom: 0;
+  height: auto;
 }
 
 
@@ -572,25 +656,28 @@ button.dock-label {
   display: inline-flex;
   min-width: 0;
   max-width: calc(100% + 8px);
-  min-height: 15px;
+  /* Room for the label's line box + padding so glyph ink isn't clipped. */
+  min-height: calc(var(--scale-px, 11px) * 1.5 + 4px);
   margin: 0 -4px;
 }
 
 .scale-label {
   border: none;
   background: none;
-  padding: 0 4px;
+  /* Vertical padding keeps overflow:hidden (needed for ellipsis) from clipping glyph ink. */
+  padding: 2px 4px;
   margin: 0;
   border-radius: 3px;
   font: inherit;
   font-size: var(--scale-px, 11px);
-  line-height: 15px;
-  color: var(--muted);
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--muted) 85%, var(--ink));
   cursor: pointer;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  box-sizing: content-box;
 }
 
 .scale-label:disabled {
@@ -971,6 +1058,10 @@ button.dock-label {
   border-block: 2px solid var(--loop);
   background: rgba(47, 111, 219, 0.04);
   pointer-events: none;
+}
+/* Across a bar line the outside gap is slot-gap + line + slot-gap. */
+.slot.looped.bar-end:not(.loop-end):not(.row-end)::after {
+  width: calc(2 * var(--slot-gap, 10px) + 2.5px);
 }
 .repeat-sign {
   position: absolute;
@@ -2471,6 +2562,30 @@ select {
   outline: 2px solid var(--grid-glow);
   outline-offset: 1px;
 }
+/* Read etude: optional scale names on the chart. */
+.transport-scales {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 4px;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+.transport-scales:focus-visible {
+  outline: 2px solid var(--grid-glow);
+  outline-offset: 1px;
+}
+.transport-scales-label {
+  opacity: 0.55;
+  font-size: 12px;
+  transition: opacity 120ms ease;
+}
+.transport-scales.on .transport-scales-label {
+  opacity: 1;
+}
 .transport-loop-icon {
   opacity: 0.55;
   transition: opacity 120ms ease;
@@ -2564,8 +2679,8 @@ select {
 .dock {
   grid-template-rows: minmax(0, 1fr);
 }
-/* While listening: a row sitting on the hex panel's top edge, over the bottom of the chart (the hex keeps its space):
-   the tuner centred, the input level at the left. Hidden when neither is shown. */
+/* While listening (Tune): a row sitting on the hex panel's top edge, over the bottom of the chart (the hex keeps its
+   space) — the tuner centred, the input level at the left. Hidden when neither is shown. */
 .main > .chart-area {
   grid-row: 1;
   grid-column: 1;
@@ -2591,6 +2706,26 @@ select {
 }
 .listen-row:not(:has(.tuner, .listen-levels)) {
   display: none;
+}
+
+/* Improvise: the tuner bar sits between chart and hex, so the chart's scrollport ends at the bar (nothing scrolls
+   under it). Chart and hex still share the space evenly. (`improvise-listen` is set from App when Listen is on.) */
+.main.improvise-listen:not(.hex-hidden) {
+  grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr);
+}
+.main.improvise-listen.hex-hidden {
+  grid-template-rows: minmax(0, 1fr) auto 0;
+}
+.main.improvise-listen > .chart-area {
+  grid-row: 1;
+}
+.main.improvise-listen > .listen-row {
+  grid-row: 2;
+  transform: none;
+  align-self: stretch;
+}
+.main.improvise-listen > .dock {
+  grid-row: 3;
 }
 .tuner-slot {
   grid-column: 2;

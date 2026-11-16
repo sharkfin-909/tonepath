@@ -118,6 +118,11 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
   const [metroBpm, setMetroBpm] = useDeviceSetting(METRONOME_BPM);
   const [metroSound, setMetroSound] = useDeviceSetting(METRONOME_SOUND);
   const [metroRestart, setMetroRestart] = useState(0);
+  /** Read etude: scale names in the chart header (off by default). */
+  const [showReadScales, setShowReadScales] = useState(false);
+  useEffect(() => {
+    if (session.mode !== 'read') setShowReadScales(false);
+  }, [session.mode]);
   /** Mic intake (SPEC §3.3): the echo guard over the app's own sounds. */
   const intakeRef = useRef<MicIntake>(NEW_INTAKE);
   /** Write etude: the last note sounded by ` (step-play) or a melody-note click, concert pitch; lights the hex (`n` replays). */
@@ -468,6 +473,8 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
                 onLoop={setLoop}
                 bars={session.selection}
                 onAllBars={() => dispatch({ type: 'clear-selection' })}
+                showScales={read ? showReadScales : undefined}
+                onShowScales={read ? setShowReadScales : undefined}
               />
             )}
             {/* The editing controls, in a pill: Write etude only (SPEC §3.2). */}
@@ -560,14 +567,22 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
       </header>
       <main
         ref={mainRef}
-        className={['main', read && 'read', tune && 'tuner-mode', improvise && 'improvise', hideHex && 'hex-hidden']
+        className={[
+          'main',
+          read && 'read',
+          tune && 'tuner-mode',
+          improvise && 'improvise',
+          improvise && listens(mode) && 'improvise-listen',
+          hideHex && 'hex-hidden',
+        ]
           .filter(Boolean)
           .join(' ')}
       >
         <section
           className="chart-area"
           style={{
-            maxHeight: read || hideHex ? undefined : mainHeight / 2 || undefined,
+            // Improvise while listening: the grid gives the chart a 1fr row above the tuner bar — no half-height cap.
+            maxHeight: read || hideHex || (improvise && listens(mode)) ? undefined : mainHeight / 2 || undefined,
           }}
         >
           {tune ? (
@@ -613,7 +628,14 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
               mode={mode}
               current={writing ? null : active.index}
               running={running}
-              maxHeight={mainHeight ? (read || hideHex ? mainHeight : mainHeight / 2) - CHART_PAD_Y : undefined}
+              showReadScales={read && showReadScales}
+              maxHeight={
+                mainHeight
+                  ? improvise && listens(mode)
+                    ? undefined // parent chart-area height (above the tuner bar) drives the zoom
+                    : (read || hideHex ? mainHeight : mainHeight / 2) - CHART_PAD_Y
+                  : undefined
+              }
             />
           )}
         </section>
@@ -688,8 +710,8 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
             />
           </section>
         )}
-        {/* While listening (Listen, §9.2): a row on top of the hex panel's top edge, overlaying the chart (it takes
-            none of the hex's space) — the tuner centred, its input level and meter at the left. */}
+        {/* While listening (Listen, §9.2): Tune — a row on the hex panel's top edge, overlaying the chart. Improvise —
+            between chart and hex so the chart scrolls above it. Tuner centred; input level at the left. */}
         {listens(mode) && (
           <div className="listen-row">
             <div className="tuner-slot" ref={setTunerSlot} />

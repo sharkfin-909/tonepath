@@ -19,6 +19,9 @@ export interface TransportBarProps {
   /** The looped bars (0-based, inclusive), or null (the whole form); × goes back to the whole form. */
   bars: { from: number; to: number } | null;
   onAllBars: () => void;
+  /** Read etude only: show scale names above each chord. */
+  showScales?: boolean;
+  onShowScales?: (on: boolean) => void;
 }
 
 /**
@@ -63,7 +66,21 @@ const icon = (d: string) => (
   </svg>
 );
 
-export function TransportBar({ bpm, onBpm, sound, onSound, running, onStartStop, onRewind, loop, onLoop, bars, onAllBars }: TransportBarProps) {
+export function TransportBar({
+  bpm,
+  onBpm,
+  sound,
+  onSound,
+  running,
+  onStartStop,
+  onRewind,
+  loop,
+  onLoop,
+  bars,
+  onAllBars,
+  showScales,
+  onShowScales,
+}: TransportBarProps) {
   return (
     <div className="transport-bar group">
       <label className="transport-field" title={`Tempo, in beats per minute (${BPM.min}–${BPM.max})`}>
@@ -105,6 +122,22 @@ export function TransportBar({ bpm, onBpm, sound, onSound, running, onStartStop,
           <span className="switch-knob" />
         </span>
       </button>
+      {onShowScales && (
+        <button
+          type="button"
+          role="switch"
+          aria-checked={!!showScales}
+          aria-label="Show scales"
+          className={showScales ? 'transport-scales on' : 'transport-scales'}
+          title={showScales ? 'Hide scale names above each chord' : 'Show scale names above each chord'}
+          onClick={() => onShowScales(!showScales)}
+        >
+          <span className="transport-scales-label">scales</span>
+          <span className="switch-track" aria-hidden>
+            <span className="switch-knob" />
+          </span>
+        </button>
+      )}
       {/* The loop status: always there at a fixed width, so the bar never changes length — "whole form", or the looped
           bars with × (back to the whole form). */}
       <span className={bars ? 'transport-bars looping' : 'transport-bars'} role="status">

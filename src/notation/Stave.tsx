@@ -73,6 +73,8 @@ export interface SlotStaveProps {
   meter: Meter;
   /** Marks for a note (SPEC §7.2); rests are never marked. */
   markOf?: (e: TimedEvent) => NoteMark | null;
+  /** Read etude: extend staff lines this many px past the slot (into gaps / across bar lines). */
+  extendRight?: number;
 }
 
 /** Time ↔ x anchors on a drawn stave: each tickable's start (where the caret sits), then the slot end. */
@@ -102,18 +104,54 @@ const OUT_OF_SCALE = '#C8650A'; // orange
 const OUT_OF_RANGE = '#B5B5B5';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
+/** Extend the five staff lines past the stave's right edge (Read etude: continuous stave across gaps). */
+function drawStaffBridge(svg: SVGSVGElement, stave: Stave, bridge: number) {
+  if (bridge <= 0) return;
+  const x1 = stave.getX() + stave.getWidth();
+  for (let i = 0; i < 5; i++) {
+    const y = Math.floor(stave.getYForLine(i)) + 0.5;
+    const line = document.createElementNS(SVG_NS, 'line');
+    line.setAttribute('x1', String(x1));
+    line.setAttribute('x2', String(x1 + bridge));
+    line.setAttribute('y1', String(y));
+    line.setAttribute('y2', String(y));
+    line.setAttribute('stroke', '#000');
+    line.setAttribute('stroke-width', '1');
+    svg.appendChild(line);
+  }
+}
+
 /**
  * One slot's stave (SPEC §7.1): no bar lines of its own (bar lines are chart chrome). Engraves the slot's events
  * in a SOFT voice padded with GhostNotes, accidentals per slot (no key signature), default beams, and the caret.
  */
-export function SlotStave({ width, timeSignature, clef, start, end, events, spell, caret, onEventClick, onTimeClick, meter, markOf }: SlotStaveProps) {
+export function SlotStave({
+  width,
+  timeSignature,
+  clef,
+  start,
+  end,
+  events,
+  spell,
+  caret,
+  onEventClick,
+  onTimeClick,
+  meter,
+  markOf,
+  extendRight = 0,
+}: SlotStaveProps) {
   const anchors = useRef<Anchor[]>([]);
+  const bridge = extendRight > 0 ? extendRight + 1 : 0; // +1 overlaps the next stave at fractional zoom
   const ref = useVexSvg(
-    width,
+    width + bridge,
     (ctx) => {
       const stave = new Stave(0, 0, width, { ...STAVE_OPTIONS, leftBar: false, rightBar: false });
       if (timeSignature) stave.addTimeSignature(timeSignature);
       stave.setContext(ctx).draw();
+      if (bridge > 0) {
+        const svg = (ctx as unknown as { svg?: SVGSVGElement }).svg;
+        if (svg) drawStaffBridge(svg, stave, bridge);
+      }
 
       const timed: { t: number; note: StaveNote | GhostNote }[] = [];
       const clickable: { e: TimedEvent; note: StaveNote; mark: NoteMark | null }[] = [];
@@ -208,7 +246,7 @@ export function SlotStave({ width, timeSignature, clef, start, end, events, spel
         svg.svg.appendChild(g);
       }
     },
-    [timeSignature, clef, start, end, events, spell, caret, onEventClick, meter, markOf],
+    [timeSignature, clef, start, end, events, spell, caret, onEventClick, meter, markOf, extendRight],
   );
   return (
     <div
@@ -231,13 +269,19 @@ export function SlotStave({ width, timeSignature, clef, start, end, events, spel
 }
 
 /** The clef drawn at the start of every row, in a gutter outside the slots (SPEC §7.3). */
-export function ClefGutter({ width, clef }: { width: number; clef: Clef }) {
+export function ClefGutter({ width, clef, extendRight = 0 }: { width: number; clef: Clef; extendRight?: number }) {
+  const bridge = extendRight > 0 ? extendRight + 1 : 0;
   const ref = useVexSvg(
-    width,
+    width + bridge,
     (ctx) => {
-      new Stave(0, 0, width, { ...STAVE_OPTIONS, rightBar: false }).addClef(clef).setContext(ctx).draw();
+      const stave = new Stave(0, 0, width, { ...STAVE_OPTIONS, leftBar: false, rightBar: false });
+      stave.addClef(clef).setContext(ctx).draw();
+      if (bridge > 0) {
+        const svg = (ctx as unknown as { svg?: SVGSVGElement }).svg;
+        if (svg) drawStaffBridge(svg, stave, bridge);
+      }
     },
-    [clef],
+    [clef, extendRight],
   );
   return <div ref={ref} className="vex-host" />;
 }

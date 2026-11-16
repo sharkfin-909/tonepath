@@ -22,10 +22,10 @@ describe('chart zoom fit', () => {
   });
 
   it('with no floor (Read etude) it keeps shrinking to fit', () => {
-    const f = fitZoom(8, STAVE, 700, 0);
+    const f = fitZoom(8, STAVE, 700, 0, ZOOM_CAP, true);
     expect(f.scrolls).toBe(false);
     expect(f.zoom).toBeLessThan(ZOOM_FLOOR + 0.3);
-    expect(chartHeight(8, STAVE, f.zoom)).toBeLessThanOrEqual(700);
+    expect(chartHeight(8, STAVE, f.zoom, true)).toBeLessThanOrEqual(700);
   });
 
   it('labels never render below their minimums; the header grows to hold them', () => {
@@ -33,7 +33,10 @@ describe('chart zoom fit', () => {
       expect(labelPx(17, MIN_CHORD_PX, z) * z).toBeGreaterThanOrEqual(MIN_CHORD_PX - 1e-9);
       expect(labelPx(11, MIN_SCALE_PX, z) * z).toBeGreaterThanOrEqual(MIN_SCALE_PX - 1e-9);
     }
-    expect(headerPx(1)).toBe(48);
-    expect(headerPx(0.5)).toBeGreaterThan(48);
+    expect(headerPx(1)).toBe(55);
+    expect(headerPx(0.5)).toBeGreaterThan(55);
+    expect(headerPx(1, true)).toBe(30);
+    expect(headerPx(0.5, true)).toBeGreaterThan(30);
+    expect(headerPx(1, true, false)).toBeLessThanOrEqual(headerPx(1, true, true));
   });
 });
