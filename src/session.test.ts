@@ -180,6 +180,14 @@ describe('Improvise (stopped)', () => {
     expect(improvise([{ type: 'set-chord-bump', on: false }, pick(62), pick(64)]).state.slot).toBe(0);
   });
 
+  it('chord bump keeps to the looped bars: at their last chord it wraps to their first', () => {
+    const on = { chordBump: true as const, chordBumpNotes: 2 as const, bumpCount: 0 };
+    const loop: Intent[] = [{ type: 'bar-select', bar: 1, extend: false }, { type: 'bar-select', bar: 2, extend: true }];
+    expect(improvise([...loop], { state: on }).state.slot).toBe(1); // picking the loop moves to its first chord
+    expect(improvise([...loop, pick(62), pick(64)], { state: on }).state.slot).toBe(2);
+    expect(improvise([...loop, pick(62), pick(64), pick(62), pick(64)], { state: on }).state.slot).toBe(1); // not 3
+  });
+
   it('← / → and < > step slots, wrapping; clicking a slot makes it current', () => {
     expect(improvise([{ type: 'step', dir: -1 }]).state.slot).toBe(3);
     expect(improvise([{ type: 'step', dir: -1 }, { type: 'browse', dir: 1 }]).state.slot).toBe(0);

@@ -3,6 +3,7 @@
 // The mode alone decides whether the mic listens (no Audio input switch).
 import { MODES, MODE_LABELS, type Mode } from '../session';
 import { Dropdown } from './Dropdown';
+import { ModeIcon } from './ModeIcon';
 
 /** What each mode is for, and what it uses or lets you edit (SPEC §3.0): the tags beside its name. */
 export const MODE_INFO: Record<Mode, { blurb: string; uses: string[] }> = {
@@ -11,7 +12,7 @@ export const MODE_INFO: Record<Mode, { blurb: string; uses: string[] }> = {
     uses: ['mic'],
   },
   improvise: {
-    blurb: 'Play over the changes. A lead sheet of each chord\'s scale; the transport keeps time and the hex rings the next chord. Stop it to step chords by hand or edit them.',
+    blurb: 'Play over the changes. Enter or import chords and then play them with a metronome. You will see the coming target chord tones ringed in the grid. Stop playback to step chords by hand or edit them.',
     uses: ['mic', 'transport', 'edit tonality'],
   },
   write: {
@@ -19,7 +20,7 @@ export const MODE_INFO: Record<Mode, { blurb: string; uses: string[] }> = {
     uses: ['edit'],
   },
   read: {
-    blurb: 'Play the etude. Every bar on one page, a click and a moving playhead; nothing to edit — made for a music stand.',
+    blurb: 'Play the etude. Every bar on one page, a click and a moving playhead.',
     uses: ['transport'],
   },
 };
@@ -36,7 +37,7 @@ export function ModePanel({ mode, onMode }: ModePanelProps) {
       <Dropdown
         value={mode}
         label="Mode"
-        options={MODES.map((m) => ({ value: m, label: MODE_LABELS[m], description: MODE_INFO[m].blurb, tags: MODE_INFO[m].uses }))}
+        options={MODES.map((m) => ({ value: m, label: MODE_LABELS[m], icon: <ModeIcon mode={m} />, description: MODE_INFO[m].blurb, tags: MODE_INFO[m].uses }))}
         onChange={onMode}
         footer={
           <>

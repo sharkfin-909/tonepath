@@ -28,12 +28,15 @@ import { modeProfile } from './modeProfile';
 import { hexLighting } from './hexLighting';
 import { LEAD_SLOT_MAX_PHONE_PX, chartArea } from './zoom';
 import { useChartSession } from './useChartSession';
+import { Logo } from './Logo';
 import { useTransport } from './useTransport';
 import { etudeOf } from './progression';
 import type { Carried } from './session';
 import { EtudePicker } from './rail/EtudePicker';
 import type { LibraryCurrent } from './library/LibraryScreen';
 import { HamburgerMenu } from './rail/HamburgerMenu';
+import { ShortcutsModal } from './rail/ShortcutsModal';
+import { HelpModal } from './rail/HelpModal';
 
 /** A CSS media query as React state (SPEC §3.6 responsive layout). */
 function useMediaQuery(query: string): boolean {
@@ -120,6 +123,12 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
   // saved (it starts mid-range and is kept within the instrument's range).
   const [linearSetting, setLinear] = useDeviceSetting(HEX_LINEAR);
   const [hexHidden, setHexHidden] = useDeviceSetting(HEX_HIDDEN);
+  /** The ☰ menu's dialogs: Keyboard shortcuts (SPEC §11) or Help (§3.1). */
+  const [dialog, setDialog] = useState<'shortcuts' | 'help' | null>(null);
+  const closeDialog = () => {
+    setDialog(null);
+    focusHex();
+  };
   // Phones (SPEC §3.6): the honeycomb is too small there, so the dock is always Linear; the saved setting is kept.
   const narrow = useMediaQuery('(max-width: 640px)');
   /** Phones (SPEC §3.6): the chart shows one bar per row (two cards don't fit); the saved setting is kept and returns
@@ -466,6 +475,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
       >
         {/* Row 1, centre: the wordmark (where the sound pill was). */}
         <div className="topbar-brand">
+          <Logo className="brand-logo" />
           <span className="brand">TONEPATH</span>
         </div>
         {/* Row 1, left: the mode panel and clef (Concert) + instrument, in one pill (SPEC §3.1). */}
@@ -504,7 +514,13 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
               </span>
             </span>
           </div>
-          <HamburgerMenu items={[{ label: 'Library', onChoose: onLibrary }]} />
+          <HamburgerMenu
+            items={[
+              { label: 'Library', onChoose: onLibrary },
+              { label: 'Keyboard shortcuts', onChoose: () => setDialog('shortcuts') },
+              { label: 'Help', onChoose: () => setDialog('help') },
+            ]}
+          />
         </div>
         {/* Row 2: the mode's own groups (SPEC §3.0) — none in Tune. */}
         <div className="mode-groups">
@@ -717,6 +733,8 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
         />
       </main>
       {soundSection}
+      {dialog === 'shortcuts' && <ShortcutsModal mode={mode} onClose={closeDialog} />}
+      {dialog === 'help' && <HelpModal mode={mode} onClose={closeDialog} onShortcuts={() => setDialog('shortcuts')} />}
     </div>
   );
 }

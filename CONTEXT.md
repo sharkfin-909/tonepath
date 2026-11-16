@@ -39,7 +39,7 @@ Tonepath is a practice-etude tool: a chord-bar form with in-slot standard notati
 - **Owning slot** — the slot holding an event's start; gives its spelling and out-of-scale mark. Events never cross a slot boundary: a length that doesn't fit before the slot ends is refused.
 - **Length latch** — the selected duration applied to the next insert (`w` · `h` · `q` · `e` · `s`).
 - **Rest latch** — toggled by R / Rest. While on, each length key (1–5 or a length button) inserts a rest of that length; picking a hex pitch turns Rest off and inserts that pitch.
-- **Nudge** — ↑/↓ move the note at the caret (the one it sits on; at the melody's end, the last note) one step of its owning slot's scale (⇧ = a semitone, ⌥ = an octave).
+- **Nudge** — ↑/↓ move the note at the caret (the one it sits on; at the melody's end, the last note) an octave (⌥ = one step of its owning slot's scale, ⇧ = a semitone).
 - **Out-of-scale mark** — visual flag on a melody note whose pitch is no longer in the scale of the slot that owns its beat (e.g. after a chord edit). Notes are kept, never auto-deleted.
 
 ## Screen

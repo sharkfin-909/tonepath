@@ -28,6 +28,7 @@ import type { OnArrival } from './device';
 import { enterChord } from './chordEntry';
 import type { ScaleId } from './harmony';
 import { modeProfile } from './modeProfile';
+import { loopRange, upcomingSlot } from './transport';
 import {
   clearEverything,
   clearMelody,
@@ -398,7 +399,8 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
           const nextCount = s.bumpCount + 1;
           if (nextCount >= s.chordBumpNotes) {
             set({ bumpCount: 0 });
-            arrive(stepSlot(current, 1, slots.length));
+            // The next chord as the transport would play it: within the looped bars, wrapping at their end.
+            arrive(upcomingSlot(slots.length, loopRange(slots, s.selection), current));
           } else set({ bumpCount: nextCount });
         }
       }

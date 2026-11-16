@@ -19,6 +19,8 @@ export interface DropdownOption<T extends string | number> {
   divider?: boolean;
   /** Its label is shown as typed (not lowercased with the group). */
   asTyped?: boolean;
+  /** A small icon before the label, in the menu and on the button (the modes). */
+  icon?: ReactNode;
 }
 
 export interface DropdownProps<T extends string | number> {
@@ -127,6 +129,7 @@ export function Dropdown<T extends string | number>({ value, options, onChange, 
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
       >
+        {current?.icon}
         <span className={current?.asTyped ? 'dropdown-value as-typed' : 'dropdown-value'}>{current?.label ?? placeholder}</span>
         <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden className={open ? 'dropdown-caret up' : 'dropdown-caret'}>
           <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -146,6 +149,7 @@ export function Dropdown<T extends string | number>({ value, options, onChange, 
                 onClick={() => choose(i)}
               >
                 <span className="dropdown-option-head">
+                  {o.icon}
                   <span className="dropdown-option-name">{o.label}</span>
                   {o.hint && <span className="dropdown-option-hint">{o.hint}</span>}
                   {o.tags?.map((t) => (

@@ -1450,6 +1450,15 @@ button.dock-label {
   min-height: 0;
   overflow: hidden;
 }
+/* …except while the header holds an open menu (the scale override menu, the chord suggestions): it shows in full,
+   over the cards around it, as in Write etude. */
+.slot.lead > .slot-header:has(.scale-menu, .chord-suggest) {
+  overflow: visible;
+}
+.slot.lead:has(> .slot-header .scale-menu, > .slot-header .chord-suggest) {
+  position: relative;
+  z-index: 25;
+}
 /* Improvise's 3-row card: [chord · scale] on top, the hex, [slot trash · key pill (· add-chord "+")] at the bottom. */
 .slot.lead > .key-pill {
   grid-row: 3;
@@ -2371,7 +2380,28 @@ select {
   line-height: 1;
   font-weight: 700;
   letter-spacing: 0.18em;
-  color: #f3eee6;
+  color: #eddd95;
+  /* Raised so the caps' top lines up with the top side of the logo's hexagon. */
+  position: relative;
+  top: -7px;
+}
+/* The mark, left of the wordmark. The pair aligns on the baseline, which puts the SVG box's bottom edge on the
+   wordmark's baseline; the hexagon's bottom side (outer edge at y≈108.65 of the 120-unit viewBox) sits 11.35 units
+   above that edge. The mark is raised from there so the wordmark's caps sit vertically centred between the
+   hexagon's top and bottom sides (measured in a 3× screenshot). */
+.topbar-brand {
+  align-items: baseline;
+  /* A soft glow in the mark's own colour, shared by the logo and the wordmark. */
+  filter: drop-shadow(0 0 5px rgba(237, 221, 149, 0.45));
+}
+.brand-logo {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  margin-right: 8px;
+  position: relative;
+  top: -1.5px;
+  color: #eddd95;
 }
 /* Row 1, right: the chord sequence · etude pill. */
 .topbar-file {
@@ -3050,4 +3080,172 @@ select {
 .topbar .mode-panel > .dropdown,
 .topbar .ins-group .instrument-select {
   margin-left: auto;
+}
+
+/* Keyboard shortcuts (SPEC §11): the library's dialog, narrower; a heading per group, key caps then what they do. */
+.library.shortcuts {
+  width: min(560px, 100%);
+}
+.shortcuts-group {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+.shortcuts-group h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.shortcuts-now {
+  padding: 0 6px;
+  border-radius: var(--pill-radius);
+  background: var(--grid-glow);
+  color: var(--dock-bg);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+}
+.shortcuts-group dl {
+  margin: 0;
+}
+.shortcuts-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 34%) 1fr;
+  align-items: baseline;
+  gap: 12px;
+  padding: 4px 0;
+}
+.shortcuts-row dt {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.shortcuts-row dd {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink);
+}
+.shortcuts kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 1px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.06);
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+  white-space: nowrap;
+}
+.shortcuts-note {
+  margin: 16px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+/* Phones: key caps above what they do. */
+@media (max-width: 640px) {
+  .shortcuts-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
+
+/* Help (☰ → Help): the library's dialog, a reading width; plain sections, the current mode marked. */
+.library.help {
+  width: min(600px, 100%);
+}
+.help-lead {
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.help-section {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.help-section h2 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.help-section p {
+  margin: 0 0 6px;
+}
+.help-section ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.help-section li + li {
+  margin-top: 4px;
+}
+.help-modes {
+  margin: 0;
+}
+/* The four modes, set apart in a box. */
+.help-section.help-box {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+}
+.help-box + .help-section {
+  border-top: none; /* the box already separates it */
+}
+.help-mode {
+  padding: 6px 0;
+}
+.help-mode dt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+/* Each mode's name in a pill (the pill tokens, lowercase like the header's mode pill; no flash). */
+.help-mode-name {
+  display: inline-flex;
+  align-items: center;
+  min-height: calc(var(--pill-h) - 6px);
+  padding: 0 var(--pill-pad-x);
+  border-radius: var(--pill-radius);
+  border: var(--pill-border);
+  background: var(--pill-bg);
+  color: var(--pill-ink);
+  font-size: var(--pill-font);
+  font-weight: 600;
+  text-transform: lowercase;
+}
+.help-mode-name {
+  gap: 5px;
+}
+.mode-icon {
+  flex: none;
+  display: block;
+}
+.help-mode.current .help-mode-name {
+  border-color: var(--grid-glow);
+}
+.help-mode dd {
+  margin: 2px 0 0;
+  color: var(--muted);
+}
+.help-mode dd p {
+  margin: 0;
+}
+.help-mode dd p + p {
+  margin-top: 6px;
+}
+.help-mode.current dd {
+  color: var(--ink);
+}
+.help-foot {
+  margin: 18px 0 0;
 }
