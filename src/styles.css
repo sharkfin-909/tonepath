@@ -1372,7 +1372,7 @@ button.dock-label {
   max-width: 220px;
 }
 
-/* The etude name above the title (SPEC §3.1): two stacked lines. */
+/* The title (SPEC §3.1), the progression's one name. */
 .title-stack {
   display: flex;
   flex-direction: column;
@@ -1380,17 +1380,10 @@ button.dock-label {
   min-width: 0;
   line-height: 1.15;
 }
-/* Two tight lines, together about a group's height. */
 .title-stack .inline-value,
 .title-stack .inline-field {
   padding-block: 0;
   line-height: 1.15;
-}
-.inline-value.etude-name,
-.inline-field.etude-name {
-  max-width: 220px;
-  font-size: 13px;
-  font-weight: 600;
 }
 .inline-value.placeholder {
   opacity: 0.5;

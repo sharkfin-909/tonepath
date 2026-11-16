@@ -67,10 +67,6 @@ function InlineField({
 }
 
 /** The etude name above the title (SPEC §3.1): blank shows a muted "Etude name". */
-export function EtudeNameField({ name, onRename }: { name: string; onRename: (text: string) => void }) {
-  return <InlineField value={name} label="Etude name" className="etude-name" onCommit={onRename} placeholder="Etude name" />;
-}
-
 export function TitleField({ title, onRename, editing = false }: { title: string; onRename: (text: string) => void; editing?: boolean }) {
   return <InlineField value={title} label="Title" className="rail-title" onCommit={onRename} startEditing={editing} />;
 }

@@ -7,8 +7,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { LengthLatch } from './rail/LengthLatch';
 import { Chart } from './chart/Chart';
-import { setBarsPerRow, setChord, setConcertClef, setEtudeName, setInstrument, setScaleOverride, setTitle, type Progression } from './progression';
-import { BarsPerRow, ClearMenu, EtudeNameField, TimeSignatureField, TitleField } from './rail/RailSettings';
+import { setBarsPerRow, setChord, setConcertClef, setInstrument, setScaleOverride, setTitle, type Progression } from './progression';
+import { BarsPerRow, ClearMenu, TimeSignatureField, TitleField } from './rail/RailSettings';
 import { InstrumentPicker } from './rail/InstrumentPicker';
 import { playBass, playChord, playNote, playRoot, playScale, setMuted, unlockAudio } from './audio';
 import { onArrivalOf, ON_ARRIVAL_LABELS, readDevice, writeDevice, type OnArrival } from './device';
@@ -428,7 +428,7 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
         {/* Row 1, right: the mode panel (Mode:), in a pill. */}
         <div className="mode-corner">{modeSwitch}</div>
         <div className="topbar-row">
-          {/* Row 2, left (under TONEPATH): ← Library, then the etude name above the file name (the title), stacked. */}
+          {/* Row 2, left (under TONEPATH): ← Library, then the title. */}
           <div className="topbar-file">
             <button
               type="button"
@@ -437,8 +437,8 @@ export function App({ initial, onLibrary, renameOnOpen = false }: AppProps) {
             >
               ← Library
             </button>
+            {/* The title is the progression's one name (the stored etudeName is kept but not shown). */}
             <div className="title-stack">
-              <EtudeNameField name={progression.etudeName ?? ''} onRename={(t) => commit(setEtudeName(doc.progression, t))} />
               <h1 className="rail-heading">
                 <TitleField title={progression.title} editing={renameOnOpen} onRename={(t) => commit(setTitle(doc.progression, t))} />
               </h1>
