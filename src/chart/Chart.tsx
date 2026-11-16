@@ -175,7 +175,7 @@ export function Chart({ progression, view, caret, onSlotClick, onEventClick, onT
             {/* Improvise's lead sheet has no stave, so no clef (SPEC §3.3). */}
             {mode !== 'improvise' && <ClefGutter width={GUTTER_WIDTH} clef={clef} />}
           </div>
-          {row.map((slot) => (
+          {row.map((slot, si) => (
             <SlotView
               key={slot.index}
               slot={slot}
@@ -192,6 +192,9 @@ export function Chart({ progression, view, caret, onSlotClick, onEventClick, onT
               onEventClick={inert ? undefined : onEventClick}
               onTimeClick={inert ? undefined : onTimeClick}
               span={2 / bars[slot.bar].length}
+              // Write etude / Read etude: one card per bar — a split bar's two slots join (SPEC §3.1). Improvise: a card per slot.
+              barCard={mode !== 'improvise' && bars[slot.bar].length === 2 ? (slot.part === 0 ? 'first' : 'second') : null}
+              rowEnd={si === row.length - 1}
               layout={layout}
               header={header}
               showTimeSignature={slot.index === 0}
@@ -271,6 +274,10 @@ interface SlotViewProps {
   /** Bar number + ⋯ handle, on the bar's first slot. */
   barTools: { menu: boolean; selected: boolean; split: boolean; canPaste: boolean; canDelete: boolean; onSelect: (bar: number, extend: boolean) => void; onAction: (bar: number, action: BarAction) => void } | null;
   inSelection: boolean;
+  /** Write etude / Read etude: this slot is half of a bar's card (a split bar) — no border or gap between the halves. */
+  barCard: 'first' | 'second' | null;
+  /** The last slot of its row: the loop band's bridge doesn't run past it. */
+  rowEnd: boolean;
   /** Part of the loop (Improvise / Read etude): its first slot carries the start repeat, its last the end repeat and the ×. */
   loop: { start: boolean; end: boolean; onClear?: () => void } | null;
   /** Write: ⇧-click anywhere in the bar extends the bar selection to it (instead of moving the caret). */
@@ -291,7 +298,7 @@ interface SlotViewProps {
   onScaleChange?: (scale: ScaleId | null) => void;
 }
 
-function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing, keyLabel, keyMate, hideMelody, onEventClick, onTimeClick, span, layout, header, barTools, inSelection, loop, onShiftSelect, onDeleteBar, onAppend, showTimeSignature, editing, error, usedChords, onEdit, onCommit, onClear, onScaleChange }: SlotViewProps) {
+function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing, keyLabel, keyMate, hideMelody, onEventClick, onTimeClick, span, layout, header, barTools, inSelection, barCard, rowEnd, loop, onShiftSelect, onDeleteBar, onAppend, showTimeSignature, editing, error, usedChords, onEdit, onCommit, onClear, onScaleChange }: SlotViewProps) {
   // Everything shown runs against the written chord; the stored melody stays concert (SPEC §5.3, §10).
   const { chord, harmony } = slot;
   const spell = (midi: number) => view.name(midi, slot);
@@ -304,7 +311,7 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
 
   return (
     <div
-      className={['slot', active && 'active', keyMate && 'key-mate', (active || keyMate) && playing && 'playing', inSelection && !loop && 'bar-selected', loop && 'looped', loop?.start && 'loop-start', loop?.end && 'loop-end', hideMelody && 'lead'].filter(Boolean).join(' ')}
+      className={['slot', active && 'active', keyMate && 'key-mate', (active || keyMate) && playing && 'playing', inSelection && !loop && 'bar-selected', loop && 'looped', loop?.start && 'loop-start', loop?.end && 'loop-end', hideMelody && 'lead', barCard && `bar-${barCard}`, rowEnd && 'row-end'].filter(Boolean).join(' ')}
       // --staff-top: where the stave's top line sits in the slot; the bar number sits just above it (CSS .bar-handle).
       // Improvise's 3-column slot keeps the usual slot height (labels + stave), so rows and the zoom stay as they were.
       style={{ gridColumn: `span ${span}`, ['--staff-top' as string]: `${header + staffTop}px`, ...(hideMelody ? { minHeight: header + staveHeight } : {}) }}

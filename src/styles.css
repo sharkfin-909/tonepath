@@ -912,29 +912,56 @@ button.dock-label {
   box-shadow: inset 0 0 0 2px rgba(47, 111, 219, 0.45);
 }
 
+/* Write etude / Read etude: one card per bar — a split bar's halves join (no inner border, no gap, square inner
+   corners); the second half reaches back over the gap. */
+.slot.bar-first {
+  border-right-width: 0;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.slot.bar-second {
+  margin-left: calc(-1 * var(--slot-gap, 10px));
+  border-left-width: 0;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
 /* The loop (Improvise / Read etude, SPEC §3.7): one band round the looped bars — top and bottom edges throughout, closed
    and rounded only at the loop's start and end (open where it wraps to the next row) — with repeat signs. */
+/* The loop (Improvise / Read etude): one band — the looped cards' top and bottom edges in the loop colour, closed and
+   rounded only at its start and end, bridged across the gaps between cards (not past a row's end: a wrapped loop
+   stays open there). */
 .slot.looped {
   --loop: #2f6fdb;
+  border-color: var(--loop);
+  border-width: 2px 0;
   border-radius: 0;
-  box-shadow: inset 0 2px 0 var(--loop), inset 0 -2px 0 var(--loop);
 }
 .slot.looped:not(.active) {
   background: rgba(47, 111, 219, 0.04);
 }
 .slot.looped.loop-start {
+  border-left-width: 2px;
   border-top-left-radius: 10px;
   border-bottom-left-radius: 10px;
-  box-shadow: inset 0 2px 0 var(--loop), inset 0 -2px 0 var(--loop), inset 2px 0 0 var(--loop);
 }
 .slot.looped.loop-end {
+  border-right-width: 2px;
   border-top-right-radius: 10px;
   border-bottom-right-radius: 10px;
-  box-shadow: inset 0 2px 0 var(--loop), inset 0 -2px 0 var(--loop), inset -2px 0 0 var(--loop);
 }
-.slot.looped.loop-start.loop-end {
-  border-radius: 10px;
-  box-shadow: inset 0 0 0 2px var(--loop);
+/* The bridge across the gap to the next looped card. */
+.slot.looped:not(.loop-end):not(.row-end):not(.bar-first)::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  left: 100%;
+  width: var(--slot-gap, 10px);
+  box-sizing: border-box;
+  border-block: 2px solid var(--loop);
+  background: rgba(47, 111, 219, 0.04);
+  pointer-events: none;
 }
 .repeat-sign {
   position: absolute;
