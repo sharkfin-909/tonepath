@@ -335,7 +335,7 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
       )}
       {keyLabel && (
         // The key pill (SPEC §3.1): the key this slot's scale belongs to; lit on the current slot and its key mates (only the pill).
-        <span className={['key-pill', onAppend && 'beside-append'].filter(Boolean).join(' ')} title={`Key: ${prettyName(keyLabel)}`}>
+        <span className={['key-pill', onAppend && 'beside-append'].filter(Boolean).join(' ')} title={`Key family: ${prettyName(keyLabel)}`}>
           {prettyName(keyLabel)}
         </span>
       )}
