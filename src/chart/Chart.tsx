@@ -119,6 +119,11 @@ export function Chart({ progression, view, caret, onSlotClick, onEventClick, onT
   const staveHeight = staveMetrics().height;
   const { zoom, scrolls } = fitZoom(rows.length, staveHeight, maxHeight ?? area.height, read ? 0 : undefined);
   const header = headerPx(zoom);
+  // Improvise's 3-row slot (SPEC §3.3): [bar number · key pill] [hex] [chord · scale]. The hex gets what the two label
+  // rows leave of the usual slot height (header + stave), so rows keep their size and the zoom is unchanged.
+  const chordPx = labelPx(CHORD_PX, MIN_CHORD_PX, zoom);
+  const scalePx = labelPx(SCALE_PX, MIN_SCALE_PX, zoom);
+  const leadHexHeight = Math.max(24, header + staveHeight - (1.885 * scalePx + 6) - (1.25 * chordPx + 8));
   const zoomStyle = {
     width: area.width / zoom,
     transform: `scale(${zoom})`,
@@ -190,6 +195,7 @@ export function Chart({ progression, view, caret, onSlotClick, onEventClick, onT
               keyLabel={keys[slot.index] && keyName(keys[slot.index]!)}
               keyMate={slot.index !== activeSlot && sameKey(keys[slot.index], activeKey)}
               hideMelody={mode === 'improvise'}
+              leadHexHeight={leadHexHeight}
               onEventClick={inert ? undefined : onEventClick}
               onTimeClick={inert ? undefined : onTimeClick}
               span={2 / bars[slot.bar].length}
@@ -265,6 +271,8 @@ interface SlotViewProps {
   keyMate: boolean;
   /** Improvise: the lead sheet — the slot's chord and scale tones in place of the stave. */
   hideMelody: boolean;
+  /** Improvise: the hex's height in the 3-row slot. */
+  leadHexHeight: number;
   onEventClick?: (e: TimedEvent) => void;
   onTimeClick?: (t: number) => void;
   span: number;
@@ -299,7 +307,7 @@ interface SlotViewProps {
   onScaleChange?: (scale: ScaleId | null) => void;
 }
 
-function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing, keyLabel, keyMate, hideMelody, onEventClick, onTimeClick, span, layout, header, barTools, inSelection, barCard, rowEnd, loop, onShiftSelect, onDeleteBar, onAppend, showTimeSignature, editing, error, usedChords, onEdit, onCommit, onClear, onScaleChange }: SlotViewProps) {
+function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing, keyLabel, keyMate, hideMelody, leadHexHeight, onEventClick, onTimeClick, span, layout, header, barTools, inSelection, barCard, rowEnd, loop, onShiftSelect, onDeleteBar, onAppend, showTimeSignature, editing, error, usedChords, onEdit, onCommit, onClear, onScaleChange }: SlotViewProps) {
   // Everything shown runs against the written chord; the stored melody stays concert (SPEC §5.3, §10).
   const { chord, harmony } = slot;
   const spell = (midi: number) => view.name(midi, slot);
@@ -350,9 +358,9 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
           +
         </button>
       )}
-      {/* Improvise: the key pill has the right-hand column of the 3-column slot. */}
+      {/* Improvise: the key pill tops the slot's right (row 1 of the 3-row slot, beside the bar number). */}
       {hideMelody && keyPill}
-      <div className="slot-header" style={{ height: header }}>
+      <div className="slot-header" style={hideMelody ? undefined : { height: header }}>
         {/* The chord name's row; elsewhere the key pill shares it, centred on the chord name. */}
         <div className="slot-title">
           {editing ? (
@@ -367,7 +375,7 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
       <div ref={ref} className="slot-body">
         {hideMelody ? (
           // Improvise (SPEC §3.3): the slot's scale, chord tones marked, where the stave would be.
-          <LeadTones harmony={harmony} />
+          <LeadTones harmony={harmony} height={leadHexHeight} />
         ) : (
         <SlotStave
           width={width}
