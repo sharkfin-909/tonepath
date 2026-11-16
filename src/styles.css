@@ -295,8 +295,8 @@ button.dock-label {
   display: flex;
   flex-direction: column;
   transform-origin: 0 0;
-  /* Room under the last row for its trash cans (the row gap; chartHeight counts it). */
-  padding-bottom: var(--row-gap, 24px);
+  /* The bar strip above the first row (the row gap above every row is its bar strip; chartHeight counts it). */
+  padding-top: var(--row-gap, 30px);
 }
 
 /* Each slot is a card (SPEC §3.1): --slot-gap between slots, --row-gap between rows (set from zoom.ts). */
@@ -871,8 +871,8 @@ button.dock-label {
 /* Bar number + ⋯ bar handle (SPEC §4.1). */
 .bar-handle {
   position: absolute;
-  /* Just above the stave's top line, at the start of the bar (SPEC §3.1). */
-  top: calc(var(--staff-top, 0px) - 1.5em);
+  /* In the bar strip above the card (the row gap), at the start of the bar (SPEC §3.1): centred in the strip. */
+  top: calc(-1px - var(--row-gap, 30px) / 2 - 0.75em);
   left: 2px;
   z-index: 5;
   display: inline-flex;
@@ -1087,13 +1087,13 @@ button.dock-label {
 }
 
 /* Delete bar (SPEC §3.1): a trash can at each bar's bottom right; faint until the bar is hovered or current. */
-/* The bar's trash can: outside the cards, in the row gap under the bar's end (it deletes the bar, not a slot). */
+/* The bar's trash can: in the bar strip above the card (the row gap), at the bar's end (it deletes the bar, not a slot). */
 .delete-bar {
   position: absolute;
   right: -1px;
   /* Centred in the row gap; sized with the chord label (zoom-proof), like the other small buttons. */
   font-size: var(--chord-px, 14px);
-  bottom: calc(-1px - var(--row-gap, 32px) / 2 - 0.65em);
+  top: calc(-1px - var(--row-gap, 30px) / 2 - 0.65em);
   z-index: 5;
   display: grid;
   place-items: center;
@@ -1450,10 +1450,6 @@ button.dock-label {
   line-height: 1.25;
 }
 /* The bar number: row 1's left, level with the key pill. */
-.slot.lead > .bar-handle {
-  top: calc(var(--slot-pad-top, 6px) + (1.595 * var(--scale-px, 11px) + 2px - 1.5em) / 2);
-  left: 6px;
-}
 .slot.lead .lead-tones {
   padding-inline: 0;
   justify-content: center;
