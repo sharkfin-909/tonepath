@@ -1,4 +1,4 @@
-// The mode panel (SPEC §3.0, §3.1): top right of the header, a group — the mode dropdown: the four modes (Tune ·
+// The mode panel (SPEC §3.0, §3.1): top left of the header, sharing a pill with Ins: — the mode dropdown: the four modes (Tune ·
 // Improvise · Write etude · Read etude), each with what it is for and what it uses or edits, and the keys to switch.
 // The mode alone decides whether the mic listens (no Audio input switch).
 import { MODES, MODE_LABELS, type Mode } from '../session';
@@ -31,7 +31,7 @@ export interface ModePanelProps {
 
 export function ModePanel({ mode, onMode }: ModePanelProps) {
   return (
-    <div className="mode-panel group">
+    <div className="mode-panel">
       <Dropdown
         value={mode}
         label="Mode"

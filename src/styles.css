@@ -1388,10 +1388,9 @@ button.dock-label {
   left: auto;
   right: -1px;
 }
-/* The mode panel sits at the right edge: its card always hangs to the left. */
+/* The mode panel sits at the left edge: its card hangs to the right, flush with the pill. */
 .mode-panel .dropdown-menu {
-  left: auto;
-  right: -9px;
+  left: -9px;
 }
 .dropdown-menu.rich {
   width: min(380px, calc(100vw - 32px));
@@ -2309,13 +2308,6 @@ select {
   max-width: 124px;
 }
 
-/* The mode panel: top right of the header (row 1), in a pill like the sound pill. */
-.mode-corner {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
 /* The ☰ menu (TrueLathe's icon): the header's top right corner. Hairline strokes in the header's light ink. */
 .hamburger {
   position: relative;
@@ -2348,12 +2340,6 @@ select {
 .hamburger-menu {
   min-width: 160px;
 }
-.topbar .mode-corner {
-  grid-row: 1;
-  grid-column: 3;
-  justify-self: end;
-}
-
 /* Clear ▾ (SPEC §6.2 item 10): a small menu under the button; Clear all asks first. Light menu on the dark header. */
 .clear-menu-wrap {
   position: relative;
@@ -2510,18 +2496,17 @@ select {
 /* Clef (Concert) and Ins:, in a pill like the others, as tall as the editing pill. */
 
 
-/* Header grid (SPEC §3.1): 3 columns × 2 rows. The wordmark is row 1 centre (the sound pill's old cell).
-   ☰ stays in the right gutter, vertically centred. */
+/* Header grid (SPEC §3.1): 3 columns × 2 rows. The wordmark is row 1 centre (the sound pill's old cell); ☰ ends
+   row 1, after the chord sequence · etude pill. */
 .topbar {
   position: relative;
-  --topbar-gutter-end: 3.75rem; /* room for the 44px ☰ icon, its padding, and a gap from the grid */
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   grid-template-rows: auto auto;
   align-items: center;
   row-gap: 8px;
   column-gap: 8px;
   padding-left: 12px;
-  padding-right: calc(12px + var(--topbar-gutter-end));
+  padding-right: 12px;
 }
 .topbar .topbar-brand {
   grid-row: 1;
@@ -2531,54 +2516,64 @@ select {
   transform: none;
   z-index: 1;
 }
-.topbar > .hamburger {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 1;
-  margin: 0;
-  flex: none;
-}
-.topbar .topbar-seq {
+/* Row 1, right: the chord sequence · etude pill, then ☰. */
+.topbar .topbar-end {
   grid-row: 1;
-  grid-column: 1;
-  justify-self: start;
+  grid-column: 3;
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
   max-width: 100%;
+}
+/* ☰ in row 1: no button padding, and its overhang past the 28px pills taken back so the row keeps their height. */
+.topbar .hamburger {
+  flex: none;
+  margin-block: -3px;
+}
+.topbar .hamburger-button {
+  padding: 0;
 }
 .topbar .topbar-center {
   grid-row: 1;
   grid-column: 2;
   justify-self: center;
 }
-.topbar .mode-corner {
+.topbar .mode-ins-group {
   grid-row: 1;
-  grid-column: 3;
-}
-.topbar .topbar-file {
-  grid-row: 2;
   grid-column: 1;
   justify-self: start;
+}
+.topbar .topbar-file {
   min-width: 0;
-  max-width: 100%;
 }
 .topbar .mode-groups {
   grid-row: 2;
-  grid-column: 2;
+  grid-column: 1 / -1;
   justify-self: center;
   min-width: 0;
 }
-.topbar .ins-group {
-  grid-row: 2;
-  grid-column: 3;
-  justify-self: end;
-}
-/* Tablet and down: chord sequence and etude live in the library's top section. */
+/* Tablet and down: chord sequence and etude live in the library's top section; the mode · ins pill moves to row 2,
+   centred under the wordmark. */
 @media (max-width: 1024px) {
-  .topbar .topbar-seq,
   .topbar .topbar-file {
     display: none;
+  }
+  .topbar .mode-ins-group {
+    grid-row: 2;
+    grid-column: 1 / -1;
+    justify-self: center;
+  }
+  .topbar .mode-groups {
+    grid-row: 3;
+  }
+}
+/* Phones: the mode and Ins: halves drop their fixed width so the pill fits. */
+@media (max-width: 640px) {
+  .topbar .mode-ins-group > .mode-panel,
+  .topbar .mode-ins-group > .ins-group {
+    min-width: 0;
   }
 }
 /* The wordmark (SPEC §3.1), in Firjar. */
@@ -2590,7 +2585,7 @@ select {
   letter-spacing: 0.18em;
   color: #f3eee6;
 }
-/* Row 2, left: etude under chord sequence (row 1 lives in .topbar-seq). */
+/* Row 1, right: the chord sequence · etude pill. */
 .topbar-file {
   display: flex;
   align-items: center;
@@ -2959,6 +2954,40 @@ select {
   grid-row: 1;
   justify-self: end;
 }
+/* Tablet and down, hex showing (App): the input level and chord bump pills in the hex panel's top corners. */
+.dock > .levels-slot,
+.dock > .bump-slot {
+  position: absolute;
+  top: 10px;
+  z-index: 3;
+  grid-row: auto;
+  grid-column: auto;
+}
+.dock > .levels-slot {
+  left: 10px;
+}
+.dock > .bump-slot {
+  right: 10px;
+}
+/* Tablet and down, hex hidden: the listen row's pills stack, centred, the tuner at the bottom. */
+@media (max-width: 1024px) {
+  .main.hex-hidden .listen-row:has(.tuner, .listen-levels, .chord-bump) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .main.hex-hidden .listen-row > .tuner-slot {
+    order: 1;
+  }
+  /* Bottom up: the tuner, then the bottom stack (sound pill, the mode's groups), then the input level. */
+  .layout-c:has(.main.hex-hidden .listen-row .tuner) > .sound-bar {
+    bottom: calc(6px + var(--well-height) + 8px); /* the listen row's padding, the tuner, a gap */
+  }
+  .main.hex-hidden .listen-row > .levels-slot {
+    margin-bottom: calc(var(--sound-bar-h, 0px) + 10px); /* + the row's 6px gap: 8px clear of the bottom stack */
+  }
+}
 /* Improvise: chord bump at the listen row's right — hex picks per slot before advancing. */
 .chord-bump {
   display: inline-flex;
@@ -3104,8 +3133,13 @@ select {
   }
 }
 
-/* Row 2's left end (SPEC §3.1): two labelled pills — chord sequence: ‹name› and etude: ‹name ▾›, in every mode. The
-   names are shown as typed (not lowercased) and shorten with an ellipsis only when the row runs out of room. */
+/* Row 1's right end (SPEC §3.1): one pill, two labelled halves — chord sequence: ‹name› | etude: ‹name ▾›, in every
+   mode. The names are shown as typed (not lowercased) and shorten with an ellipsis only when the row runs out of room. */
+.file-group {
+  display: inline-flex;
+  max-width: 100%;
+  min-width: 0;
+}
 .seq-group,
 .etude-group {
   display: inline-flex;
@@ -3229,7 +3263,7 @@ select {
   opacity: 1;
 }
 
-/* The mode pill and the Ins: pill share one width, their labels at the left, so nothing shifts when the mode or the
+/* The mode half and the Ins: half of their pill share one width, their labels at the left, so nothing shifts when the mode or the
    instrument changes: wide
    enough for the widest of either ("mode: Write etude", "ins: E♭ baritone sax"). In em: it follows the text size.
    Concert's clef choice widens the Ins: pill (an extra control). */
@@ -3237,10 +3271,6 @@ select {
 .topbar .ins-group {
   min-width: 11.9em; /* a little over the widest, so even it never pushes the label */
   justify-content: flex-start; /* the labels stay put; the values change to their right */
-}
-/* Ins: lines up under mode: (whose label sits inside its button's padding). */
-.topbar .ins-group > .instrument-picker {
-  margin-left: 3px;
 }
 /* …and the values at the right: the label left, the value (and its ▾) right, in one fixed-width pill. */
 .topbar .mode-panel > .dropdown,
@@ -3255,5 +3285,13 @@ select {
 }
 .topbar .ins-group .instrument-select {
   margin-left: auto;
-  margin-right: -5px; /* its ▾ lines up with mode's, whose button fills its pill */
+  margin-right: -5px; /* its ▾ sits as close to the pill's edge as mode: sits to the other */
+}
+/* The hairline between the two halves of a combined pill (chord sequence · etude, mode · ins). */
+.group-sep {
+  flex: none;
+  align-self: stretch;
+  width: 1px;
+  margin: 6px 2px;
+  background: rgba(255, 255, 255, 0.25);
 }

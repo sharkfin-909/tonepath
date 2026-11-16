@@ -106,6 +106,16 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
   /** Improvise / Tune: bottom overlay (tuner bar + hex) — chart scrollport sits above it. */
   const dockWrapRef = useRef<HTMLDivElement>(null);
   const [dockWrapHeight, setDockWrapHeight] = useState(0);
+  /** The bottom stack (sound pill, and from tablet down the mode's groups): its height, so a hex-hidden listen row
+   *  can stack its pills above it (CSS `--sound-bar-h`). */
+  const [soundBar, setSoundBar] = useState<HTMLDivElement | null>(null);
+  const [soundBarHeight, setSoundBarHeight] = useState(0);
+  useLayoutEffect(() => {
+    if (!soundBar) return;
+    const ro = new ResizeObserver(([e]) => setSoundBarHeight(Math.ceil(e.borderBoxSize?.[0]?.blockSize ?? e.contentRect.height)));
+    ro.observe(soundBar);
+    return () => ro.disconnect();
+  }, [soundBar]);
   // Linear (SPEC §8.5): the dock as one row, switched by octave. The layout is a device setting; the octave isn't
   // saved (it starts mid-range and is kept within the instrument's range).
   const [linearSetting, setLinear] = useDeviceSetting(HEX_LINEAR);
@@ -254,6 +264,8 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
   /** Hide hex: Improvise only (SPEC §3.1); Read etude has no hex at all. */
   const hideHex = profile.hexHideable && hexHidden;
   const dockedBottom = improvise || tune;
+  /** Tablet and down, hex showing: the input level and chord bump pills move from the listen row into the hex panel. */
+  const listenInDock = tablet && profile.hex && !hideHex;
   const area = chartArea(profile.chartBudget, profile.chart, mainHeight, dockedBottom ? dockWrapHeight : 0);
   useLayoutEffect(() => {
     if (!dockedBottom) {
@@ -367,6 +379,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
 
   const soundSection = (
     <div
+      ref={setSoundBar}
       className="sound-bar"
       onClick={(e) => {
         const el = e.target as Element;
@@ -414,7 +427,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
   };
 
   return (
-    <div className="layout-c">
+    <div className="layout-c" style={{ '--sound-bar-h': `${soundBarHeight}px` } as CSSProperties}>
       <header
         className="topbar"
         aria-label="Controls"
@@ -426,54 +439,57 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
           if (el.closest('.dropdown-option') || (el.closest('button') && !el.closest('.inline-value') && !el.closest('.dropdown'))) focusHex();
         }}
       >
-        {/* Row 1, centre: the wordmark (where the sound pill was). ☰ stays in the right gutter. */}
+        {/* Row 1, centre: the wordmark (where the sound pill was). */}
         <div className="topbar-brand">
           <span className="brand">TONEPATH</span>
         </div>
-        {/* Row 1, left: chord sequence (etude sits in row 2 of this column). */}
-        <div className="topbar-seq">
-          <span className="seq-group group">
-            <span className="rail-label">chord sequence:</span>
-            <h1 className="rail-heading">
-              <TitleField title={progression.title} editing={renameOnOpen} onRename={(text) => dispatch({ type: 'title', text })} />
-            </h1>
-          </span>
-        </div>
-        {/* Row 1, right: the mode panel (Mode:), in a pill. */}
-        {/* Row 1, right: the mode panel. */}
-        <div className="mode-corner">{modeSwitch}</div>
-        <HamburgerMenu items={[{ label: 'Library', onChoose: onLibrary }]} />
-        {/* Row 2, col beside the wordmark: etude under chord sequence (SPEC §3.1). */}
-        <div className="topbar-file">
-          <span className="etude-group group">
-            <span className="rail-label">etude:</span>
-            <EtudePicker
-              etudes={progression.etudes}
-              open={etude.id}
-              onOpen={(id) => dispatch({ type: 'etude-open', id })}
-              onNew={() => dispatch({ type: 'etude-new' })}
-              onDuplicate={() => dispatch({ type: 'etude-duplicate' })}
-              onRename={(text) => dispatch({ type: 'etude-rename', text })}
-              onDelete={() => dispatch({ type: 'etude-delete' })}
+        {/* Row 1, left: the mode panel and clef (Concert) + instrument, in one pill (SPEC §3.1). */}
+        <div className="mode-ins-group group">
+          {modeSwitch}
+          <span className="group-sep" aria-hidden />
+          <span className="ins-group">
+            <InstrumentPicker
+              instrument={view.inst.id}
+              concertClef={etude.concertClef === 'bass' ? 'bass' : 'treble'}
+              onInstrument={(id) => dispatch({ type: 'instrument', id })}
+              onConcertClef={(clef) => dispatch({ type: 'clef', clef })}
             />
           </span>
         </div>
-        {/* Row 2, centre: the mode's own groups (SPEC §3.0) — none in Tune. */}
+        {/* Row 1, right: chord sequence and etude, in one pill, then ☰ (SPEC §3.1). */}
+        <div className="topbar-end">
+          <div className="topbar-file">
+            <span className="file-group group">
+              <span className="seq-group">
+                <span className="rail-label">chord sequence:</span>
+                <h1 className="rail-heading">
+                  <TitleField title={progression.title} editing={renameOnOpen} onRename={(text) => dispatch({ type: 'title', text })} />
+                </h1>
+              </span>
+              <span className="group-sep" aria-hidden />
+              <span className="etude-group">
+                <span className="rail-label">etude:</span>
+                <EtudePicker
+                  etudes={progression.etudes}
+                  open={etude.id}
+                  onOpen={(id) => dispatch({ type: 'etude-open', id })}
+                  onNew={() => dispatch({ type: 'etude-new' })}
+                  onDuplicate={() => dispatch({ type: 'etude-duplicate' })}
+                  onRename={(text) => dispatch({ type: 'etude-rename', text })}
+                  onDelete={() => dispatch({ type: 'etude-delete' })}
+                />
+              </span>
+            </span>
+          </div>
+          <HamburgerMenu items={[{ label: 'Library', onChoose: onLibrary }]} />
+        </div>
+        {/* Row 2: the mode's own groups (SPEC §3.0) — none in Tune. */}
         <div className="mode-groups">
             {/* Tablet and down: form, edit, and transport sit in the bottom stack, above the sound pill. */}
             {!tablet && formControls}
             {!tablet && transportControls}
             {!tablet && editControls}
         </div>
-        {/* Row 2, right: clef (Concert) and instrument, in a pill (SPEC §3.1). */}
-        <span className="ins-group group">
-          <InstrumentPicker
-            instrument={view.inst.id}
-            concertClef={etude.concertClef === 'bass' ? 'bass' : 'treble'}
-            onInstrument={(id) => dispatch({ type: 'instrument', id })}
-            onConcertClef={(clef) => dispatch({ type: 'clef', clef })}
-          />
-        </span>
       </header>
       <main
         ref={mainRef}
@@ -546,9 +562,9 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
           <div ref={dockWrapRef} className="hex-dock-wrap">
             {profile.listens && (
               <div className="listen-row">
-                <div className="levels-slot" ref={setLevelsSlot} />
+                {!listenInDock && <div className="levels-slot" ref={setLevelsSlot} />}
                 <div className="tuner-slot" ref={setTunerSlot} />
-                {improvise && !hideHex && <div className="bump-slot" ref={setBumpSlot} />}
+                {improvise && !hideHex && !listenInDock && <div className="bump-slot" ref={setBumpSlot} />}
               </div>
             )}
             {improvise && profile.listens && !hideHex && (
@@ -562,6 +578,9 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
             )}
             {profile.hex && !hideHex && (
               <section ref={dockRef} className={linear ? 'dock linear' : 'dock'} aria-label="Docked hex" tabIndex={-1}>
+                {/* Tablet and down: the input level and chord bump pills sit in the hex panel's top corners. */}
+                {listenInDock && <div className="levels-slot" ref={setLevelsSlot} />}
+                {listenInDock && improvise && <div className="bump-slot" ref={setBumpSlot} />}
                 {!narrow && (
                   <button
                     type="button"
