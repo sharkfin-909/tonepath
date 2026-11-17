@@ -63,6 +63,10 @@ function useMorph(open: boolean): Seg[] {
 export interface MenuItem {
   label: string;
   onChoose: () => void;
+  /** A small icon before the label. */
+  icon?: ReactNode;
+  /** A muted line under the label (Library: what's open, from tablet down). */
+  detail?: string;
 }
 
 export function HamburgerMenu({ items, footer }: { items: MenuItem[]; footer?: ReactNode }) {
@@ -126,8 +130,10 @@ export function HamburgerMenu({ items, footer }: { items: MenuItem[]; footer?: R
                 onClick={() => choose(i)}
               >
                 <span className="dropdown-option-head">
+                  {it.icon}
                   <span className="dropdown-option-name">{it.label}</span>
                 </span>
+                {it.detail && <span className="hamburger-detail">{it.detail}</span>}
               </li>
             ))}
           </ul>

@@ -4,7 +4,7 @@ Tonepath is a practice-etude tool: a chord-bar form with in-slot standard notati
 
 ## Library and files
 
-- **Library** — all the user's progressions, autosaved in browser storage; listed in the library (a modal over the chart, from the ☰ menu), newest edit first. **Demo progression** — the deletable ii–V–I opened on first launch.
+- **Library** — all the user's progressions, autosaved in browser storage; listed in the library (a modal over the chart, from the ☰ menu), newest edit first, under **now open** (the open progression and etude, named and switchable there — the only place they show from tablet down, besides the ☰ menu's Library line). **Demo progression** — the deletable ii–V–I opened on first launch.
 - **Backup** — an *Export all* bundle file; imports only ever add progressions, never overwrite.
 - **Envelope** — the wrapper every Tonepath file has: `{ app: "tonepath", v, kind }`, where `kind` is `progression` (one progression, *Export one*) or `library` (a bundle, *Export all*). Files never carry ids, timestamps or device settings.
 - **Device settings** — per-browser state, never exported: last-picked instrument, mute, *Audio on chord* ("On arrival"), the transport's tempo / click sound / Loop, last-open progression, last backup date, reminder dismissal, whether the demo has been seeded.

@@ -79,7 +79,9 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
   const etude = etudeOf(progression, session.etude);
   useEffect(() => {
     onEtudeDock?.({
+      id: initial.id,
       title: progression.title,
+      onRenameTitle: (text) => dispatch({ type: 'title', text }),
       etudes: progression.etudes,
       open: etude.id,
       onOpen: (id) => dispatch({ type: 'etude-open', id }),
@@ -538,7 +540,13 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
           </div>
           <HamburgerMenu
             items={[
-              { label: 'Library', onChoose: onLibrary },
+              {
+                label: 'Library',
+                icon: <FolderIcon />,
+                // Tablet and down the header hides the chord sequence · etude pill: the menu says what's open.
+                detail: tablet ? `${progression.title || 'Untitled'} · ${etude.name}` : undefined,
+                onChoose: onLibrary,
+              },
               { label: 'Keyboard shortcuts', onChoose: () => setDialog('shortcuts') },
               { label: 'Help', onChoose: () => setDialog('help') },
             ]}
@@ -737,5 +745,14 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
       {dialog === 'shortcuts' && <ShortcutsModal mode={mode} onClose={closeDialog} />}
       {dialog === 'help' && <HelpModal mode={mode} onClose={closeDialog} onShortcuts={() => setDialog('shortcuts')} />}
     </div>
+  );
+}
+
+/** The ☰ menu's Library item: a folder. */
+function FolderIcon() {
+  return (
+    <svg className="menu-icon" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" aria-hidden>
+      <path d="M1.8 4.2a1 1 0 0 1 1-1h3.4l1.5 1.6h5.5a1 1 0 0 1 1 1v6.4a1 1 0 0 1-1 1H2.8a1 1 0 0 1-1-1z" />
+    </svg>
   );
 }

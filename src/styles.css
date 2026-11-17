@@ -1624,27 +1624,46 @@ button.dock-label {
 }
 
 .library-current {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px 18px;
   margin: -4px 0 16px;
   padding-bottom: 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 }
-.library-current-seq {
-  margin: 0;
-  min-width: 0;
-  font-size: 13px;
-}
-.library-current-label {
+/* The library's section headings: now open, my progressions (and, later, standards). */
+.library-section {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--muted);
 }
-.library-current-title {
+.library-current-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+.library-current-seq {
+  min-width: 0;
+}
+.library-current-seq .rail-title {
   text-transform: none;
 }
 .library-current-etude {
   flex: none;
+}
+/* The open progression's row in the list. */
+.library-open-tag {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--grid-glow);
+  color: #1d1b19;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: 1px;
 }
 
 .library-header h1 {
@@ -3257,4 +3276,24 @@ select {
 }
 .help-foot {
   margin: 18px 0 0;
+}
+
+/* The ☰ menu: an item's icon, and Library's line saying what's open (tablet and down). */
+.hamburger-menu .dropdown-option-head {
+  gap: 8px;
+}
+.menu-icon {
+  flex: none;
+  opacity: 0.8;
+}
+.hamburger-detail {
+  display: block;
+  max-width: 240px;
+  margin: 2px 0 0 22px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: none;
 }

@@ -1,4 +1,6 @@
-// Library (SPEC §3.5), a modal over the chart screen: rows newest edit first (title, instrument, bar count, last edited); click opens.
+// Library (SPEC §3.5), a modal over the chart screen. *Now open* on top — the open progression (rename in place) and
+// its etude picker, so the state shows even where the header hides it (tablet and down) — then *My progressions*: rows
+// newest edit first (title, instrument, bar count, last edited); click opens.
 // New · Duplicate · Rename · Delete (immediate, ~10 s Undo toast that restores exactly) · Export one · Export all ·
 // Import (several files at once; one toast with counts; new rows highlighted) · the backup reminder · a line for
 // unreadable keys.
@@ -6,11 +8,15 @@ import { useEffect, useRef, useState } from 'react';
 import { etudeSummary } from '../library';
 import type { Etude } from '../progression';
 import { EtudePicker } from '../rail/EtudePicker';
+import { TitleField } from '../rail/RailSettings';
 import type { StoredProgression } from '../storage';
 
 /** The open chart, so the library can switch its etude without leaving the modal. */
 export interface LibraryCurrent {
+  /** The open progression's id (its row is marked) and title (renamed in place). */
+  id: string;
   title: string;
+  onRenameTitle: (text: string) => void;
   etudes: Etude[];
   open: string;
   onOpen: (id: string) => void;
@@ -143,26 +149,30 @@ export function LibraryScreen(props: LibraryScreenProps) {
         </span>
       </header>
       {current && (
-        <div className="library-current">
-          <p className="library-current-seq">
-            <span className="library-current-label">current chord sequence:</span> <span className="library-current-title">{current.title}</span>
-          </p>
-          <span className="library-current-etude pill">
-            <span className="pill-label">choose etude</span>
-            <EtudePicker
-              etudes={current.etudes}
-              open={current.open}
-              onOpen={(id) => {
-                current.onOpen(id);
-                onClose?.();
-              }}
-              onNew={current.onNew}
-              onDuplicate={current.onDuplicate}
-              onRename={current.onRename}
-              onDelete={current.onDelete}
-            />
-          </span>
-        </div>
+        <section className="library-current" aria-label="Now open">
+          <h2 className="library-section">now open</h2>
+          <div className="library-current-body">
+            <span className="library-current-seq pill">
+              <span className="pill-label">chord sequence:</span>
+              <TitleField title={current.title} onRename={current.onRenameTitle} />
+            </span>
+            <span className="library-current-etude pill">
+              <span className="pill-label">etude:</span>
+              <EtudePicker
+                etudes={current.etudes}
+                open={current.open}
+                onOpen={(id) => {
+                  current.onOpen(id);
+                  onClose?.();
+                }}
+                onNew={current.onNew}
+                onDuplicate={current.onDuplicate}
+                onRename={current.onRename}
+                onDelete={current.onDelete}
+              />
+            </span>
+          </div>
+        </section>
       )}
       {reminder && (
         <p className="backup-reminder" role="note">
@@ -189,11 +199,14 @@ export function LibraryScreen(props: LibraryScreenProps) {
           </button>
         </div>
       ) : (
-        <ul className="library-list" aria-label="Progressions">
-          {progressions.map((p) => (
-            <Row key={p.id} p={p} {...props} onOpen={onOpen} fresh={!!imported?.ids.has(p.id)} />
-          ))}
-        </ul>
+        <>
+          <h2 className="library-section">my progressions</h2>
+          <ul className="library-list" aria-label="My progressions">
+            {progressions.map((p) => (
+              <Row key={p.id} p={p} {...props} onOpen={onOpen} fresh={!!imported?.ids.has(p.id)} isOpen={p.id === current?.id} />
+            ))}
+          </ul>
+        </>
       )}
       {imported?.summary && (
         <div key={`import-${imported.n}`} className="library-toast" role="status">
@@ -213,7 +226,7 @@ export function LibraryScreen(props: LibraryScreenProps) {
   );
 }
 
-function Row({ p, fresh, onOpen, onDuplicate, onRename, onDelete, onExportOne }: { p: StoredProgression; fresh: boolean } & LibraryScreenProps) {
+function Row({ p, fresh, isOpen, onOpen, onDuplicate, onRename, onDelete, onExportOne }: { p: StoredProgression; fresh: boolean; isOpen: boolean } & LibraryScreenProps) {
   const [renaming, setRenaming] = useState(false);
   const done = useRef(false);
   const finish = (text: string | null) => {
@@ -223,7 +236,7 @@ function Row({ p, fresh, onOpen, onDuplicate, onRename, onDelete, onExportOne }:
     if (text !== null) onRename(p, text);
   };
   return (
-    <li className={fresh ? 'library-row fresh' : 'library-row'}>
+    <li className={['library-row', fresh && 'fresh', isOpen && 'open'].filter(Boolean).join(' ')}>
       {renaming ? (
         <input
           className="library-rename"
@@ -239,7 +252,10 @@ function Row({ p, fresh, onOpen, onDuplicate, onRename, onDelete, onExportOne }:
         />
       ) : (
         <button type="button" className="library-open" onClick={() => onOpen(p)}>
-          <span className="library-title">{p.title}</span>
+          <span className="library-title">
+            {p.title}
+            {isOpen && <span className="library-open-tag">open</span>}
+          </span>
           <span className="library-meta">
             {etudeSummary(p)} · {p.bars.length} bar{p.bars.length === 1 ? '' : 's'} · {lastEdited(p.updatedAt)}
           </span>

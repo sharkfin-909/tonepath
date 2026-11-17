@@ -81,6 +81,13 @@ export function Root() {
     return () => window.removeEventListener('storage', onStorage);
   }, [showLibrary]);
 
+  // The open progression renamed from *now open*: its row follows (the edit is already saved).
+  const openTitle = currentEtude?.title;
+  useEffect(() => {
+    if (showLibrary) refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- on a rename only
+  }, [openTitle]);
+
   // Backup reminder (SPEC §3.5), re-read whenever the list changes.
   const [device, setDevice] = useState(() => readDevice(localStorage));
   useEffect(() => setDevice(readDevice(localStorage)), [list]);
