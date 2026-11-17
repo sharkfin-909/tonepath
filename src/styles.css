@@ -3459,3 +3459,47 @@ select {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
   max-width: calc(100vw - 32px);
 }
+
+/* Phones (SPEC §3.6): the editing pill is a two-row toolbar instead of a row that wraps wherever it runs out.
+   Row 1: the note lengths and Rest, the controls used most, as wide and as tall as a fingertip; their key hints
+   go (no keyboard to press them on). Row 2: nudge, step, undo / redo and clear, each pair spaced from the next. */
+@media (max-width: 640px) {
+  .sound-bar .edit-pill {
+    --chip-h: 36px;
+    --chip-icon-w: 36px;
+    display: grid;
+    grid-template-columns: auto auto auto auto;
+    justify-content: space-between;
+    align-items: center;
+    row-gap: 2px;
+    width: min(100%, 360px);
+    padding: 4px 10px;
+    border-radius: 18px;
+  }
+  .sound-bar .edit-pill .length-latch {
+    grid-column: 1 / -1;
+    justify-content: space-between;
+    gap: 0;
+  }
+  .sound-bar .edit-pill .latch-button {
+    min-width: 44px;
+    justify-content: center;
+  }
+  .sound-bar .edit-pill .latch-key {
+    display: none;
+  }
+  .sound-bar .edit-pill .note-icon {
+    width: 14px;
+    height: 24px;
+  }
+  .sound-bar .edit-pill .rest-latch {
+    margin-left: 0;
+  }
+  .sound-bar .edit-pill .clear-menu-wrap {
+    justify-self: end;
+  }
+  .sound-bar .edit-pill .clear-menu {
+    left: auto;
+    right: 0;
+  }
+}
