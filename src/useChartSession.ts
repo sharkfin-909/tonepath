@@ -7,6 +7,7 @@ import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { playBass, playChord, playNote, playRoot, playScale, setMuted } from './audio';
 import { onArrivalOf, readDevice, readSetting, writeDevice } from './device';
 import { CHORD_BUMP_NOTES, LAST_MODE, MOVE_BY } from './deviceSettings';
+import { isStandardId } from './standards';
 import { openDocument, type ProgressionDocument } from './document';
 import { NEW_INTAKE, appSounded, isPlayed, type MicIntake } from './micIntake';
 import { modeProfile } from './modeProfile';
@@ -77,6 +78,7 @@ export function useChartSession(o: ChartSessionOptions): ChartSession {
       },
       doc.progression.openEtudeId,
       o.carried,
+      { locked: isStandardId(o.initial.id) }, // a standard's chords are read-only (SPEC §3.12)
     );
   });
   const view = useMemo(() => instrumentView(progression, session.etude), [progression, session.etude]);

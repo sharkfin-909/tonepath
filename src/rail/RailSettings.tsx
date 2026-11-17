@@ -80,10 +80,28 @@ export function InlineField({
 }
 
 /** The progression's one name in the header (SPEC §3.1). Longer than 30 characters → ellipsis. */
-export function TitleField({ title, onRename, editing = false }: { title: string; onRename: (text: string) => void; editing?: boolean }) {
+export function TitleField({ title, onRename, editing = false, locked = false }: { title: string; onRename: (text: string) => void; editing?: boolean; locked?: boolean }) {
   const display = title.length > 30 ? `${title.slice(0, 30)}…` : title;
+  // A standard (SPEC §3.12): its title is frozen — plain text, with a lock.
+  if (locked)
+    return (
+      <span className="rail-title locked" title={`${title}: a standard progression (read-only)`}>
+        <LockIcon />
+        {display}
+      </span>
+    );
   return (
     <InlineField value={title} display={display} label="Title" className="rail-title" onCommit={onRename} startEditing={editing} />
+  );
+}
+
+/** A standard progression's lock (SPEC §3.12). */
+export function LockIcon() {
+  return (
+    <svg className="lock-icon" viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" strokeWidth={1.4} aria-hidden>
+      <rect x="2.5" y="5.2" width="7" height="5" rx="1" />
+      <path d="M4.2 5.2V3.8a1.8 1.8 0 0 1 3.6 0v1.4" />
+    </svg>
   );
 }
 

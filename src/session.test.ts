@@ -678,3 +678,35 @@ describe('etude and ins read need chords', () => {
     expect(initialSession(prog(), { onArrival: 'silent', lastMode: 'write' }).mode).toBe('write');
   });
 });
+
+describe('a standard progression is locked (SPEC §3.12)', () => {
+  const locked = (mode: SessionState['mode'], more: Intent[]) => run(more, { state: { mode, locked: true } });
+
+  it('edit progression shows it but edits nothing: chords, scales, bars, time, title, Clear all, undo', () => {
+    const r = locked('progression', [
+      { type: 'chord-entry', bar: 0, part: 0, text: 'Em7' },
+      { type: 'scale-override', bar: 1, part: 0, scale: 'lydian-dominant' },
+      { type: 'append-bar' },
+      { type: 'bar-action', bar: 1, action: 'delete' },
+      { type: 'time-signature', text: '3/4' },
+      { type: 'bars-per-row', n: 2 },
+      { type: 'title', text: 'Mine' },
+      { type: 'clear-all' },
+    ]);
+    expect(r.p).toEqual(prog());
+    expect(r.outcomes[0].entry).toBeUndefined();
+  });
+
+  it('your etudes over it still edit: notes, new etude, rename, instrument', () => {
+    const r = locked('write', [pick(62), { type: 'etude-new' }, { type: 'etude-rename', text: 'Line' }, { type: 'instrument', id: 'bb-trumpet' }]);
+    expect(r.p.etudes).toHaveLength(2);
+    expect(melodyOf(r.p)).toEqual([{ pitch: 62, d: 'q' }]);
+    expect(r.p.etudes[1]).toMatchObject({ name: 'Line', instrument: 'bb-trumpet' });
+    expect(r.p.bars).toEqual(prog().bars);
+  });
+
+  it('an open of a standard is locked', () => {
+    expect(initialSession(prog(), { onArrival: 'silent' }, null, undefined, { locked: true }).locked).toBe(true);
+    expect(initialSession(prog(), { onArrival: 'silent' }).locked).toBe(false);
+  });
+});

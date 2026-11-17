@@ -73,7 +73,13 @@ export interface ModeProfile {
   writeLights: boolean;
 }
 
-export function modeProfile(mode: Mode, running = false, moveBy: MoveBy = 'notes'): ModeProfile {
+export function modeProfile(
+  mode: Mode,
+  running = false,
+  moveBy: MoveBy = 'notes',
+  /** A standard progression (SPEC §3.12): its chords never edit. */
+  locked = false,
+): ModeProfile {
   const progression = mode === 'progression';
   const grid = mode === 'grid';
   const tune = mode === 'tune';
@@ -90,12 +96,12 @@ export function modeProfile(mode: Mode, running = false, moveBy: MoveBy = 'notes
     listens: tune || improvise,
     transport,
     editsMelody: write,
-    editsForm: progression && !running,
+    editsForm: progression && !running && !locked,
     needsChords: write || read,
     movesByHand: !running,
     chartInert: read && running,
     editPill: write,
-    formGroup: progression && !running,
+    formGroup: progression && !running && !locked,
     transportBar: transport,
     loopPickers: transport && !progression,
     moveOn: grid,

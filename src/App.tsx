@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { LengthLatch } from './rail/LengthLatch';
 import { Chart } from './chart/Chart';
-import { BarsPerRow, ClearMenu, TimeSignatureField, TitleField } from './rail/RailSettings';
+import { BarsPerRow, ClearMenu, LockIcon, TimeSignatureField, TitleField } from './rail/RailSettings';
 import { InstrumentPicker } from './rail/InstrumentPicker';
 import { unlockAudio } from './audio';
 import { ON_ARRIVAL_LABELS, type OnArrival } from './device';
@@ -66,14 +66,16 @@ export interface AppProps {
   onCarry?: (carried: Carried) => void;
   /** The open progression and etude, for the library modal's top section. */
   onEtudeDock?: (dock: LibraryCurrent | null) => void;
+  /** A standard's *Make my own copy* (SPEC §3.12): a progression of mine with its chords, opened. */
+  onCopyStandard?: (id: string) => void;
 }
 
 /** The chart screen (layout C, SPEC §3.1) for one progression. */
-export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry, onEtudeDock }: AppProps) {
+export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry, onEtudeDock, onCopyStandard }: AppProps) {
   const chart = useChartSession({ initial, onDeleted: onLibrary, onTransportRestart: () => transport.restart(), carried });
   const { doc, progression, view, session, dispatch } = chart;
   const { mode, running } = session;
-  const profile = modeProfile(mode, running, session.moveBy);
+  const profile = modeProfile(mode, running, session.moveBy, session.locked);
   useEffect(() => onCarry?.({ mode, clip: session.clip }), [mode, session.clip, onCarry]);
   /** The open etude: its melody (Write etude, Read etude) and its instrument (every mode). */
   const etude = etudeOf(progression, session.etude);
@@ -81,6 +83,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
     onEtudeDock?.({
       id: initial.id,
       title: progression.title,
+      locked: session.locked,
       onRenameTitle: (text) => dispatch({ type: 'title', text }),
       etudes: progression.etudes,
       open: etude.id,
@@ -91,7 +94,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
       onDelete: () => dispatch({ type: 'etude-delete' }),
     });
     return () => onEtudeDock?.(null);
-  }, [onEtudeDock, progression, etude.id, dispatch]);
+  }, [onEtudeDock, progression, etude.id, dispatch, session.locked]);
 
   /** The written pitch A would pick (the hovered hex cell or ♯ / ♭ button). */
   const hovered = useRef<number | null>(null);
@@ -314,6 +317,19 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
     </div>
   );
 
+  /** Edit progression on a standard (SPEC §3.12): read-only, with a way to a copy of my own. */
+  const lockedBanner = session.locked && mode === 'progression' && (
+    <div className="locked-banner pill" role="note">
+      <LockIcon />
+      <span className="pill-label">standard progression: read-only</span>
+      {onCopyStandard && (
+        <button type="button" className="chip chip--filled" onClick={() => onCopyStandard(initial.id)}>
+          make my own copy
+        </button>
+      )}
+    </div>
+  );
+
   /** The loop pickers: loop bars `from`–`to`. */
   const pickBars = (from: number, to: number) => {
     dispatch({ type: 'bar-select', bar: from, extend: false });
@@ -521,7 +537,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
               <span className="seq-group">
                 <span className="pill-label">chord sequence:</span>
                 <h1 className="rail-heading">
-                  <TitleField title={progression.title} editing={renameOnOpen} onRename={(text) => dispatch({ type: 'title', text })} />
+                  <TitleField title={progression.title} editing={renameOnOpen} locked={session.locked} onRename={(text) => dispatch({ type: 'title', text })} />
                 </h1>
               </span>
               <span className="etude-group">
@@ -557,6 +573,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
             {/* Tablet and down: edit and transport sit in the bottom stack, above the sound pill; Improvise's form
                 group stays here. */}
             {formControls}
+            {lockedBanner}
             {!tablet && moveOnControls}
             {!tablet && transportControls}
             {!tablet && editControls}

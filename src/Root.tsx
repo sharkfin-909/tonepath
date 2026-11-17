@@ -6,7 +6,9 @@ import demo from '../examples/demo.tonepath.json';
 import rhythmChanges from '../examples/rhythm-changes.tonepath.json';
 import { App } from './App';
 import {
+  copyStandard,
   createProgression,
+  openStandard,
   deleteProgression,
   duplicateProgression,
   importTexts,
@@ -25,6 +27,7 @@ import { readDevice, writeDevice } from './device';
 import { exportAll, exportOne } from './schema';
 import { isReadOnly } from './readOnly';
 import type { Carried } from './session';
+import { FIRST_STANDARD, STANDARDS, listMine } from './standards';
 
 /** The open progression (null: none, e.g. an empty library) — `n` re-mounts the chart when it changes underneath. */
 type Chart = { progression: StoredProgression; rename: boolean; n: number } | null;
@@ -41,7 +44,8 @@ function download(filename: string, text: string) {
 
 function initialChart(): Chart {
   migrateStorage(localStorage); // SPEC §12.4: older storage is migrated; newer makes the tab read-only
-  const l = launch(localStorage, demo, undefined, undefined, [{ key: 'rhythm-changes', file: rhythmChanges }]);
+  // A first ever launch lands on the 12-bar blues standard (in grid improv, SPEC §3.0); the demos are still seeded.
+  const l = launch(localStorage, demo, undefined, undefined, [{ key: 'rhythm-changes', file: rhythmChanges }], (s) => openStandard(s, FIRST_STANDARD));
   if (l.kind === 'empty') return null;
   rememberOpen(localStorage, l.progression.id);
   return { progression: l.progression, rename: false, n: 0 };
@@ -144,10 +148,24 @@ export function Root() {
     {banner}
     <Tooltips />
     {/* Keyed by id (and reloads): a fresh chart screen (and empty undo history) for every progression opened. */}
-    {chart && <App key={`${chart.progression.id}:${chart.n}`} initial={chart.progression} renameOnOpen={chart.rename} onLibrary={toLibrary} carried={carried.current} onCarry={onCarry} onEtudeDock={onEtudeDock} />}
+    {chart && (
+      <App
+        key={`${chart.progression.id}:${chart.n}`}
+        initial={chart.progression}
+        renameOnOpen={chart.rename}
+        onLibrary={toLibrary}
+        carried={carried.current}
+        onCarry={onCarry}
+        onEtudeDock={onEtudeDock}
+        onCopyStandard={(id) => open(copyStandard(localStorage, id), true)}
+      />
+    )}
     {showLibrary && <LibraryScreen
       onClose={chart ? () => setLibraryOpen(false) : undefined}
-      progressions={list}
+      progressions={listMine(list)}
+      standards={STANDARDS.map((st) => ({ id: st.id, title: st.title, bars: st.bars.length, stored: list.find((p) => p.id === st.id) ?? null }))}
+      onOpenStandard={(id) => open(openStandard(localStorage, id))}
+      onCopyStandard={(id) => open(copyStandard(localStorage, id), true)}
       onExportOne={(p) => {
         const f = exportOne(p);
         download(f.filename, f.text);

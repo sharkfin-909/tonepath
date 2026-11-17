@@ -3,10 +3,11 @@
 
 import { readDevice, writeDevice } from './device';
 import { instrumentOf } from './instruments';
-import { SCHEMA_VERSION, newProgression, setTitle, type Progression } from './progression';
+import { SCHEMA_VERSION, newEtude, newProgression, setTitle, type Progression } from './progression';
 import { importSummary, migrate, parseFile, uniqueTitle } from './schema';
 import { PROGRESSION_PREFIX, listProgressions, saveProgression, type StoredProgression } from './storage';
 import { isReadOnly, setReadOnly } from './readOnly';
+import { standardOf, withStandard } from './standards';
 
 type MakeId = () => string;
 const uuid: MakeId = () => crypto.randomUUID();
@@ -37,6 +38,32 @@ export function duplicateProgression(storage: Storage, p: StoredProgression, mak
 export function renameProgression(storage: Storage, p: StoredProgression, title: string, now = new Date()): StoredProgression {
   const next = setTitle(p, title);
   return next === p ? p : saveProgression(storage, { ...p, ...next }, now);
+}
+
+/**
+ * Open a standard (SPEC §3.12): its stored record — your etudes over it — or, the first time, a new one with one empty
+ * etude on the device's last-picked instrument (saved now). The chords come from the frozen definition either way.
+ */
+export function openStandard(storage: Storage, id: string, now = new Date()): StoredProgression {
+  const stored = readProgression(storage, id);
+  if (stored) return stored;
+  const s = standardOf(id);
+  if (!s) throw new Error(`no standard ${id}`);
+  const inst = readDevice(storage).lastInstrument;
+  const fresh: StoredProgression = { ...s, bars: s.bars.map((b) => b.map((x) => ({ ...x }))), etudes: [newEtude(typeof inst === 'string' ? inst : undefined)], updatedAt: '' };
+  return withStandard(saveProgression(storage, fresh, now));
+}
+
+/**
+ * Make my own copy (SPEC §3.12): the standard's chords in a new progression of mine, "‹title› (my copy)", with one
+ * fresh etude — the etudes stay with the standard.
+ */
+export function copyStandard(storage: Storage, id: string, makeId: MakeId = uuid, now = new Date()): StoredProgression {
+  const s = standardOf(id);
+  if (!s) throw new Error(`no standard ${id}`);
+  const inst = readDevice(storage).lastInstrument;
+  const { id: _id, ...form } = s;
+  return addProgression(storage, { ...form, title: `${s.title} (my copy)`, bars: s.bars.map((b) => b.map((x) => ({ ...x }))), etudes: [newEtude(typeof inst === 'string' ? inst : undefined)] }, makeId, now);
 }
 
 /** Delete: removes the key and returns the raw string, so Undo restores it exactly (updatedAt included). */
@@ -163,8 +190,17 @@ export interface ExtraDemo {
  * then reopen `lastOpenId`, or if it is missing / dangling the newest; an empty library → the empty state.
  * Each extra demo is added once per device (`seededDemos`, so deleting it is permanent too) without being opened.
  */
-export function launch(storage: Storage, demo: unknown, makeId: MakeId = uuid, now = new Date(), extras: ExtraDemo[] = []): Launch {
+export function launch(
+  storage: Storage,
+  demo: unknown,
+  makeId: MakeId = uuid,
+  now = new Date(),
+  extras: ExtraDemo[] = [],
+  /** The very first launch opens this instead of the demo (the 12-bar blues standard, SPEC §3.0); the demo is still seeded. */
+  first?: (storage: Storage) => StoredProgression,
+): Launch {
   const device = readDevice(storage);
+  const firstEver = !device.seeded;
   if (!device.seeded) {
     // Through the normal import path. Existing (pre-library) progressions count as a library already: don't bury them.
     if (listProgressions(storage).length === 0) importTexts(storage, [{ name: 'demo', text: JSON.stringify(demo) }], makeId, now);
@@ -180,6 +216,7 @@ export function launch(storage: Storage, demo: unknown, makeId: MakeId = uuid, n
     importTexts(storage, fresh.map((x) => ({ name: x.key, text: JSON.stringify(x.file) })), makeId, now);
     writeDevice(storage, { seededDemos: [...seeded, ...fresh.map((x) => x.key)] });
   }
+  if (firstEver && first) return { kind: 'open', progression: first(storage) };
   const opened = open ?? listProgressions(storage)[0];
   return opened ? { kind: 'open', progression: opened } : { kind: 'empty' };
 }

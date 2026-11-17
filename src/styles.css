@@ -3297,3 +3297,33 @@ select {
   color: var(--muted);
   text-transform: none;
 }
+
+/* Standard progressions (SPEC §3.12): the lock on their titles and rows, and edit progression's read-only banner. */
+.lock-icon {
+  flex: none;
+  margin-right: 5px;
+  vertical-align: -1px;
+  opacity: 0.75;
+}
+.rail-title.locked {
+  display: inline-flex;
+  align-items: center;
+  text-transform: none;
+  cursor: default;
+}
+.locked-banner {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pill-gap);
+  white-space: nowrap;
+}
+.locked-banner .lock-icon {
+  margin-right: 0;
+}
+.library-list.standards {
+  margin-bottom: 16px;
+}
+.library-list.standards .library-title {
+  display: inline-flex;
+  align-items: center;
+}

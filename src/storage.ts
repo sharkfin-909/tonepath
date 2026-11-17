@@ -4,6 +4,7 @@
 import { newProgression, type Progression } from './progression';
 import { readDevice } from './device';
 import { isReadOnly } from './readOnly';
+import { withStandard } from './standards';
 
 export const PROGRESSION_PREFIX = 'tonepath:progression:';
 
@@ -55,7 +56,8 @@ export function countUnreadable(storage: Storage): number {
   return n;
 }
 
-/** Every readable progression in storage, newest edit first. Corrupt keys are skipped. */
+/** Every readable progression in storage, newest edit first. Corrupt keys are skipped; a standard comes back with its
+ *  frozen chords (SPEC §3.12). */
 export function listProgressions(storage: Storage): StoredProgression[] {
   const out: StoredProgression[] = [];
   for (let i = 0; i < storage.length; i++) {
@@ -63,7 +65,7 @@ export function listProgressions(storage: Storage): StoredProgression[] {
     if (!key?.startsWith(PROGRESSION_PREFIX)) continue;
     try {
       const parsed: unknown = JSON.parse(storage.getItem(key) ?? '');
-      if (isStored(parsed)) out.push(parsed);
+      if (isStored(parsed)) out.push(withStandard(parsed));
     } catch {
       // corrupt key: skipped, raw string left in place
     }

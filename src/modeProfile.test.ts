@@ -67,6 +67,11 @@ describe('mode profile', () => {
     expect(modeProfile('improvise', true).arrivalWaits).toBe(false);
   });
 
+  it('a standard (locked): edit progression shows it read-only — no form group, nothing edits; ▶ still plays', () => {
+    expect(modeProfile('progression', false, 'notes', true)).toMatchObject({ editsForm: false, formGroup: false, transport: true, hex: true });
+    expect(modeProfile('write', false, 'notes', true)).toMatchObject({ editsMelody: true, editPill: true });
+  });
+
   it('edit etude and ins read need chords to work over', () => {
     expect(MODES.filter((m) => modeProfile(m).needsChords)).toEqual(['write', 'read']);
   });

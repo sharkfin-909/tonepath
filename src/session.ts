@@ -129,6 +129,8 @@ export interface SessionState {
   bumpCount: number;
   /** Grid improv: the chords move on by notes (chord bump) or in time (the transport). */
   moveBy: MoveBy;
+  /** A standard progression (SPEC §3.12): its chords, bars, time signature and title never edit; its etudes do. */
+  locked: boolean;
   chordBumpNotes: ChordBumpNotes;
 }
 
@@ -249,6 +251,7 @@ export function initialSession(
   device: { muted?: boolean; onArrival: OnArrival; moveBy?: MoveBy; chordBumpNotes?: ChordBumpNotes; lastMode?: Mode },
   etude?: string | null,
   carried?: Carried,
+  opts: { locked?: boolean } = {},
 ): SessionState {
   const wanted = carried?.mode ?? device.lastMode ?? 'grid';
   // Edit etude and ins read need chords: without any, the open starts in edit progression.
@@ -275,6 +278,7 @@ export function initialSession(
     onArrival: device.onArrival,
     bumpCount: 0,
     moveBy,
+    locked: opts.locked === true,
     chordBumpNotes: device.chordBumpNotes ?? 4,
   };
 }
@@ -345,7 +349,8 @@ const SLOT_MOVES: Intent['type'][] = ['step', 'browse', 'event-click', 'time-cli
 /** What the mode lets through (SPEC §3.2–3.4, §3.8), by its profile. */
 function allowed(s: SessionState, intent: Intent): boolean {
   const t = intent.type;
-  const m = modeProfile(s.mode, s.running, s.moveBy);
+  const m = modeProfile(s.mode, s.running, s.moveBy, s.locked);
+  if (t === 'title') return !s.locked; // a standard's title is frozen too
   if (ANY_MODE.includes(t)) return true;
   if (MELODY_EDITS.includes(t)) return m.editsMelody;
   if (FORM_EDITS.includes(t)) return m.editsForm;
@@ -382,7 +387,7 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
   const melodyEdit = (next: MelodyEvent[]) => (edit = setMelody(p, s.etude, next));
 
   /** The mode's profile as the session now stands (it changes with the transport and grid improv's move-on choice). */
-  const profile = () => modeProfile(s.mode, s.running, s.moveBy);
+  const profile = () => modeProfile(s.mode, s.running, s.moveBy, s.locked);
   /**
    * Reach a slot by hand (outside Write etude). On the lead sheet its *On arrival* sound waits for the first note
    * picked or played there; Read etude's arrival is silent (nothing is played there).

@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { etudeSummary } from '../library';
 import type { Etude } from '../progression';
 import { EtudePicker } from '../rail/EtudePicker';
-import { TitleField } from '../rail/RailSettings';
+import { LockIcon, TitleField } from '../rail/RailSettings';
 import type { StoredProgression } from '../storage';
 
 /** The open chart, so the library can switch its etude without leaving the modal. */
@@ -16,6 +16,8 @@ export interface LibraryCurrent {
   /** The open progression's id (its row is marked) and title (renamed in place). */
   id: string;
   title: string;
+  /** A standard (SPEC §3.12): its title is frozen. */
+  locked: boolean;
   onRenameTitle: (text: string) => void;
   etudes: Etude[];
   open: string;
@@ -26,8 +28,20 @@ export interface LibraryCurrent {
   onDelete: () => void;
 }
 
+/** A standard's row (SPEC §3.12): built in; `stored` once opened (it holds your etudes over it). */
+export interface StandardRow {
+  id: string;
+  title: string;
+  bars: number;
+  stored: StoredProgression | null;
+}
+
 export interface LibraryScreenProps {
+  /** My progressions (the standards apart). */
   progressions: StoredProgression[];
+  standards: StandardRow[];
+  onOpenStandard: (id: string) => void;
+  onCopyStandard: (id: string) => void;
   onOpen: (p: StoredProgression) => void;
   onNew: () => void;
   onDuplicate: (p: StoredProgression) => void;
@@ -154,7 +168,7 @@ export function LibraryScreen(props: LibraryScreenProps) {
           <div className="library-current-body">
             <span className="library-current-seq pill">
               <span className="pill-label">chord sequence:</span>
-              <TitleField title={current.title} onRename={current.onRenameTitle} />
+              <TitleField title={current.title} locked={current.locked} onRename={current.onRenameTitle} />
             </span>
             <span className="library-current-etude pill">
               <span className="pill-label">etude:</span>
@@ -191,6 +205,28 @@ export function LibraryScreen(props: LibraryScreenProps) {
           {unreadable === 1 ? "1 progression couldn't be read" : `${unreadable} progressions couldn't be read`}
         </p>
       )}
+      <h2 className="library-section">standards</h2>
+      <ul className="library-list standards" aria-label="Standards">
+        {props.standards.map((st) => (
+          <li key={st.id} className={['library-row', st.id === current?.id && 'open'].filter(Boolean).join(' ')}>
+            <button type="button" className="library-open" onClick={() => props.onOpenStandard(st.id)}>
+              <span className="library-title">
+                <LockIcon />
+                {st.title}
+                {st.id === current?.id && <span className="library-open-tag">open</span>}
+              </span>
+              <span className="library-meta">
+                {st.stored && st.stored.etudes.some((e) => e.melody.length > 0) ? etudeSummary(st.stored) : 'read-only chords'} · {st.bars} bars
+              </span>
+            </button>
+            <span className="library-actions">
+              <button type="button" onClick={() => props.onCopyStandard(st.id)}>
+                Make my own copy
+              </button>
+            </span>
+          </li>
+        ))}
+      </ul>
       {progressions.length === 0 ? (
         <div className="library-empty">
           <p>No progressions yet.</p>
