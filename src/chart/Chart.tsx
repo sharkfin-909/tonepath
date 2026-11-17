@@ -41,6 +41,8 @@ export interface ChartProps {
   onChordClear?: (bar: number, part: number) => void;
   /** Open a slot's chord field from outside (the dock label); `n` changes on every request. */
   editRequest?: { bar: number; part: number; n: number } | null;
+  /** Outside edit progression: a chord's click jumps there, its field open (SPEC §3.10). */
+  onEditElsewhere?: (bar: number, part: number) => void;
   /** Bar selection (a run), for the bar handles and ⌘C / ⌘V / ⌘D / ⌫ (SPEC §4.1). */
   selection: { from: number; to: number } | null;
   onBarSelect: (bar: number, extend: boolean) => void;
@@ -108,6 +110,7 @@ export function Chart({
   onScaleChange,
   onChordClear,
   editRequest,
+  onEditElsewhere,
   selection,
   onBarSelect,
   onBarAction,
@@ -165,8 +168,10 @@ export function Chart({
     setEditing(target);
   };
 
+  // A chord's field opened from outside (the hex's label, or a jump from another mode): only where chords edit.
   useEffect(() => {
-    if (editRequest) startEditing({ bar: editRequest.bar, part: editRequest.part });
+    if (editRequest && editsForm) startEditing({ bar: editRequest.bar, part: editRequest.part });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- on a new request only
   }, [editRequest]);
 
   /** Returns false when the text was refused and the field should stay open. */
@@ -272,11 +277,14 @@ export function Chart({
               onEdit={
                 editsForm
                   ? () => {
-                      if (!writing) onSlotClick(slot); // Improvise: the slot becomes current too
-                      startEditing({ bar: slot.bar, part: slot.part }); // chord entry in Write etude and Improvise
+                      onSlotClick(slot); // the slot becomes current too
+                      startEditing({ bar: slot.bar, part: slot.part }); // chord entry: edit progression
                     }
-                  : undefined
+                  : !inert && onEditElsewhere
+                    ? () => onEditElsewhere(slot.bar, slot.part)
+                    : undefined
               }
+              jump={!editsForm && !inert && !!onEditElsewhere}
               onCommit={(text, move) => commit(slot, text, move)}
               onClear={
                 editsForm && onChordClear && slot.data.chord !== ''
@@ -352,6 +360,8 @@ interface SlotViewProps {
   editing: boolean;
   error: string | null;
   onEdit?: () => void;
+  /** The chord's click jumps to edit progression (its tooltip says so). */
+  jump?: boolean;
   onCommit: (text: string, move: -1 | 1 | null) => boolean;
   /** The × after the chord: clear it. */
   onClear?: () => void;
@@ -359,7 +369,7 @@ interface SlotViewProps {
   onScaleChange?: (scale: ScaleId | null) => void;
 }
 
-function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing, keyLabel, keyMate, hideMelody, leadHexHeight, slotHeight, onEventClick, onTimeClick, span, layout, header, barTools, inSelection, barCard, rowEnd, readEtude, readShowScales, loop, onShiftSelect, onDeleteBar, onInsertBar, onAddChord, onDeleteSlot, showTimeSignature, editing, error, usedChords, onEdit, onCommit, onClear, onScaleChange }: SlotViewProps) {
+function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing, keyLabel, keyMate, hideMelody, leadHexHeight, slotHeight, onEventClick, onTimeClick, span, layout, header, barTools, inSelection, barCard, rowEnd, readEtude, readShowScales, loop, onShiftSelect, onDeleteBar, onInsertBar, onAddChord, onDeleteSlot, showTimeSignature, editing, error, usedChords, onEdit, jump, onCommit, onClear, onScaleChange }: SlotViewProps) {
   // Everything shown runs against the written chord; the stored melody stays concert (SPEC §5.3, §10).
   const { chord, harmony } = slot;
   const spell = (midi: number) => view.name(midi, slot);
@@ -431,7 +441,7 @@ function SlotView({ slot, view, active, onActivate, clef, melody, caret, playing
           {editing ? (
             <ChordField initial={chord} error={error} onCommit={onCommit} used={usedChords} inKey={view.keyChords(slot.index).map((k) => k.symbol)} />
           ) : (
-            <ChordLabel chord={chord} harmony={harmony} bar={slot.bar} part={slot.part} onEdit={onEdit} onClear={onClear} />
+            <ChordLabel chord={chord} harmony={harmony} bar={slot.bar} part={slot.part} onEdit={onEdit} jump={jump} onClear={onClear} />
           )}
           {readEtude && readShowScales && <ScaleLabel harmony={harmony} bar={slot.bar} />}
           {!hideMelody && !readEtude && keyPill}
@@ -540,10 +550,12 @@ interface ChordLabelProps {
   bar: number;
   part: number;
   onEdit?: () => void;
+  /** Its click jumps to edit progression. */
+  jump?: boolean;
   onClear?: () => void;
 }
 
-function ChordLabel({ chord, harmony, bar, part, onEdit, onClear }: ChordLabelProps) {
+function ChordLabel({ chord, harmony, bar, part, onEdit, jump, onClear }: ChordLabelProps) {
   const overridden = harmony.kind === 'chord' && harmony.overridden;
   const kind = parseChord(chord).kind;
   const tipId = `chord-tip-${bar}-${part}`;
@@ -555,7 +567,15 @@ function ChordLabel({ chord, harmony, bar, part, onEdit, onClear }: ChordLabelPr
         className={cls}
         onClick={onEdit}
         disabled={!onEdit}
-        aria-label={chord ? `Chord ${chord}, bar ${bar + 1}` : onEdit ? `Add chord, bar ${bar + 1}` : `No chord, bar ${bar + 1}`}
+        aria-label={
+          jump
+            ? `${chord ? `Chord ${chord}` : 'Add a chord'}, bar ${bar + 1}: edit in progression`
+            : chord
+              ? `Chord ${chord}, bar ${bar + 1}`
+              : onEdit
+                ? `Add chord, bar ${bar + 1}`
+                : `No chord, bar ${bar + 1}`
+        }
         aria-describedby={tipId}
       >
         {chord || (onEdit ? '+' : '')}
@@ -571,6 +591,7 @@ function ChordLabel({ chord, harmony, bar, part, onEdit, onClear }: ChordLabelPr
       )}
       <span role="tooltip" id={tipId} className="chord-tip">
         {tooltip(chord, harmony)}
+        {jump && <span className="chord-tip-jump">edit in progression →</span>}
       </span>
     </span>
   );

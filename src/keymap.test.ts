@@ -59,8 +59,8 @@ describe('keymap (SPEC §11)', () => {
       expect(intent(key('`'), ctx(mode))).toBeNull(); // stepwise playback: Write etude only
       expect(intent(key('Escape'), ctx(mode, { selection: { from: 1 } }))).toEqual({ type: 'clear-selection' }); // the whole form again
     }
-    expect(intent(key('z', { metaKey: true }), ctx('improvise'))).toEqual({ type: 'undo' }); // the lead sheet's form
-    expect(intent(key('z', { metaKey: true }), ctx('improvise', { running: true }))).toBeNull();
+    expect(intent(key('z', { metaKey: true }), ctx('improvise'))).toBeNull(); // the chords are edit progression's
+    expect(intent(key('z', { metaKey: true }), ctx('progression', { running: true }))).toBeNull();
     expect(intent(key('z', { metaKey: true }), ctx('read'))).toBeNull();
     expect(intent(key('z', { metaKey: true }), ctx('progression'))).toEqual({ type: 'undo' });
     expect(intent(key('z', { metaKey: true }), ctx('grid'))).toBeNull(); // grid improv's chords are read-only
@@ -86,12 +86,22 @@ describe('keymap (SPEC §11)', () => {
     expect(intent(key('<', { shiftKey: true }), t)).toBeNull();
   });
 
-  it('with a bar selection: ⌘C / ⌘V / ⌘D, ⌫ deletes bars, Esc clears', () => {
-    const sel = ctx('write', { selection: { from: 2 } });
+  it('edit progression, with a bar selection: ⌘C / ⌘V / ⌘D, ⌫ deletes bars, Esc clears', () => {
+    const sel = ctx('progression', { selection: { from: 2 } });
     expect(intent(key('c', { metaKey: true }), sel)).toEqual({ type: 'bar-action', bar: 2, action: 'copy' });
+    expect(intent(key('v', { metaKey: true }), sel)).toEqual({ type: 'bar-action', bar: 2, action: 'paste' });
     expect(intent(key('d', { ctrlKey: true }), sel)).toEqual({ type: 'bar-action', bar: 2, action: 'duplicate' });
     expect(intent(key('Backspace'), sel)).toEqual({ type: 'bar-action', bar: 2, action: 'delete' });
     expect(intent(key('Escape'), sel)).toEqual({ type: 'clear-selection' });
-    expect(intent(key('Backspace'), ctx('write'))).toEqual({ type: 'delete', back: true });
+    expect(intent(key('d', { metaKey: true }), ctx('progression', { selection: { from: 2 }, running: true }))).toBeNull();
+  });
+
+  it('edit etude, with a bar selection: ⌘C / ⌘V copy and paste notes; ⌘D and ⌫ leave the bars alone', () => {
+    const sel = ctx('write', { selection: { from: 2 } });
+    expect(intent(key('c', { metaKey: true }), sel)).toEqual({ type: 'bar-action', bar: 2, action: 'copy' });
+    expect(intent(key('v', { metaKey: true }), sel)).toEqual({ type: 'bar-action', bar: 2, action: 'paste' });
+    expect(intent(key('d', { metaKey: true }), sel)).toBeNull();
+    expect(intent(key('Backspace'), sel)).toEqual({ type: 'delete', back: true });
+    expect(intent(key('Escape'), sel)).toEqual({ type: 'clear-selection' });
   });
 });

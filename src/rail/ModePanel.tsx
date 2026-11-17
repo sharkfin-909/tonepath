@@ -4,6 +4,7 @@
 import { MODES, MODE_LABELS, MODE_SHORT, type Mode } from '../session';
 import { Dropdown } from './Dropdown';
 import { ModeIcon } from './ModeIcon';
+import { modeProfile } from '../modeProfile';
 
 /** What each mode is for, and what it uses or lets you edit (SPEC §3.0): the tags beside its name. */
 export const MODE_INFO: Record<Mode, { blurb: string; uses: string[] }> = {
@@ -36,9 +37,11 @@ export const MODE_INFO: Record<Mode, { blurb: string; uses: string[] }> = {
 export interface ModePanelProps {
   mode: Mode;
   onMode: (mode: Mode) => void;
+  /** The progression has chords: without them edit etude and ins read can't be picked (SPEC §3.0). */
+  hasChords: boolean;
 }
 
-export function ModePanel({ mode, onMode }: ModePanelProps) {
+export function ModePanel({ mode, onMode, hasChords }: ModePanelProps) {
   return (
     <div className="mode-panel">
       <span className="pill-label">mode:</span>
@@ -53,6 +56,7 @@ export function ModePanel({ mode, onMode }: ModePanelProps) {
           description: MODE_INFO[m].blurb,
           tags: MODE_INFO[m].uses,
           divider: m === 'tune', // the instrument's modes start here
+          ...(!hasChords && modeProfile(m).needsChords ? { disabled: true, hint: 'add chords first' } : {}),
         }))}
         onChange={onMode}
         footer={

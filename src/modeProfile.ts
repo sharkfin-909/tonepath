@@ -27,16 +27,18 @@ export interface ModeProfile {
   editsMelody: boolean;
   /**
    * The form and the chart's tonality: chords, scales, time signature, bars per row, the ⋯ bar menu, "+", the trash,
-   * undo / redo. Write etude; Improvise while stopped.
+   * Clear all. Edit progression alone, while stopped.
    */
   editsForm: boolean;
+  /** Edit etude and ins read work over the chords: with none, they can't be picked (SPEC §3.0). */
+  needsChords: boolean;
   /** The current slot moves by hand (← / →, < >, clicks): stopped. Write etude moves its caret instead. */
   movesByHand: boolean;
   /** Nothing on the chart answers a click (Read etude while running). */
   chartInert: boolean;
 
   // ——— What shows ———
-  /** The header's own groups: Write etude's editing pill, the form group (progression, ins improv), the transport bar. */
+  /** The header's own groups: edit etude's editing pill, edit progression's form group, the transport bar. */
   editPill: boolean;
   formGroup: boolean;
   transportBar: boolean;
@@ -88,11 +90,12 @@ export function modeProfile(mode: Mode, running = false, moveBy: MoveBy = 'notes
     listens: tune || improvise,
     transport,
     editsMelody: write,
-    editsForm: write || ((progression || improvise) && !running),
+    editsForm: progression && !running,
+    needsChords: write || read,
     movesByHand: !running,
     chartInert: read && running,
     editPill: write,
-    formGroup: (progression || improvise) && !running,
+    formGroup: progression && !running,
     transportBar: transport,
     loopPickers: transport && !progression,
     moveOn: grid,

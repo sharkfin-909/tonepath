@@ -1,7 +1,7 @@
 // Test table 8 (SPEC §14.8): bar editing.
 import { describe, expect, it } from 'vitest';
 import { melodyOf, withFlat } from './test-progression';
-import { appendBar, copyBars, deleteBars, deleteSlot, duplicateBars, insertBars, mergeBar, pasteBars, splitBar, type BarEdit } from './bars';
+import { appendBar, copyBars, deleteBars, deleteSlot, duplicateBars, insertBars, mergeBar, pasteBars, pasteNotes, splitBar, type BarEdit } from './bars';
 import { TICKS } from './melody';
 import { newProgression, setTimeSignature, type MelodyEvent, type Progression } from './progression';
 
@@ -186,5 +186,23 @@ describe('the clipboard between progressions', () => {
     const other = ok(pasteBars(waltz, 1, clip, 0)).progression;
     expect(other.bars[1]).toEqual([{ chord: 'Dm7', scale: 'aeolian' }]);
     expect(other.etudes[0].melody).toEqual([]); // a 4/4 bar's notes don't fit a 3/4 bar
+  });
+});
+
+describe('paste notes only (edit etude)', () => {
+  it('replaces the open etude\'s notes in the target bars; chords and later notes stay', () => {
+    const p = prog();
+    const e = ok(pasteNotes(p, 1, copyBars(p, 0, 0), 0));
+    expect(chords(e.progression)).toBe(chords(p));
+    expect(show(melodyOf(e.progression))).toBe('62w 62w 72w');
+  });
+
+  it('refused into bars of another length, bars split differently, or past the end', () => {
+    const p = prog();
+    const clip = copyBars(p, 0, 0);
+    expect(pasteNotes({ ...p, timeSignature: '3/4' }, 1, clip, 0)).toEqual({ ok: false, message: 'the copied bars are another length' });
+    const split = { ...p, bars: [p.bars[0], [{ chord: 'G7' }, { chord: 'C7' }], p.bars[2], p.bars[3]] };
+    expect(pasteNotes(split, 1, clip, 0)).toEqual({ ok: false, message: 'the bars are split differently' });
+    expect(pasteNotes(p, 3, copyBars(p, 0, 1), 0)).toEqual({ ok: false, message: 'not enough bars to paste into' });
   });
 });

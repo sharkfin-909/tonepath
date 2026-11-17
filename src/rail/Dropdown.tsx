@@ -23,6 +23,8 @@ export interface DropdownOption<T extends string | number> {
   icon?: ReactNode;
   /** The button's text when this is the value, where the label is too long for it (the modes' short names). */
   short?: string;
+  /** Shown but can't be chosen (its hint says why); the keys pass over it. */
+  disabled?: boolean;
 }
 
 export interface DropdownProps<T extends string | number> {
@@ -84,6 +86,7 @@ export function Dropdown<T extends string | number>({ value, options, onChange, 
   }, [open, active]);
 
   const choose = (i: number) => {
+    if (options[i].disabled) return;
     setOpen(false);
     if (options[i].value !== value) onChange(options[i].value);
   };
@@ -93,12 +96,18 @@ export function Dropdown<T extends string | number>({ value, options, onChange, 
     const last = options.length - 1;
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
-      setActive((a) => Math.min(last, Math.max(0, a + (e.key === 'ArrowDown' ? 1 : -1))));
+      // The next option that can be chosen that way (a disabled one is passed over; none: stay).
+      const dir = e.key === 'ArrowDown' ? 1 : -1;
+      setActive((a) => {
+        for (let i = a + dir; i >= 0 && i <= last; i += dir) if (!options[i].disabled) return i;
+        return a;
+      });
     } else if (e.key === 'Home' || e.key === 'End') {
       e.preventDefault();
       setActive(e.key === 'Home' ? 0 : last);
     } else if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
+      if (options[active].disabled) return;
       choose(active);
       button.current?.focus();
     } else if (e.key === 'Escape' || e.key === 'Tab') {
@@ -146,7 +155,8 @@ export function Dropdown<T extends string | number>({ value, options, onChange, 
                 id={`${id}-${i}`}
                 role="option"
                 aria-selected={o.value === value}
-                className={['dropdown-option', i === active && 'active', o.value === value && 'current', o.divider && 'divider', o.asTyped && 'as-typed'].filter(Boolean).join(' ')}
+                aria-disabled={o.disabled || undefined}
+                className={['dropdown-option', i === active && 'active', o.value === value && 'current', o.divider && 'divider', o.asTyped && 'as-typed', o.disabled && 'disabled'].filter(Boolean).join(' ')}
                 onPointerEnter={() => setActive(i)}
                 onClick={() => choose(i)}
               >

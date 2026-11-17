@@ -112,7 +112,21 @@ export function BarsPerRow({ value, onChange }: { value: number; onChange: (n: n
  * Clear ▾ (SPEC §6.2 item 10): a menu with **Clear notes** (the melody; undoable, no confirm) and **Clear all…**
  * (chords, scales and notes; asks for confirmation in the menu first). Both are one undo step.
  */
-export function ClearMenu({ canClearNotes, canClearAll, onClearNotes, onClearAll }: { canClearNotes: boolean; canClearAll: boolean; onClearNotes: () => void; onClearAll: () => void }) {
+/**
+ * Clear ▾: edit etude offers Clear notes; edit progression, Clear all (chords, scales and the open etude's notes),
+ * after a confirm. Each item only where its handler is given.
+ */
+export function ClearMenu({
+  canClearNotes = false,
+  canClearAll = false,
+  onClearNotes,
+  onClearAll,
+}: {
+  canClearNotes?: boolean;
+  canClearAll?: boolean;
+  onClearNotes?: () => void;
+  onClearAll?: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
@@ -153,7 +167,7 @@ export function ClearMenu({ canClearNotes, canClearAll, onClearNotes, onClearAll
             <div className="clear-confirm" role="alertdialog" aria-label="Clear all">
               <p>Clear all chords, scales and notes?</p>
               <div className="clear-confirm-actions">
-                <button type="button" className="clear-menu-item danger" onClick={() => (onClearAll(), close())}>
+                <button type="button" className="clear-menu-item danger" onClick={() => (onClearAll?.(), close())}>
                   Clear all
                 </button>
                 <button type="button" className="clear-menu-item" onClick={close}>
@@ -163,12 +177,16 @@ export function ClearMenu({ canClearNotes, canClearAll, onClearNotes, onClearAll
             </div>
           ) : (
             <>
-              <button type="button" role="menuitem" className="clear-menu-item" disabled={!canClearNotes} onClick={() => (onClearNotes(), close())}>
-                Clear notes
-              </button>
-              <button type="button" role="menuitem" className="clear-menu-item" disabled={!canClearAll} onClick={() => setConfirming(true)}>
-                Clear all…
-              </button>
+              {onClearNotes && (
+                <button type="button" role="menuitem" className="clear-menu-item" disabled={!canClearNotes} onClick={() => (onClearNotes(), close())}>
+                  Clear notes
+                </button>
+              )}
+              {onClearAll && (
+                <button type="button" role="menuitem" className="clear-menu-item" disabled={!canClearAll} onClick={() => setConfirming(true)}>
+                  Clear all…
+                </button>
+              )}
             </>
           )}
         </div>

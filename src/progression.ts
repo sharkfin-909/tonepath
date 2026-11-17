@@ -173,6 +173,11 @@ export function clearMelody(p: Progression, etude?: string | null): Progression 
  * splits), title, time signature, instruments and the other etudes' notes stay. Unchanged when there is nothing to
  * clear.
  */
+/** Any slot has a chord: what edit etude and ins read need (SPEC §3.0). */
+export function hasChords(p: Progression): boolean {
+  return p.bars.some((b) => b.some((s) => s.chord.trim() !== ''));
+}
+
 export function clearEverything(p: Progression, etude?: string | null): Progression {
   const noChords = p.bars.every((b) => b.every((s) => s.chord === '' && s.scale === undefined));
   const cleared = clearMelody(p, etude);

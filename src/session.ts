@@ -15,6 +15,7 @@ import {
   insertBars,
   mergeBar,
   pasteBars,
+  pasteNotes,
   splitBar,
   type BarAction,
   type BarClip,
@@ -49,6 +50,7 @@ import {
   type Etude,
   type MelodyEvent,
   type Progression,
+  hasChords,
 } from './progression';
 import { instrumentView, type ViewSlot } from './view';
 
@@ -248,7 +250,9 @@ export function initialSession(
   etude?: string | null,
   carried?: Carried,
 ): SessionState {
-  const mode = carried?.mode ?? device.lastMode ?? 'grid';
+  const wanted = carried?.mode ?? device.lastMode ?? 'grid';
+  // Edit etude and ins read need chords: without any, the open starts in edit progression.
+  const mode = modeProfile(wanted).needsChords && !hasChords(p) ? 'progression' : wanted;
   const moveBy = device.moveBy ?? 'notes';
   const open = etudeOf(p, etude).id;
   const caret = melodyEnd(etudeOf(p, open).melody); // opens at the melody's end; not saved
@@ -328,10 +332,12 @@ const ANY_MODE: Intent['type'][] = [
   'set-move-by',
   'set-chord-bump-notes',
 ];
-/** The melody (Write etude). */
-const MELODY_EDITS: Intent['type'][] = ['length', 'toggle-rest', 'delete', 'nudge', 'step-play', 'clear-notes', 'clear-all'];
-/** The form and its tonality (Write etude; Improvise while stopped). */
-const FORM_EDITS: Intent['type'][] = ['time-signature', 'bars-per-row', 'undo', 'redo', 'append-bar', 'bar-action', 'slot-delete', 'chord-entry', 'chord-clear', 'scale-override'];
+/** The melody (edit etude). */
+const MELODY_EDITS: Intent['type'][] = ['length', 'toggle-rest', 'delete', 'nudge', 'step-play', 'clear-notes'];
+/** The form and its tonality (edit progression, stopped). */
+const FORM_EDITS: Intent['type'][] = ['time-signature', 'bars-per-row', 'append-bar', 'slot-delete', 'chord-entry', 'chord-clear', 'scale-override', 'clear-all'];
+/** Undo / redo: where something edits (the melody, or the form). */
+const HISTORY: Intent['type'][] = ['undo', 'redo'];
 const TRANSPORT: Intent['type'][] = ['transport', 'transport-chord', 'transport-end', 'rewind'];
 /** Moves of the caret (Write etude) or of the current slot by hand (Improvise, Read etude: only while stopped). */
 const SLOT_MOVES: Intent['type'][] = ['step', 'browse', 'event-click', 'time-click', 'slot-click'];
@@ -343,6 +349,12 @@ function allowed(s: SessionState, intent: Intent): boolean {
   if (ANY_MODE.includes(t)) return true;
   if (MELODY_EDITS.includes(t)) return m.editsMelody;
   if (FORM_EDITS.includes(t)) return m.editsForm;
+  if (HISTORY.includes(t)) return m.editsForm || m.editsMelody;
+  if (intent.type === 'bar-action') {
+    // Edit etude copies bars and pastes their notes; every other bar action is edit progression's.
+    if (intent.action === 'copy' || intent.action === 'paste') return m.editsForm || m.editsMelody;
+    return m.editsForm;
+  }
   if (TRANSPORT.includes(t)) return m.transport;
   if (t === 'pick') return m.hex;
   if (t === 'heard') return m.listens;
@@ -513,16 +525,22 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
       return done();
     }
     case 'mode': {
-      const i = MODES.indexOf(s.mode);
-      const to: Mode =
-        intent.mode === 'prev'
-          ? MODES[Math.max(0, i - 1)]
-          : intent.mode === 'next'
-            ? MODES[Math.min(MODES.length - 1, i + 1)]
-            : intent.mode === 'partner'
-              ? (MODE_PARTNER[s.mode] ?? s.mode)
-              : intent.mode;
+      const chords = hasChords(p);
+      /** A mode that needs chords (edit etude, ins read) can't be picked without them. */
+      const open = (m: Mode) => chords || !modeProfile(m).needsChords;
+      let to: Mode;
+      if (intent.mode === 'prev' || intent.mode === 'next') {
+        // Step to the next mode that can be picked (no wrap; none: stay).
+        const dir = intent.mode === 'prev' ? -1 : 1;
+        let j = MODES.indexOf(s.mode) + dir;
+        while (j >= 0 && j < MODES.length && !open(MODES[j])) j += dir;
+        to = j >= 0 && j < MODES.length ? MODES[j] : s.mode;
+      } else to = intent.mode === 'partner' ? (MODE_PARTNER[s.mode] ?? s.mode) : intent.mode;
       if (to === s.mode) return done();
+      if (!open(to)) {
+        say('Add chords first (edit progression)');
+        return done();
+      }
       // Switching stops the transport and carries the current slot (SPEC §3.0).
       let slot = writing ? active.index : current;
       if (to === 'write') {
@@ -638,7 +656,8 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
           break;
         }
         case 'paste':
-          if (s.clip) barEdit(pasteBars(p, from, s.clip, caret, s.etude));
+          // Edit etude: the copied bars' notes only (its chords are edit progression's).
+          if (s.clip) barEdit((writing ? pasteNotes : pasteBars)(p, from, s.clip, caret, s.etude));
           break;
         case 'split':
           barEdit(splitBar(p, bar, caret));

@@ -25,10 +25,10 @@ describe('mode profile', () => {
   it.each<[Mode, boolean, ReturnType<typeof pick>]>([
     ['progression', false, { listens: false, transport: true, editsMelody: false, editsForm: true, movesByHand: true, chartInert: false, chart: 'lead', chartBudget: 'fill', hex: true, heardLights: false, targets: false }],
     ['progression', true, { listens: false, transport: true, editsMelody: false, editsForm: false, movesByHand: false, chartInert: false, chart: 'lead', chartBudget: 'fill', hex: true, heardLights: false, targets: true }],
-    ['write', false, { listens: false, transport: false, editsMelody: true, editsForm: true, movesByHand: true, chartInert: false, chart: 'write', chartBudget: 'half', hex: true, heardLights: false, targets: false }],
+    ['write', false, { listens: false, transport: false, editsMelody: true, editsForm: false, movesByHand: true, chartInert: false, chart: 'write', chartBudget: 'half', hex: true, heardLights: false, targets: false }],
     ['grid', false, { listens: false, transport: false, editsMelody: false, editsForm: false, movesByHand: true, chartInert: false, chart: 'lead', chartBudget: 'fill', hex: true, heardLights: false, targets: false }],
     ['tune', false, { listens: true, transport: false, editsMelody: false, editsForm: false, movesByHand: true, chartInert: false, chart: 'lead', chartBudget: 'half', hex: true, heardLights: true, targets: false }],
-    ['improvise', false, { listens: true, transport: true, editsMelody: false, editsForm: true, movesByHand: true, chartInert: false, chart: 'lead', chartBudget: 'fill', hex: true, heardLights: true, targets: false }],
+    ['improvise', false, { listens: true, transport: true, editsMelody: false, editsForm: false, movesByHand: true, chartInert: false, chart: 'lead', chartBudget: 'fill', hex: true, heardLights: true, targets: false }],
     ['improvise', true, { listens: true, transport: true, editsMelody: false, editsForm: false, movesByHand: false, chartInert: false, chart: 'lead', chartBudget: 'fill', hex: true, heardLights: false, targets: true }],
     ['read', false, { listens: false, transport: true, editsMelody: false, editsForm: false, movesByHand: true, chartInert: false, chart: 'read', chartBudget: 'full', hex: false, heardLights: false, targets: false }],
     ['read', true, { listens: false, transport: true, editsMelody: false, editsForm: false, movesByHand: false, chartInert: true, chart: 'read', chartBudget: 'full', hex: false, heardLights: false, targets: false }],
@@ -50,13 +50,13 @@ describe('mode profile', () => {
 
   it('only a mode with a transport runs', () => {
     for (const mode of MODES) expect(modeProfile(mode, true).running).toBe(modeProfile(mode).transport);
-    expect(modeProfile('write', true).editsForm).toBe(true);
+    expect(MODES.filter((m) => modeProfile(m).editsForm)).toEqual(['progression']); // the chords: edit progression's alone
   });
 
   it("each mode's own header group: the editing pill, the form group (stopped), the transport bar and its loop pickers", () => {
     expect(MODES.filter((m) => modeProfile(m).editPill)).toEqual(['write']);
-    expect(MODES.filter((m) => modeProfile(m).formGroup)).toEqual(['progression', 'improvise']);
-    expect(modeProfile('improvise', true).formGroup).toBe(false);
+    expect(MODES.filter((m) => modeProfile(m).formGroup)).toEqual(['progression']);
+    expect(modeProfile('progression', true).formGroup).toBe(false);
     expect(MODES.filter((m) => modeProfile(m).transportBar)).toEqual(['progression', 'improvise', 'read']);
     // Progression plays the form back to hear it: nothing to practise, so no looped bars.
     expect(MODES.filter((m) => modeProfile(m, false, 'time').loopPickers)).toEqual(['grid', 'improvise', 'read']);
@@ -65,6 +65,10 @@ describe('mode profile', () => {
   it("a slot reached by hand waits for the first note picked or played to sound (On arrival): the lead sheet's modes but Tune", () => {
     expect(MODES.filter((m) => modeProfile(m).arrivalWaits)).toEqual(['progression', 'grid', 'improvise']);
     expect(modeProfile('improvise', true).arrivalWaits).toBe(false);
+  });
+
+  it('edit etude and ins read need chords to work over', () => {
+    expect(MODES.filter((m) => modeProfile(m).needsChords)).toEqual(['write', 'read']);
   });
 
   it('key pills everywhere but Read etude; a clef only over a stave; Hide hex only in ins improv', () => {

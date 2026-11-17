@@ -198,17 +198,10 @@ describe('Improvise (stopped)', () => {
     expect(improvise([{ type: 'slot-click', index: 2 }]).state.slot).toBe(2);
   });
 
-  it('edits the lead sheet\'s form: time signature, undo, "+", trash and the ⋯ bar menu', () => {
-    expect(improvise([{ type: 'append-bar' }]).p.bars).toHaveLength(5);
-    expect(improvise([{ type: 'bar-action', bar: 3, action: 'delete' }]).p.bars).toHaveLength(3);
-    expect(improvise([{ type: 'bar-action', bar: 1, action: 'duplicate' }]).p.bars).toHaveLength(5);
-    expect(improvise([{ type: 'time-signature', text: '3/4' }]).p.timeSignature).toBe('3/4');
-    expect(improvise([{ type: 'undo' }]).effects).toEqual([{ type: 'history', dir: 'undo' }]);
-  });
-
-  it('deleting the current slot\'s bar keeps the current slot in the form', () => {
-    const r = improvise([{ type: 'step', dir: -1 }, { type: 'bar-action', bar: 3, action: 'delete' }]);
-    expect(r.state.slot).toBe(2);
+  it('the chords are read-only: no time signature, undo, "+", trash or ⋯ bar menu (edit progression has them)', () => {
+    const r = improvise([{ type: 'append-bar' }, { type: 'bar-action', bar: 3, action: 'delete' }, { type: 'time-signature', text: '3/4' }, { type: 'undo' }]);
+    expect(r.p).toEqual(prog());
+    expect(r.effects).toEqual([]);
   });
 });
 
@@ -344,7 +337,7 @@ describe('slots without a chord', () => {
 });
 
 describe('editing commands', () => {
-  it('delete, nudge (plays, halo) and clear all', () => {
+  it('delete, nudge (plays, halo) and clear notes; clear all is edit progression\'s', () => {
     const p = withFlat(prog(), { melody: [{ pitch: 62, d: 'q' as const }, { pitch: 65, d: 'q' as const }] });
     const n = run([{ type: 'nudge', dir: 1, octave: false }], { p });
     expect(melodyOf(n.p)[1]).toEqual({ pitch: 66, d: 'q' }); // ↑: a semitone
@@ -355,18 +348,23 @@ describe('editing commands', () => {
     expect(melodyOf(run([{ type: 'delete', back: true }], { p }).p)).toHaveLength(1);
     const c = run([{ type: 'clear-notes' }], { p });
     expect([melodyOf(c.p), c.state.caret, c.p.bars]).toEqual([[], 0, p.bars]); // notes only
-    const all = run([{ type: 'clear-all' }], { p: { ...p, bars: [[{ chord: 'Dm7', scale: 'aeolian' }], [{ chord: 'G7' }, { chord: 'G7alt' }]] } });
-    expect([melodyOf(all.p), all.p.bars]).toEqual([[], [[{ chord: '' }], [{ chord: '' }, { chord: '' }]]]); // bars and splits stay
+    expect(run([{ type: 'clear-all' }], { p }).p).toBe(p);
   });
 
-  it('bar actions: copy says so, delete refuses the last bar with a notice', () => {
-    const r = run([{ type: 'bar-select', bar: 1, extend: false }, { type: 'bar-select', bar: 2, extend: true }, { type: 'bar-action', bar: 1, action: 'copy' }]);
-    expect(r.state.notice?.text).toBe('Copied bars 2–3');
-    const one = { ...prog(), bars: [[{ chord: 'C' }]] };
-    expect(run([{ type: 'bar-action', bar: 0, action: 'delete' }], { p: one }).state.notice).not.toBeNull();
+  it('bars: copy says so; paste puts the copied bars\' notes in, chords untouched; nothing else edits bars', () => {
+    const p = withFlat(prog(), { melody: [{ pitch: 62, d: 'w' as const }] });
+    const copied = run([{ type: 'bar-select', bar: 0, extend: false }, { type: 'bar-action', bar: 0, action: 'copy' }], { p });
+    expect(copied.state.notice?.text).toBe('Copied bar 1');
+    const pasted = run([{ type: 'bar-select', bar: 2, extend: false }, { type: 'bar-action', bar: 2, action: 'paste' }], { p, state: { clip: copied.state.clip } });
+    expect(pasted.p.bars).toEqual(p.bars); // chords stay
+    expect(melodyOf(pasted.p)).toEqual([{ pitch: 62, d: 'w' }, { d: 'w' }, { pitch: 62, d: 'w' }]);
+    for (const action of ['delete', 'duplicate', 'insert-after', 'split'] as const) {
+      expect(run([{ type: 'bar-action', bar: 1, action }], { p }).p).toBe(p);
+    }
+    expect(run([{ type: 'append-bar' }], { p }).p).toBe(p);
   });
 
-  it('undo / redo are effects; a restore puts the caret back and clears selection and refusal', () => {
+  it('undo / redo are effects (edit etude too); a restore puts the caret back and clears selection and refusal', () => {
     expect(run([{ type: 'undo' }]).effects).toEqual([{ type: 'history', dir: 'undo' }]);
     const r = run([{ type: 'bar-select', bar: 1, extend: false }, { type: 'restored', caret: q }]);
     expect(r.state).toMatchObject({ caret: q, selection: null, refusal: null });
@@ -441,8 +439,8 @@ describe('the screen\'s signals', () => {
 });
 
 describe('edits outside the melody go through the mode too', () => {
-  it('Write etude, and Improvise while stopped: chords, scales, bars per row', () => {
-    for (const mode of ['write', 'improvise'] as const) {
+  it('edit progression while stopped: chords, scales, bars per row', () => {
+    for (const mode of ['progression'] as const) {
       const r = run(
         [
           { type: 'chord-entry', bar: 0, part: 0, text: 'Em7' },
@@ -460,8 +458,8 @@ describe('edits outside the melody go through the mode too', () => {
     }
   });
 
-  it('nowhere else: Improvise running, Read etude, Tune refuse them', () => {
-    for (const state of [{ mode: 'improvise' as const, running: true }, { mode: 'read' as const }, { mode: 'tune' as const }]) {
+  it('nowhere else: progression running, edit etude, grid improv, ins improv, ins read, ins tune refuse them', () => {
+    for (const state of [{ mode: 'progression' as const, running: true }, { mode: 'write' as const }, { mode: 'grid' as const }, { mode: 'improvise' as const }, { mode: 'read' as const }, { mode: 'tune' as const }]) {
       const r = run(
         [
           { type: 'chord-entry', bar: 0, part: 0, text: 'Em7' },
@@ -509,7 +507,7 @@ describe('the open etude (issue 080)', () => {
     const r = run([pick(64)], { p: two(), state: { etude: 'e2', caret: 2 * q } }); // written E on B♭ trumpet = concert D
     expect(r.p.etudes[0]).toEqual(two().etudes[0]);
     expect(r.p.etudes[1].melody[2]).toEqual({ pitch: 62, d: 'q' });
-    const cleared = run([{ type: 'clear-all' }], { p: two(), state: { etude: 'e2' } }).p;
+    const cleared = run([{ type: 'clear-all' }], { p: two(), state: { etude: 'e2', mode: 'progression' } }).p;
     expect(cleared.etudes.map((e) => e.melody.length)).toEqual([1, 0]); // Clear all: chords + the open etude's notes
   });
 
@@ -567,10 +565,9 @@ describe('the open etude (issue 080)', () => {
 
 describe("a slot's trash goes through the mode", () => {
   const split = (): Progression => ({ ...prog(), bars: [[{ chord: 'Dm7' }, { chord: 'G7' }], [{ chord: 'C' }]] });
-  it('Write etude and Improvise stopped delete the slot (one undo step); running or Read etude, nothing', () => {
-    expect(run([{ type: 'slot-delete', bar: 0, part: 0 }], { p: split(), state: { mode: 'improvise' } }).p.bars[0]).toEqual([{ chord: 'G7' }]);
-    expect(run([{ type: 'slot-delete', bar: 0, part: 1 }], { p: split(), state: { mode: 'write' } }).p.bars[0]).toEqual([{ chord: 'Dm7' }]);
-    for (const state of [{ mode: 'improvise' as const, running: true }, { mode: 'read' as const }]) {
+  it('edit progression (stopped) deletes the slot (one undo step); elsewhere, nothing', () => {
+    expect(run([{ type: 'slot-delete', bar: 0, part: 0 }], { p: split(), state: { mode: 'progression' } }).p.bars[0]).toEqual([{ chord: 'G7' }]);
+    for (const state of [{ mode: 'progression' as const, running: true }, { mode: 'write' as const }, { mode: 'improvise' as const }, { mode: 'read' as const }]) {
       expect(run([{ type: 'slot-delete', bar: 0, part: 0 }], { p: split(), state }).p.bars[0]).toHaveLength(2);
     }
   });
@@ -625,7 +622,59 @@ describe('progression', () => {
     expect(r.state.slot).toBe(0); // no chord bump
   });
 
+  it('edits the lead sheet\'s form: time signature, undo, "+", trash and the ⋯ bar menu', () => {
+    expect(progression([{ type: 'append-bar' }]).p.bars).toHaveLength(5);
+    expect(progression([{ type: 'bar-action', bar: 3, action: 'delete' }]).p.bars).toHaveLength(3);
+    expect(progression([{ type: 'bar-action', bar: 1, action: 'duplicate' }]).p.bars).toHaveLength(5);
+    expect(progression([{ type: 'time-signature', text: '3/4' }]).p.timeSignature).toBe('3/4');
+    expect(progression([{ type: 'undo' }]).effects).toEqual([{ type: 'history', dir: 'undo' }]);
+  });
+
+  it('deleting the current slot\'s bar keeps the current slot in the form', () => {
+    const r = progression([{ type: 'step', dir: -1 }, { type: 'bar-action', bar: 3, action: 'delete' }]);
+    expect(r.state.slot).toBe(2);
+  });
+
+  it('clear all: chords, scales and the open etude\'s notes (bars and splits stay)', () => {
+    const p = withFlat(prog(), { melody: [{ pitch: 62, d: 'q' as const }] });
+    const all = run([{ type: 'mode', mode: 'progression' }, { type: 'clear-all' }], { p: { ...p, bars: [[{ chord: 'Dm7', scale: 'aeolian' }], [{ chord: 'G7' }, { chord: 'G7alt' }]] } });
+    expect([melodyOf(all.p), all.p.bars]).toEqual([[], [[{ chord: '' }], [{ chord: '' }, { chord: '' }]]]);
+  });
+
+  it('bar actions: copy says so, delete refuses the last bar with a notice', () => {
+    const r = progression([{ type: 'bar-select', bar: 1, extend: false }, { type: 'bar-select', bar: 2, extend: true }, { type: 'bar-action', bar: 1, action: 'copy' }]);
+    expect(r.state.notice?.text).toBe('Copied bars 2–3');
+    const one = { ...prog(), bars: [[{ chord: 'C' }]] };
+    expect(run([{ type: 'mode', mode: 'progression' }, { type: 'bar-action', bar: 0, action: 'delete' }], { p: one }).state.notice).not.toBeNull();
+  });
+
   it('▶ plays the form back', () => {
     expect(progression([{ type: 'transport', run: true }]).state.running).toBe(true);
+  });
+});
+
+describe('etude and ins read need chords', () => {
+  const empty = (): Progression => ({ ...prog(), bars: [[{ chord: '' }], [{ chord: '' }]] });
+  const to = (mode: Extract<Intent, { type: 'mode' }>['mode']): Intent => ({ type: 'mode', mode });
+
+  it('with no chords, picking them (or \\) is refused with a notice', () => {
+    for (const mode of ['write', 'read'] as const) {
+      const r = run([to(mode)], { p: empty(), state: { mode: 'progression' } });
+      expect(r.state.mode).toBe('progression');
+      expect(r.state.notice?.text).toBe('Add chords first (edit progression)');
+    }
+    expect(run([to('partner')], { p: empty(), state: { mode: 'improvise' } }).state.mode).toBe('grid'); // not affected
+  });
+
+  it('[ / ] step over them', () => {
+    expect(run([to('next')], { p: empty(), state: { mode: 'progression' } }).state.mode).toBe('grid');
+    expect(run([to('prev')], { p: empty(), state: { mode: 'grid' } }).state.mode).toBe('progression');
+    expect(run([to('next')], { p: empty(), state: { mode: 'improvise' } }).state.mode).toBe('improvise'); // ins read was the last
+  });
+
+  it('an open with no chords in a mode that needs them starts in edit progression', () => {
+    expect(initialSession(empty(), { onArrival: 'silent', lastMode: 'write' }).mode).toBe('progression');
+    expect(initialSession(empty(), { onArrival: 'silent' }, null, { mode: 'read', clip: null }).mode).toBe('progression');
+    expect(initialSession(prog(), { onArrival: 'silent', lastMode: 'write' }).mode).toBe('write');
   });
 });

@@ -567,6 +567,12 @@ button.dock-label {
 .chord-label:focus-visible + .chord-tip {
   display: block;
 }
+/* Outside edit progression: what the chord's click does (SPEC §3.10). */
+.chord-tip-jump {
+  display: block;
+  margin-top: 2px;
+  color: var(--grid-glow);
+}
 /* On the × the app tooltip ("Clear this chord") speaks instead: one label at a time. */
 .chord-wrap:has(.chord-clear:hover) .chord-tip {
   display: none;
@@ -1344,6 +1350,14 @@ button.dock-label {
 }
 .dropdown-option.current {
   border-left-color: var(--grid-glow);
+}
+/* Shown but not available (e.g. edit etude with no chords): dimmed, its hint says why. */
+.dropdown-option.disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.dropdown-option.disabled.active {
+  background: none;
 }
 .dropdown-option-head {
   display: flex;

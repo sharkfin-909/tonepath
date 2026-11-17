@@ -30,7 +30,7 @@ import { LEAD_SLOT_MAX_PHONE_PX, chartArea } from './zoom';
 import { useChartSession } from './useChartSession';
 import { Logo } from './Logo';
 import { useTransport } from './useTransport';
-import { etudeOf } from './progression';
+import { etudeOf, hasChords } from './progression';
 import type { Carried } from './session';
 import { EtudePicker } from './rail/EtudePicker';
 import type { LibraryCurrent } from './library/LibraryScreen';
@@ -151,6 +151,11 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
     if (mode !== 'read') setShowReadScales(false);
   }, [mode]);
   const [editRequest, setEditRequest] = useState<{ bar: number; part: number; n: number } | null>(null);
+  /** Open a chord's field — from another mode, in edit progression (the chords are its alone, SPEC §3.10). */
+  const editChord = (bar: number, part: number) => {
+    if (mode !== 'progression') dispatch({ type: 'mode', mode: 'progression' });
+    setEditRequest((r) => ({ bar, part, n: (r?.n ?? 0) + 1 }));
+  };
 
   const octaves = linearOctaves(view.range);
   const octave = Math.min(octaves.max, Math.max(octaves.min, octaveWanted ?? octaves.start));
@@ -250,13 +255,14 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
   const modeSwitch = (
     <ModePanel
       mode={mode}
+      hasChords={hasChords(progression)}
       onMode={(m) => {
         dispatch({ type: 'mode', mode: m });
         focusHex();
       }}
     />
   );
-  /** Undo / redo (SPEC §6.3): Write etude's editing pill, and Improvise's form group. */
+  /** Undo / redo (SPEC §6.3): edit etude's editing pill, and edit progression's form group. */
   const undoRedo = (
         <div className="undo-controls">
           <button type="button" className="rail-button chip chip--icon" title="Undo (⌘Z)" aria-label="Undo" disabled={!doc.canUndo} onClick={() => dispatch({ type: 'undo' })}>
@@ -299,6 +305,10 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
       <TimeSignatureField value={progression.timeSignature} onChange={(text) => dispatch({ type: 'time-signature', text })} />
       {!narrow && <BarsPerRow value={progression.barsPerRow} onChange={(n) => dispatch({ type: 'bars-per-row', n })} />}
       {undoRedo}
+      <ClearMenu
+        canClearAll={etude.melody.length > 0 || progression.bars.some((b) => b.some((s) => s.chord !== '' || s.scale !== undefined))}
+        onClearAll={() => dispatch({ type: 'clear-all' })}
+      />
     </div>
   );
 
@@ -352,8 +362,6 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
         refusal={session.refusal}
         onRefusalShown={onRefusalShown}
       />
-      <TimeSignatureField value={progression.timeSignature} onChange={(text) => dispatch({ type: 'time-signature', text })} />
-      {!narrow && <BarsPerRow value={progression.barsPerRow} onChange={(n) => dispatch({ type: 'bars-per-row', n })} />}
       <div className="step-controls">
         <button
           type="button"
@@ -405,12 +413,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
         </button>
       </div>
       {undoRedo}
-      <ClearMenu
-        canClearNotes={etude.melody.length > 0}
-        canClearAll={etude.melody.length > 0 || progression.bars.some((b) => b.some((s) => s.chord !== '' || s.scale !== undefined))}
-        onClearNotes={() => dispatch({ type: 'clear-notes' })}
-        onClearAll={() => dispatch({ type: 'clear-all' })}
-      />
+      <ClearMenu canClearNotes={etude.melody.length > 0} onClearNotes={() => dispatch({ type: 'clear-notes' })} />
     </div>
   );
 
@@ -600,6 +603,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
               onScaleChange={(bar, part, scale) => dispatch({ type: 'scale-override', bar, part, scale })}
               onChordClear={(bar, part) => dispatch({ type: 'chord-clear', bar, part })}
               editRequest={editRequest}
+              onEditElsewhere={editChord}
               selection={session.selection}
               onBarSelect={(bar, extend) => dispatch({ type: 'bar-select', bar, extend })}
               onBarAction={(bar, action) => dispatch({ type: 'bar-action', bar, action })}
@@ -663,13 +667,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
                 )}
                 <DockedHex
                   dock={profile.noChord ? view.tunerDock(shape) : view.dock(active.index, shape)}
-                  onLabelClick={() =>
-                    setEditRequest((r) => ({
-                      bar: active.bar,
-                      part: active.part,
-                      n: (r?.n ?? 0) + 1,
-                    }))
-                  }
+                  onLabelClick={() => editChord(active.bar, active.part)}
                   onPick={(written) => dispatch({ type: 'pick', written })}
                   onHoverPitch={(p) => {
                     hovered.current = p;
@@ -714,13 +712,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
               )}
               <DockedHex
                 dock={view.dock(active.index, shape)}
-                onLabelClick={() =>
-                  setEditRequest((r) => ({
-                    bar: active.bar,
-                    part: active.part,
-                    n: (r?.n ?? 0) + 1,
-                  }))
-                }
+                onLabelClick={() => editChord(active.bar, active.part)}
                 onPick={(written) => dispatch({ type: 'pick', written })}
                 onHoverPitch={(p) => {
                   hovered.current = p;

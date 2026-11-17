@@ -139,6 +139,20 @@ export function pasteBars(p: Progression, at: number, clip: BarClip, caret: numb
 }
 
 /**
+ * Paste notes only (edit etude, SPEC §3.2): the clip's slices replace the open etude's notes in bars from `at`; the
+ * chords, the other etudes and every later note stay. Refused when the bars are another length, or split differently
+ * (a note could then cross a slot's end).
+ */
+export function pasteNotes(p: Progression, at: number, clip: BarClip, caret: number, etude?: string | null): BarEdit {
+  const n = clip.bars.length;
+  if (at + n > p.bars.length) return { ok: false, message: 'not enough bars to paste into' };
+  if (clip.barTicks !== barTicks(meterOf(p))) return { ok: false, message: 'the copied bars are another length' };
+  if (clip.bars.some((b, i) => b.length !== p.bars[at + i].length)) return { ok: false, message: 'the bars are split differently' };
+  const sl = slicesOf(p).map((s, k) => (isEtude(p, k, etude) ? s.map((x, i) => (i >= at && i < at + n ? [...clip.slices[i - at]] : x)) : s));
+  return { ok: true, progression: rebuild(p, p.bars, sl), caret };
+}
+
+/**
  * Split a one-slot bar into two halves (the second starts empty). Refused if a note — in any etude — crosses the
  * middle; a rest crossing it is re-split into rests on each side. Melody timing is untouched.
  */

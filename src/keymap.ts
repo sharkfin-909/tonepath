@@ -80,6 +80,16 @@ export function keyIntent(e: KeyPress, ctx: KeyContext): KeyResult {
     return NONE;
   }
 
+  // Edit progression, stopped, with a bar selection: ⌘C / ⌘V / ⌘D, ⌫ / Del deletes the bar(s), Esc clears it.
+  if (ctx.selection && m.editsForm) {
+    const k = e.key.toLowerCase();
+    const bar = ctx.selection.from;
+    if (cmd && !e.shiftKey && (k === 'c' || k === 'v' || k === 'd')) {
+      return handled({ type: 'bar-action', bar, action: k === 'c' ? 'copy' : k === 'v' ? 'paste' : 'duplicate' });
+    }
+    if (!e.metaKey && !e.ctrlKey && (e.key === 'Backspace' || e.key === 'Delete')) return handled({ type: 'bar-action', bar, action: 'delete' });
+  }
+
   if (ctx.mode !== 'write') {
     // The lead sheet's modes and Read etude: ← / → step slots (stopped); the shared keys; Esc: the whole form again
     // (no looped bars); ⌘Z where the mode edits the form (progression, ins improv).
@@ -97,13 +107,11 @@ export function keyIntent(e: KeyPress, ctx: KeyContext): KeyResult {
   // Write etude.
   if (cmd && (e.key === 'z' || e.key === 'Z')) return handled({ type: e.shiftKey ? 'redo' : 'undo' });
   if (ctx.selection) {
-    // With a bar selection: ⌘C / ⌘V / ⌘D, ⌫ / Del deletes the bar(s), Esc clears it.
+    // With a bar selection: ⌘C copies the bars, ⌘V pastes their notes (the bars themselves are edit progression's);
+    // Esc clears it.
     const k = e.key.toLowerCase();
     const bar = ctx.selection.from;
-    if (cmd && !e.shiftKey && (k === 'c' || k === 'v' || k === 'd')) {
-      return handled({ type: 'bar-action', bar, action: k === 'c' ? 'copy' : k === 'v' ? 'paste' : 'duplicate' });
-    }
-    if (!e.metaKey && !e.ctrlKey && (e.key === 'Backspace' || e.key === 'Delete')) return handled({ type: 'bar-action', bar, action: 'delete' });
+    if (cmd && !e.shiftKey && (k === 'c' || k === 'v')) return handled({ type: 'bar-action', bar, action: k === 'c' ? 'copy' : 'paste' });
     if (e.key === 'Escape') return handled({ type: 'clear-selection' });
   }
   // ⌥↑ / ⌥↓: nudge one step of the slot's scale (diatonic).
