@@ -1,5 +1,6 @@
-// The four modes' icons (SPEC §3.0): small line drawings in the text colour, 16 × 16. Tune: a tuner's gauge and
-// needle. Improvise: a free line with a spark. Write etude: a pencil. Read etude: a page with a note on it.
+// The six modes' icons (SPEC §3.0): small line drawings in the text colour, 16 × 16. Progression: chord blocks.
+// Etude: a pencil. The two improvs share a free line, with a small hexagon (grid) or a sound wave (instrument). Ins
+// tune: a tuner's gauge and needle. Ins read: a page with a note on it.
 import type { Mode } from '../session';
 
 export function ModeIcon({ mode, size = 14 }: { mode: Mode; size?: number }) {
@@ -24,10 +25,24 @@ export function ModeIcon({ mode, size = 14 }: { mode: Mode; size?: number }) {
           <circle cx="8" cy="12.5" r="0.9" fill="currentColor" stroke="none" />
         </>
       )}
+      {mode === 'progression' && (
+        <>
+          <rect x="3" y="2.2" width="10" height="3" rx="1" />
+          <rect x="3" y="6.5" width="10" height="3" rx="1" />
+          <rect x="3" y="10.8" width="10" height="3" rx="1" />
+        </>
+      )}
+      {mode === 'grid' && (
+        <>
+          <path d="M1.5 11.5c1.6-3.2 3-3.2 4.2-.6s2.7 2.6 4.1-.9" />
+          <path d="M12.3 1.9l2 1.15v2.3l-2 1.15-2-1.15v-2.3z" strokeWidth={1.2} />
+        </>
+      )}
       {mode === 'improvise' && (
         <>
           <path d="M1.5 11.5c1.6-3.2 3-3.2 4.2-.6s2.7 2.6 4.1-.9" />
-          <path d="M12.5 2.5v4M10.5 4.5h4" />
+          <circle cx="10.6" cy="4.4" r="0.8" fill="currentColor" stroke="none" />
+          <path d="M12.2 2.8a2.3 2.3 0 0 1 0 3.2M13.9 1.4a4.3 4.3 0 0 1 0 6" strokeWidth={1.2} />
         </>
       )}
       {mode === 'write' && (

@@ -3,6 +3,8 @@
 import type { DeviceSetting } from './device';
 import { clampBpm, clickSoundOf } from './metronome';
 import type { ClickSound } from './audio';
+import type { MoveBy } from './modeProfile';
+import { isMode, type Mode } from './session';
 
 /** The dock's layout (§8.5): Linear (true) or the 3-row honeycomb (false, default). */
 export const HEX_LINEAR: DeviceSetting<boolean> = {
@@ -24,8 +26,13 @@ export const METRONOME_SOUND: DeviceSetting<ClickSound> = { key: 'metronomeSound
 export const CHORD_BUMP_NOTES_OPTIONS = [1, 2, 4, 8, 16, 32] as const;
 export type ChordBumpNotes = (typeof CHORD_BUMP_NOTES_OPTIONS)[number];
 
-/** Improvise: after this many hex picks in a slot, advance to the next chord (hex input only). */
-export const CHORD_BUMP: DeviceSetting<boolean> = { key: 'chordBump', read: (raw) => raw === true };
+/** Grid improv: the chords move on by notes (chord bump, default) or in time (the transport). */
+export const MOVE_BY: DeviceSetting<MoveBy> = { key: 'moveBy', read: (raw) => (raw === 'time' ? 'time' : 'notes') };
+
+/** The mode last used: the next open starts there (none yet: grid improv). */
+export const LAST_MODE: DeviceSetting<Mode | undefined> = { key: 'lastMode', read: (raw) => (isMode(raw) ? raw : undefined) };
+
+/** Grid improv, by notes: after this many hex picks in a slot, move on to the next chord. */
 export const CHORD_BUMP_NOTES: DeviceSetting<ChordBumpNotes> = {
   key: 'chordBumpNotes',
   read: (raw) => {

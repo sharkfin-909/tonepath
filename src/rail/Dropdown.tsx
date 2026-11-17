@@ -21,6 +21,8 @@ export interface DropdownOption<T extends string | number> {
   asTyped?: boolean;
   /** A small icon before the label, in the menu and on the button (the modes). */
   icon?: ReactNode;
+  /** The button's text when this is the value, where the label is too long for it (the modes' short names). */
+  short?: string;
 }
 
 export interface DropdownProps<T extends string | number> {
@@ -130,7 +132,7 @@ export function Dropdown<T extends string | number>({ value, options, onChange, 
         onClick={() => setOpen((o) => !o)}
       >
         {current?.icon}
-        <span className={current?.asTyped ? 'dropdown-value as-typed' : 'dropdown-value'}>{current?.label ?? placeholder}</span>
+        <span className={current?.asTyped ? 'dropdown-value as-typed' : 'dropdown-value'}>{current?.short ?? current?.label ?? placeholder}</span>
         <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden className={open ? 'dropdown-caret up' : 'dropdown-caret'}>
           <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>

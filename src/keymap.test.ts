@@ -26,7 +26,7 @@ describe('keymap (SPEC §11)', () => {
 
   it('Space clicks under the pointer in every mode (no repeat); A picks the hovered pitch; ⇧Space plays the scale', () => {
     const over = ctx('write', { hovered: 67 });
-    for (const mode of ['tune', 'improvise', 'write', 'read'] as const) {
+    for (const mode of ['progression', 'write', 'grid', 'tune', 'improvise', 'read'] as const) {
       expect(keyIntent(key(' '), ctx(mode, { hovered: 67 }))).toEqual({ intent: null, handled: true, click: true });
     }
     expect(intent(key('a'), over)).toEqual({ type: 'pick', written: 67 });
@@ -38,7 +38,7 @@ describe('keymap (SPEC §11)', () => {
   });
 
   it('C / B / S sound the chord / bass / scale; < > (and , .) browse — not in Tune (no chord)', () => {
-    for (const mode of ['improvise', 'write', 'read'] as const) {
+    for (const mode of ['progression', 'write', 'grid', 'improvise', 'read'] as const) {
       expect(intent(key('c'), ctx(mode))).toEqual({ type: 'sound', what: 'chord' });
       expect(intent(key('B', { shiftKey: true }), ctx(mode))).toEqual({ type: 'sound', what: 'bass' });
       expect(intent(key('<', { shiftKey: true }), ctx(mode))).toEqual({ type: 'browse', dir: -1 });
@@ -50,8 +50,8 @@ describe('keymap (SPEC §11)', () => {
     expect(keyIntent(key(' ', { shiftKey: true }), ctx('tune'))).toEqual({ intent: null, handled: true });
   });
 
-  it('Improvise / Read etude: ← / → step slots while stopped; editing keys do nothing but are swallowed', () => {
-    for (const mode of ['improvise', 'read'] as const) {
+  it('the lead sheet\'s modes and Read etude: ← / → step slots while stopped; editing keys do nothing but are swallowed', () => {
+    for (const mode of ['progression', 'grid', 'improvise', 'read'] as const) {
       expect(intent(key('ArrowRight'), ctx(mode))).toEqual({ type: 'step', dir: 1 });
       expect(keyIntent(key('ArrowRight'), ctx(mode, { running: true }))).toEqual({ intent: null, handled: true });
       expect(keyIntent(key('Backspace'), ctx(mode))).toEqual({ intent: null, handled: true });
@@ -62,13 +62,16 @@ describe('keymap (SPEC §11)', () => {
     expect(intent(key('z', { metaKey: true }), ctx('improvise'))).toEqual({ type: 'undo' }); // the lead sheet's form
     expect(intent(key('z', { metaKey: true }), ctx('improvise', { running: true }))).toBeNull();
     expect(intent(key('z', { metaKey: true }), ctx('read'))).toBeNull();
+    expect(intent(key('z', { metaKey: true }), ctx('progression'))).toEqual({ type: 'undo' });
+    expect(intent(key('z', { metaKey: true }), ctx('grid'))).toBeNull(); // grid improv's chords are read-only
+    expect(intent(key('a'), ctx('grid', { hovered: 60 }))).toEqual({ type: 'pick', written: 60 });
   });
 
-  it('[ / ] previous / next mode, \\ Write etude ↔ Read etude — in every mode; P does nothing; ⇧M mutes', () => {
-    for (const mode of ['tune', 'improvise', 'write', 'read'] as const) {
+  it('[ / ] previous / next mode, \\ the partner mode — in every mode; P does nothing; ⇧M mutes', () => {
+    for (const mode of ['progression', 'write', 'grid', 'tune', 'improvise', 'read'] as const) {
       expect(intent(key('['), ctx(mode))).toEqual({ type: 'mode', mode: 'prev' });
       expect(intent(key(']'), ctx(mode))).toEqual({ type: 'mode', mode: 'next' });
-      expect(intent(key('\\'), ctx(mode))).toEqual({ type: 'mode', mode: 'toggle-read' });
+      expect(intent(key('\\'), ctx(mode))).toEqual({ type: 'mode', mode: 'partner' });
       expect(intent(key('p'), ctx(mode))).toBeNull();
       expect(intent(key('M', { shiftKey: true }), ctx(mode))).toEqual({ type: 'toggle-mute' });
     }

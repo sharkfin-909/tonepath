@@ -23,6 +23,8 @@ export interface TransportBarProps {
   barCount: number;
   /** The loop pickers: loop bars `from`–`to` (0-based, inclusive; either order). */
   onPickBars: (from: number, to: number) => void;
+  /** The loop status (pickers, or the looped bars with ×): off in progression, which only plays the form back. */
+  loopPickers?: boolean;
   /** Read etude only: show scale names above each chord. */
   showScales?: boolean;
   onShowScales?: (on: boolean) => void;
@@ -110,6 +112,7 @@ export function TransportBar({
   onPickBars,
   showScales,
   onShowScales,
+  loopPickers = true,
 }: TransportBarProps) {
   return (
     <div className="transport-bar pill">
@@ -168,20 +171,32 @@ export function TransportBar({
           </span>
         </button>
       )}
-      {/* The loop status, always there at a fixed width so the bar never changes length: with nothing looped, a picker
-          for the first and the last bar (both picked: they loop); looping, the looped bars with × (back to the whole form). */}
-      {bars ? (
-        <span className="transport-bars looping">
-          <span className="transport-bars-text" role="status">
-            {bars.from === bars.to ? `bar ${bars.from + 1}` : `bars ${bars.from + 1}–${bars.to + 1}`}
-          </span>
-          <button type="button" className="transport-bars-clear chip" aria-label="Loop the whole form" title="Loop the whole form" onClick={onAllBars}>
-            ×
-          </button>
-        </span>
-      ) : (
-        <LoopPickers barCount={barCount} onPick={onPickBars} />
-      )}
+      {loopPickers && <LoopStatus bars={bars} onAllBars={onAllBars} barCount={barCount} onPickBars={onPickBars} />}
     </div>
+  );
+}
+
+/**
+ * The loop status, always there at a fixed width so its pill never changes length: with nothing looped, a picker for
+ * the first and the last bar (both picked: they loop); looping, the looped bars with × (back to the whole form). In the
+ * transport bar, and in grid improv's move-on pill while it moves on by notes.
+ */
+export function LoopStatus({
+  bars,
+  onAllBars,
+  barCount,
+  onPickBars,
+}: Pick<TransportBarProps, 'bars' | 'onAllBars' | 'barCount' | 'onPickBars'>) {
+  return bars ? (
+    <span className="transport-bars looping">
+      <span className="transport-bars-text" role="status">
+        {bars.from === bars.to ? `bar ${bars.from + 1}` : `bars ${bars.from + 1}–${bars.to + 1}`}
+      </span>
+      <button type="button" className="transport-bars-clear chip" aria-label="Loop the whole form" title="Loop the whole form" onClick={onAllBars}>
+        ×
+      </button>
+    </span>
+  ) : (
+    <LoopPickers barCount={barCount} onPick={onPickBars} />
   );
 }

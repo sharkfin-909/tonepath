@@ -1546,12 +1546,12 @@ button.dock-label {
 }
 
 /* Improvise: warm paper behind the lead sheet. */
-.main.improvise > .chart-area {
+.main.lead > .chart-area {
   background: #f7f3e5; /* #ECE5C3, lightened */
 }
 /* …and the lead sheet's cards keep the original white paper on it (their highlights tint over it), lifted off the
    background by a light shadow. */
-.main.improvise .slot.lead {
+.main.lead .slot.lead {
   --slot-paper: var(--bg);
   box-shadow: 0 1px 2px rgba(29, 27, 25, 0.06), 0 2px 8px rgba(29, 27, 25, 0.08);
 }
@@ -2016,7 +2016,7 @@ select {
 .main.hex-hidden .dock {
   box-shadow: none;
 }
-.main.improvise.hex-hidden .dock {
+.main.lead.hex-hidden .dock {
   box-shadow: none;
 }
 
@@ -2675,12 +2675,12 @@ select {
   /* A black inner glow round the whole row, and a soft shadow up onto the chart. */
   box-shadow: inset 0 0 14px 2px rgba(0, 0, 0, 0.7), 0 -4px 12px rgba(0, 0, 0, 0.18);
 }
-.listen-row:not(:has(.tuner, .listen-levels, .chord-bump, .hex-hide-toggle)) {
+.listen-row:not(:has(.tuner, .listen-levels, .hex-hide-toggle)) {
   display: none;
 }
 
 /* Improvise / Tune: chart scrollport (absolute inset); bottom overlay = tuner bar + hex (`hex-dock-wrap`). */
-.main.improvise,
+.main.lead,
 .main.tuner-mode {
   display: block;
   position: relative;
@@ -2701,7 +2701,7 @@ select {
 .hex-dock-wrap > * {
   pointer-events: auto;
 }
-.main.improvise .hex-dock-wrap:has(.dock),
+.main.lead .hex-dock-wrap:has(.dock),
 .main.tuner-mode .hex-dock-wrap:has(.dock) {
   height: var(--hex-share, 50%); /* App: 50%, 60% from tablet down */
   max-height: var(--hex-share, 50%);
@@ -2737,25 +2737,14 @@ select {
   grid-row: 1;
   justify-self: start;
 }
-.bump-slot {
-  grid-column: 3;
-  grid-row: 1;
-  justify-self: end;
-}
-/* Tablet and down, hex showing (App): the input level and chord bump pills in the hex panel's top corners. */
-.dock > .levels-slot,
-.dock > .bump-slot {
+/* Tablet and down, hex showing (App): the input level pill in the hex panel's top left corner. */
+.dock > .levels-slot {
   position: absolute;
   top: 10px;
+  left: 10px;
   z-index: 3;
   grid-row: auto;
   grid-column: auto;
-}
-.dock > .levels-slot {
-  left: 10px;
-}
-.dock > .bump-slot {
-  right: 10px;
 }
 /* Tablet and down: Hide / Show hex at the tuner bar's right end, on the tuner's line (App). */
 .hex-toggle-slot {
@@ -2774,7 +2763,7 @@ select {
 /* Tablet and down, hex hidden: the listen row's pills stack, centred — the input level on top, the tuner (with Show
    hex at the bar's right end) at the bottom. */
 @media (max-width: 1024px) {
-  .main.hex-hidden .listen-row:has(.tuner, .listen-levels, .chord-bump) {
+  .main.hex-hidden .listen-row:has(.tuner, .listen-levels) {
     row-gap: 6px;
   }
   .main.hex-hidden .listen-row > .levels-slot {
@@ -2794,25 +2783,21 @@ select {
     margin-bottom: calc(var(--sound-bar-h, 0px) + 10px); /* + the row's 6px gap: 8px clear of the bottom stack */
   }
 }
-/* Improvise: chord bump at the listen row's right — hex picks per slot before advancing. */
-.chord-bump {
-  display: inline-flex;
-  gap: 8px;
-  flex-wrap: nowrap;
-  white-space: nowrap;
-}
-.chord-bump-toggle {
-  gap: 8px;
-}
-/* notes: picker stays in the layout when off so the row doesn't jump on toggle (SPEC §9.2). */
-.chord-bump-notes {
+/* Grid improv's move-on pill (SPEC §3.11): by notes | in time, then (by notes) the notes count and the loop status. */
+.move-on {
   display: inline-flex;
   align-items: center;
   gap: var(--pill-gap);
+  white-space: nowrap;
 }
-.chord-bump:not(.on) .chord-bump-notes {
-  visibility: hidden;
-  pointer-events: none;
+.move-on-choice {
+  display: inline-flex;
+  gap: var(--chip-gap);
+}
+.move-on-notes {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pill-gap);
 }
 
 /* The big tuner (SPEC §9.2): note, a ±50 ¢ scale with a needle, the cents off. */
@@ -3006,6 +2991,16 @@ select {
   left: 6px;
   right: 6px;
   border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+/* The mode menu: the line between the hex grid's modes and the instrument's, with room either side. */
+.rich .dropdown-option.divider {
+  margin-top: 13px;
+}
+.rich .dropdown-option.divider::before {
+  top: -7px;
+  left: 10px;
+  right: 10px;
+  border-top-color: rgba(255, 255, 255, 0.28);
 }
 .etude-picker .inline-field {
   width: 160px;

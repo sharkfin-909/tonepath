@@ -12,10 +12,10 @@ const GROUPS: Group[] = [
     title: 'Everywhere',
     rows: [
       { keys: ['Space'], what: 'Click whatever is under the pointer' },
-      { keys: ['A'], what: 'Play the hex note under the pointer (Write etude: write it)' },
+      { keys: ['A'], what: 'Play the hex note under the pointer (edit etude: write it)' },
       { keys: ['['], what: 'Previous mode' },
       { keys: [']'], what: 'Next mode' },
-      { keys: ['\\'], what: 'Write etude ↔ Read etude' },
+      { keys: ['\\'], what: 'The same work on the other side: etude ↔ ins read, grid improv ↔ ins improv' },
       { keys: ['C'], what: '▶ Chord' },
       { keys: ['B'], what: '▶ Bass' },
       { keys: ['S', '⇧Space'], what: '▶ Scale' },
@@ -24,7 +24,7 @@ const GROUPS: Group[] = [
   },
   {
     id: 'write',
-    title: 'Write etude',
+    title: 'edit etude',
     modes: ['write'],
     rows: [
       { keys: ['1', '2', '3', '4', '5'], what: 'Note length: whole, half, quarter, eighth, sixteenth' },
@@ -41,30 +41,30 @@ const GROUPS: Group[] = [
   },
   {
     id: 'play',
-    title: 'Improvise and Read etude',
-    modes: ['improvise', 'read'],
+    title: 'progression, the improvs and ins read',
+    modes: ['progression', 'grid', 'improvise', 'read'],
     rows: [
       { keys: ['←', '→'], what: 'Previous / next slot (stopped)' },
       { keys: ['<', '>'], what: 'Previous / next slot (stopped)' },
-      { keys: ['⌘Z', '⇧⌘Z'], what: 'Undo / redo (Improvise, stopped)' },
+      { keys: ['⌘Z', '⇧⌘Z'], what: 'Undo / redo (progression, ins improv; stopped)' },
     ],
   },
   {
     id: 'bars',
     title: 'Bars and loops',
-    modes: ['write', 'improvise', 'read'],
+    modes: ['write', 'grid', 'improvise', 'read'],
     rows: [
-      { keys: ['click bar number'], what: 'Write etude: select the bar · Improvise, Read etude: loop it' },
+      { keys: ['click bar number'], what: 'edit etude: select the bar · the improvs, ins read: loop it' },
       { keys: ['⇧click'], what: 'Extend to a run of bars' },
       { keys: ['Esc'], what: 'Deselect / stop looping' },
-      { keys: ['⌘C', '⌘V', '⌘D'], what: 'Write etude, bars selected: copy / paste / duplicate' },
-      { keys: ['⌫'], what: 'Write etude, bars selected: delete them' },
+      { keys: ['⌘C', '⌘V', '⌘D'], what: 'edit etude, bars selected: copy / paste / duplicate' },
+      { keys: ['⌫'], what: 'edit etude, bars selected: delete them' },
     ],
   },
   {
     id: 'chord',
     title: 'Typing a chord',
-    modes: ['write', 'improvise'],
+    modes: ['progression', 'write', 'improvise'],
     rows: [
       { keys: ['↑', '↓'], what: 'Pick a suggestion' },
       { keys: ['Enter', 'Tab'], what: 'Commit, on to the next slot' },
@@ -99,7 +99,7 @@ export function ShortcutsModal({ mode, onClose }: { mode: Mode; onClose: () => v
           </dl>
         </section>
       ))}
-      <p className="shortcuts-note">Shortcuts wait while you type in a field (a chord, the title, the tempo). In Tune, only the hex, sound and mode keys apply.</p>
+      <p className="shortcuts-note">Shortcuts wait while you type in a field (a chord, the title, the tempo). In ins tune, only the hex, sound and mode keys apply.</p>
     </Dialog>
   );
 }

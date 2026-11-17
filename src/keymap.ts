@@ -62,10 +62,11 @@ function shared(e: KeyPress, ctx: KeyContext): KeyResult | null {
 export function keyIntent(e: KeyPress, ctx: KeyContext): KeyResult {
   const plain = !e.metaKey && !e.ctrlKey && !e.altKey;
   const cmd = (e.metaKey || e.ctrlKey) && !e.altKey;
-  const m = modeProfile(ctx.mode, ctx.running);
+  // Running implies a transport (grid improv: in time), so `time` here; the keys read nothing else move-on decides.
+  const m = modeProfile(ctx.mode, ctx.running, 'time');
 
-  // Every mode: \ Write etude ↔ Read etude, [ / ] the previous / next mode (SPEC §11).
-  if (plain && e.key === '\\') return handled({ type: 'mode', mode: 'toggle-read' });
+  // Every mode: \ the partner mode, [ / ] the previous / next mode (SPEC §11).
+  if (plain && e.key === '\\') return handled({ type: 'mode', mode: 'partner' });
   if (plain && (e.key === '[' || e.key === ']')) return handled(e.repeat ? null : { type: 'mode', mode: e.key === '[' ? 'prev' : 'next' });
 
   if (ctx.mode === 'tune') {
@@ -79,8 +80,9 @@ export function keyIntent(e: KeyPress, ctx: KeyContext): KeyResult {
     return NONE;
   }
 
-  if (ctx.mode === 'improvise' || ctx.mode === 'read') {
-    // Improvise / Read etude: ← / → step slots (stopped); the shared keys; Esc: the whole form again (no looped bars).
+  if (ctx.mode !== 'write') {
+    // The lead sheet's modes and Read etude: ← / → step slots (stopped); the shared keys; Esc: the whole form again
+    // (no looped bars); ⌘Z where the mode edits the form (progression, ins improv).
     if (cmd && (e.key === 'z' || e.key === 'Z')) return handled(m.editsForm ? { type: e.shiftKey ? 'redo' : 'undo' } : null);
     if (!plain) return NONE;
     if (e.key === 'Escape') return ctx.selection ? handled({ type: 'clear-selection' }) : NONE;

@@ -4,6 +4,9 @@
 
 import type { Mode } from './session';
 
+/** Grid improv's one choice (SPEC §3.11): the chords move on after N notes picked (chord bump) or in time (the transport). */
+export type MoveBy = 'notes' | 'time';
+
 /** How the chart draws its slots: Improvise's lead sheet, Write etude's cards, Read etude's continuous staves. */
 export type ChartKind = 'lead' | 'write' | 'read';
 
@@ -33,10 +36,18 @@ export interface ModeProfile {
   chartInert: boolean;
 
   // ——— What shows ———
-  /** The header's own groups: Write etude's editing pill, Improvise's form group, the transport bar. */
+  /** The header's own groups: Write etude's editing pill, the form group (progression, ins improv), the transport bar. */
   editPill: boolean;
   formGroup: boolean;
   transportBar: boolean;
+  /** The transport's loop pickers (looped bars): not in progression, which only plays the form back. */
+  loopPickers: boolean;
+  /** Grid improv: the *move on* control (by notes | in time). */
+  moveOn: boolean;
+  /** Grid improv, by notes: hex picks in a slot move the form on after N notes. */
+  chordBump: boolean;
+  /** A slot reached by hand keeps its *On arrival* sound for the first note picked or played there (stopped). */
+  arrivalWaits: boolean;
   /** Tune: the chart pane keeps its height, empty (SPEC §3.8). */
   chartEmpty: boolean;
   chart: ChartKind;
@@ -60,37 +71,45 @@ export interface ModeProfile {
   writeLights: boolean;
 }
 
-export function modeProfile(mode: Mode, running = false): ModeProfile {
+export function modeProfile(mode: Mode, running = false, moveBy: MoveBy = 'notes'): ModeProfile {
+  const progression = mode === 'progression';
+  const grid = mode === 'grid';
   const tune = mode === 'tune';
   const improvise = mode === 'improvise';
   const write = mode === 'write';
   const read = mode === 'read';
-  const transport = improvise || read;
+  const transport = progression || improvise || read || (grid && moveBy === 'time');
   running = running && transport; // only a mode with a transport runs
+  /** The lead sheet's modes that play over the chords (Tune's chart pane is empty). */
+  const lead = progression || grid || improvise;
   return {
     mode,
     running,
     listens: tune || improvise,
     transport,
     editsMelody: write,
-    editsForm: write || (improvise && !running),
+    editsForm: write || ((progression || improvise) && !running),
     movesByHand: !running,
     chartInert: read && running,
     editPill: write,
-    formGroup: improvise && !running,
+    formGroup: (progression || improvise) && !running,
     transportBar: transport,
+    loopPickers: transport && !progression,
+    moveOn: grid,
+    chordBump: grid && moveBy === 'notes',
+    arrivalWaits: lead && !running,
     chartEmpty: tune,
     // Tune lays its (hidden) pane out as a lead sheet, so the chart's height doesn't change on the way to Improvise.
     chart: write ? 'write' : read ? 'read' : 'lead',
-    // Improvise: the grid gives the chart the row above the tuner bar (it scrolls there). Read etude: no hex.
-    chartBudget: read ? 'full' : improvise ? 'fill' : 'half',
+    // The lead sheet's modes: the grid gives the chart the row above the hex panel (it scrolls there). Read etude: no hex.
+    chartBudget: read ? 'full' : lead ? 'fill' : 'half',
     keyPills: !read,
     clef: write || read,
     hex: !read,
     hexHideable: improvise,
     noChord: tune,
     heardLights: tune || (improvise && !running),
-    targets: improvise && running,
+    targets: lead && running,
     writeLights: write,
   };
 }

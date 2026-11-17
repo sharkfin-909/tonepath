@@ -48,22 +48,32 @@ The mode menu of [Mode menu](issues/068-mode-menu.md) (2026-11-16) replaced the 
 
 ### 3.0 The modes
 
-The **Mode:** dropdown offers four modes, in this order. Each is a fixed set of panels; nothing is toggled per mode except **Hide hex** in Improvise.
+The **Mode:** dropdown offers six modes in two families ([Mode families](issues/084-mode-families-plan.md), 2026-11-17): the **hex grid**'s three, a line, then the **instrument**'s three. The menu shows each full name; the mode pill's button shows the short name. Internal ids kept from the four-mode app in brackets.
 
-| | **Tune** (§3.8) | **Improvise** (§3.3) | **Write etude** (§3.2) | **Read etude** (§3.4) |
-|---|---|---|---|---|
-| Listen (mic) | on | on | off | off |
-| Tuner bar | yes | yes | — | — |
-| Header row 2, centre | — | form group, or the transport bar (§3.7) | editing pill | transport bar |
-| Chart | the pane, empty | lead sheet: chords and scales, empty staves | chart with the etude, caret | the etude, Fit page, playhead |
-| Docked hex | unchecked hex; lights what is played | stopped: current slot, lights what is played; running: the upcoming chord's tones and target rings | note input at the caret | none |
-| Sound pill | yes (chord controls greyed) | yes | yes | yes |
-| Hide hex | — | yes | — | — |
+| Full name (menu, Help) | Short (button) | Id | Section |
+|---|---|---|---|
+| edit progression | progression | `progression` | §3.10 |
+| edit etude | etude | `write` | §3.2 |
+| improvise on the grid | grid improv | `grid` | §3.11 |
+| tune instrument | ins tune | `tune` | §3.8 |
+| improvise on instrument | ins improv | `improvise` | §3.3 |
+| read etude on instrument | ins read | `read` | §3.4 |
 
-- **Opening**: launching or reloading the app starts in **Tune**; opening another progression (from the library) **keeps the mode** you were in, so the browser may ask for the microphone at once; while it asks, the tuner bar shows **allow the microphone to start listening**. Where the browser keeps audio suspended until a user gesture, the tuner bar shows **tap to start listening** until the first click or key.
-- **The mode decides the mic**: Listen (§9.2) is on in Tune and Improvise and off in Write etude and Read etude; there is no Audio input switch. Leaving Tune or Improvise closes the mic.
+Each is a fixed set of panels; nothing is toggled per mode except **Hide hex** in ins improv and grid improv's **move on** choice.
+
+| | **progression** | **etude** | **grid improv** | **ins tune** | **ins improv** | **ins read** |
+|---|---|---|---|---|---|---|
+| Listen (mic) | off | off | off | on | on | off |
+| Tuner bar | — | — | — | yes | yes | — |
+| Header row 2, centre | form group + transport bar (no loop pickers) | editing pill | move-on pill (+ transport bar, in time) | — | form group, or the transport bar (§3.7) | transport bar |
+| Chart | lead sheet, editable | chart with the etude, caret | lead sheet, read-only | the pane, empty | lead sheet | the etude, Fit page, playhead |
+| Docked hex | current slot; picks audition | note input at the caret | current slot; picks audition (and count, by notes) | unchecked hex; lights what is played | stopped: current slot, lights what is played; running: targets | none |
+| Hide hex | — | — | — | — | yes | — |
+
+- **Opening**: launching or reloading starts in the **device's last mode** (`lastMode`, §12.5); the very first open, in **grid improv**. Opening another progression (from the library) **keeps the mode** you were in, so the browser may ask for the microphone at once; while it asks, the tuner bar shows **allow the microphone to start listening**. Where the browser keeps audio suspended until a user gesture, the tuner bar shows **tap to start listening** until the first click or key.
+- **The mode decides the mic**: Listen (§9.2) is on in ins tune and ins improv and off in the rest; there is no Audio input switch. Leaving them closes the mic.
 - **Mic unavailable** (permission denied, no input device, insecure origin): the mode stays; the tuner bar says why (e.g. *Mic blocked: allow it in the browser's site settings*); hex clicks keep working.
-- **Switching**: the dropdown, `[` / `]` (previous / next mode, no wrap) and `\` (Write etude ↔ Read etude; from Tune or Improvise → Read etude) (§11). Switching modes is silent and always **stops the transport**.
+- **Switching**: the dropdown, `[` / `]` (previous / next mode in the menu's order, no wrap) and `\` (the **partner mode**, the same work in the other family: etude ↔ ins read, grid improv ↔ ins improv; nothing in progression or ins tune) (§11). Switching modes is silent, always **stops the transport**, and is remembered on the device.
 - **Carried between modes**: the **current slot** — entering Improvise or Read etude starts on the caret's slot; entering Write etude puts the caret at the start of the current slot (Tune keeps the current slot unseen). The **bar selection** and the **looped bars** are one selection, shared by Improvise, Write etude and Read etude. Tempo, click sound and Loop are device settings (§12.5), the same for both transports.
 
 ### 3.1 Chart screen (layout C) — [Whole-screen layout (docked hex)](issues/030-whole-screen-layout-docked-hex.md)
@@ -93,7 +103,7 @@ Hex picks are recorded at the caret (§6). The mic is off (no writing by playing
 
 ### 3.3 Improvise — [Play mode](issues/035-play-mode.md), [Mode menu](issues/068-mode-menu.md)
 
-Playing over the form, from a **lead sheet**: Listen on, the tuner bar, the transport (§3.7). The form moves on with the **transport** (time). Stopped, optional **chord bump** (§9.2) can advance slots from **hex picks** alone. *Formerly* Practice, built on the old Play mode's behaviour (Play is not offered).
+**ins improv** (*improvise on instrument*; id `improvise`). Playing over the form on your instrument, from a **lead sheet**: Listen on, the tuner bar, the transport (§3.7). The form moves on only with the **transport** (time); chord bump is grid improv's (§3.11). *Formerly* Practice, built on the old Play mode's behaviour (Play is not offered). Editing the chords here while stopped stays until slice 2 of [Mode families](issues/084-mode-families-plan.md) moves it to progression alone.
 
 - **Lead sheet**: no stave — each card is at most **160px** on screen (**120px** on phones) after chart zoom (`LEAD_SLOT_MAX_PX`, a little more only when the labels need it at a small zoom), and in place of the stave each slot shows a **little hex of its scale**, spelled from the root: rows `[1 2]` `[3 4]` `[5 6 7]` from the bottom, each half a cell left of the one below (the docked hex's geometry: right = the next step, up-left = a third); other sizes pair up from the bottom with the top row taking the rest (whole-tone `[2][2][2]`, diminished `[2][2][4]`; a chord no scale fits: its chord tones; no chord: nothing). Coloured as the docked hex: triad tones and the guide tone (outlined) in their **degree colour**, the rest neutral taupe; the note name in each cell. Each Improvise slot is **three rows**: `[chord · scale]` on top (chord at the left, scale at the right), then the **hex**, centred, then the **key pill** at the bottom right (with the add-chord "+" beside it on a one-chord bar). The hex takes what the two label rows leave of the card. In a **split bar** each slot has a **trash can** at its bottom left, shown while the card is hovered: it deletes that chord (with its scale override) and the other slot fills the bar (one undo step; editing only — stopped). The written melody and the clef are hidden; bar lines and chords stay; rows keep the stave's height (`leadSheet.ts`). The caret is hidden; the **current slot** gets Write etude's active-slot tint (the same light blue; Read etude's playhead too).
 - **Editing the lead sheet** (transport stopped): **chord and scale entry** exactly as in Write etude (clicking a chord name or an empty slot's `+` edits it — autosuggest, Tab / Enter to move on — and makes that slot current; the scale name opens its scale menu); the **form group** in the header — time signature, bars per row, undo / redo; each bar's **"+"** and **trash can**, and the **add-chord "+"**; the **⋯ bar menu** (Insert / Duplicate / Copy / Paste / Split / Merge / Delete) as in Write etude. No note lengths, Rest, nudge, step or Clear (those are Write etude's). While the transport **runs**, the form group, ⋯ menu, "+" and trash cans are hidden and chord / scale entry is off, so the form never changes under the playhead.
@@ -101,9 +111,19 @@ Playing over the form, from a **lead sheet**: Listen on, the tuner bar, the tran
 - **Transport stopped**: **← / →** (and `<` / `>`) move to the previous / next **slot** (a split bar = two stops), **wrapping**; clicking a slot makes it current. ↑ / ↓ do nothing. The hex shows the **current slot's scale**, remoulding on arrival exactly as in Write etude (pitch anchor kept, travel, the no-scale rules of §8.4), and **lights the notes played** (mic or hex) like a hovered cell. Hex picks (click, Space, `A`) audition only.
 - **Transport running** (§3.7): time moves the form on; the hex shows the **upcoming chord's chord tones** with the dashed **target rings** (at the last chord, the first chord's), with **no slot-change motion** (no travel, no fades) — each chord lands at once. Notes played (mic or hex) **sound but do not light** the hex.
 - **On arrival** (*Audio on chord*): Silent (default) · Chord · Root note · Bass note · Bass note + chord, a device setting. Running, it sounds as each chord begins (the starting chord too). Stopped, arriving by hand is silent and the sound waits for the **first note played** in the slot (hex or mic), sounding with it. The mic hears it, so an **echo guard** ignores everything for 250 ms after it starts and, while it rings (chord ~3.2 s, root / bass note ~1.1 s), heard notes matching its pitches (or an octave off). Headphones avoid the question.
-- **Chord bump** (§9.2): optional. While stopped, after **N hex picks** (not mic) in the current slot — N is 1, 2, 4, 8, 16, or 32 (device settings, default 4) — the playhead advances to the next slot, wrapping; *On arrival* applies as when stepping by hand.
 - **Hide hex** is offered here (only): the hex leaves the bottom overlay; the chart scrollport grows to use that space (the tuner bar stays).
 - Chart scrolls to keep the current slot in view.
+
+### 3.10 progression (edit progression)
+
+Entering the chords and their scales, on the **lead sheet** of §3.3, always editable while stopped: chord and scale entry, the **form group** (time signature, bars per row, undo / redo), the ⋯ bar menu, "+" and the trash cans. The docked hex shows the current slot; picks **audition** (nothing is written, nothing moves on). The **transport bar** plays the form back (tempo, click, ▶, Loop) **without loop pickers** — nothing to practise here; running, nothing edits. No mic. *On arrival* waits for the first pick in a slot reached by hand, as in ins improv.
+
+### 3.11 grid improv (improvise on the grid)
+
+Improvising on the hex grid, no mic: the **lead sheet**, read-only, the current chord highlighted; the hex always shown (no Hide hex); click, Space or `A` plays a note. One **move-on pill** in the header (from tablet down, the bottom stack) chooses how the chords move on — `move on [by notes | in time]` (device setting `moveBy`, default by notes):
+
+- **by notes** (**chord bump**): after **N hex picks** in the current slot — `notes: N`, 1, 2, 4, 8, 16 or 32 (device setting, default 4) — the form moves on to the next slot, wrapping, within the **looped bars** when there are some. The pill carries the **loop status** (§3.7: the loop pickers, or `bars 2–3 ×`), since there is no transport. *On arrival* applies as when stepping by hand. ← / → and `<` / `>` step slots too.
+- **in time**: the **transport bar** (§3.7) beside the pill runs the form; while it runs, the hex shows the upcoming chord's tones with target rings, as in ins improv. Picks never move the form. Switching to by notes stops it.
 
 ### 3.4 Read etude (formerly Etude view, Stand)
 
@@ -356,7 +376,7 @@ Reference implementation: the throwaway [VexFlow spike prototype](prototypes/vex
 - The mic is opened with echo cancellation off (it can colour an instrument through speakers); noise suppression and auto gain stay off (they colour an instrument too). The **echo guard** (§3.3) ignores the app's own *On arrival* sounds and hex auditions.
 - **Input level control** ("In", in the Listen pill): gain from **−12 to +24 dB** before the detectors, a device setting (`micGainDb`, default 0; double-click resets). The **level meter** is on a dB scale (−60 … 0 dBFS) with a white **mark** where a note starts to count (the onset gate): set the input so playing passes the mark — the meter brightens past it — and silence stays below.
 - Heard notes light the hex in Tune and in Improvise with the transport stopped (§3.3); they are never written into the etude and never move the form on (and do not count toward **chord bump**).
-- **Chord bump** (Improvise only): at the **right end** of the listen row, a switch **Chord bump** and, when on, a **notes:** picker (1 · 2 · 4 · 8 · 16 · 32). After that many hex picks in a slot (transport stopped; the mic doesn't count) the form moves on to the next chord **as the transport would**: with bars looped, it stays within them, wrapping from their last chord to their first. Device settings `chordBump` and `chordBumpNotes`.
+- **Chord bump** moved to grid improv's move-on pill (§3.11); the listen row no longer carries it.
 - **Tablet and down (≤ 1024px)**: with the hex showing, the input level pill and the chord bump pill leave the listen row for the hex panel's **top left and top right corners** (absolutely positioned); the tuner stays centred in the listen row. With the hex hidden (Improvise), everything stacks in one centred column, bottom up: the **tuner**, the bottom stack (sound pill, form group and transport bar), then the input level pill.
 
 ## 10. Instruments — [Instrument view](issues/011-instrument-view.md), [Instrument practical ranges](issues/013-instrument-practical-ranges.md), [Clef policy](issues/032-clef-policy.md)
@@ -386,7 +406,7 @@ Reference implementation: the throwaway [VexFlow spike prototype](prototypes/vex
 
 ## 11. Keyboard
 
-| Key | Write etude | Improvise (Tune: the hex, sound and mode keys only) | Read etude |
+| Key | etude (`write`) | the lead sheet's modes — progression, grid improv, ins improv (ins tune: the hex, sound and mode keys only) | ins read |
 |---|---|---|---|
 | `1`–`5` | length latch (w h q e s); with Rest on, also inserts a rest | — | — |
 | `R` | Rest latch on / off | — | — |
@@ -403,9 +423,9 @@ Reference implementation: the throwaway [VexFlow spike prototype](prototypes/vex
 | `C` / `B` | ▶ Chord / ▶ Bass | ▶ Chord / ▶ Bass | ▶ Chord / ▶ Bass |
 | `<` / `>` (or `,` / `.`) | previous / next slot, wrapping (caret to its start) | stopped: previous / next slot, wrapping | stopped: previous / next slot, wrapping |
 | `⇧M` | mute | mute | mute |
-| `[` / `]` | previous / next mode (Tune · Improvise · Write etude · Read etude; no wrap) | same | same |
-| `\` | → Read etude | → Read etude | → Write etude |
-| ⌘Z / ⇧⌘Z | undo / redo | undo / redo (transport stopped) | — |
+| `[` / `]` | previous / next mode (progression · etude · grid improv · ins tune · ins improv · ins read; no wrap) | same | same |
+| `\` | → ins read | grid improv ↔ ins improv (progression, ins tune: nothing) | → etude |
+| ⌘Z / ⇧⌘Z | undo / redo | progression, ins improv: undo / redo (transport stopped) | — |
 | Enter / Tab / ⇧Tab | (in a chord field) commit and move to next / previous slot | same (transport stopped) | |
 
 **Keyboard shortcuts** (☰ → *Keyboard shortcuts*): a dialog like the library listing these keys in groups — Everywhere first, then the current mode's groups (marked *this mode*), then the rest; Esc, × or the backdrop closes it, and keys pressed in it never reach the chart.
@@ -454,13 +474,13 @@ All shortcuts are ignored while a text field (title, chord symbol, time signatur
 
 ### 12.5 Device key and demo
 
-- `tonepath:device` = `{ v, lastInstrument, muted, lastOpenId, lastBackupAt, reminderDismissedAt, seeded, seededDemos, playArrival, hexShape, hexHidden, practiceLoop, metronomeBpm, metronomeSound, micGainDb }` — `playArrival`: `"silent" | "chord" | "root" | "bass" | "bass-chord"` (default `"silent"`); `hexShape`: `"honeycomb" | "linear"`; `practiceLoop`: the transport's Loop (default true; name kept); `practiceRule` and `practiceCount` (the dropped advance rules) are no longer read and stay as unknown fields; `micGainDb`: −12 … 24 (default 0); `seededDemos`: keys of extra demos already added. Unknown fields are kept. Never exported.
+- `tonepath:device` = `{ v, lastInstrument, muted, lastOpenId, lastBackupAt, reminderDismissedAt, seeded, seededDemos, playArrival, hexShape, hexHidden, practiceLoop, metronomeBpm, metronomeSound, micGainDb, lastMode, moveBy, chordBumpNotes }` — `lastMode`: the mode the next open starts in (§3.0; missing: grid improv); `moveBy`: grid improv's `"notes" | "time"` (default `"notes"`; the old `chordBump` switch is no longer read); `chordBumpNotes`: 1 · 2 · 4 · 8 · 16 · 32 (default 4); `playArrival`: `"silent" | "chord" | "root" | "bass" | "bass-chord"` (default `"silent"`); `hexShape`: `"honeycomb" | "linear"`; `practiceLoop`: the transport's Loop (default true; name kept); `practiceRule` and `practiceCount` (the dropped advance rules) are no longer read and stay as unknown fields; `micGainDb`: −12 … 24 (default 0); `seededDemos`: keys of extra demos already added. Unknown fields are kept. Never exported.
 - `lastOpenId` missing / dangling → newest; empty library → empty state.
 - Demo: bundled [demo.tonepath.json](examples/demo.tonepath.json) (`Dm7 | G7 | Cmaj7 | Cmaj7`, Concert, short melody with a rest; a v2 file, so it imports as one etude), imported once through the normal path, guarded by `seeded`. Deleting it is permanent. **Further demos** are added to every library once (even a non-empty one, without opening them), each guarded by its key in `seededDemos`; deleting one is permanent: [rhythm-changes.tonepath.json](examples/rhythm-changes.tonepath.json) — rhythm changes in B♭ (32 bars AABA, the *I Got Rhythm* changes) with an original etude: a guide-tone line (one half note per chord, the 3rd or 7th nearest the last) in the A sections, chord arpeggios in eighths on the bridge. The A sections set in-key scales where the defaults would leave B♭ (Gm7 Aeolian, Dm7 Phrygian, E♭maj7 Lydian; G7 Phrygian dominant, as V7/ii to Cm7); the bridge dominants stay Mixolydian.
 
 ## 13. Glossary
 
-[CONTEXT.md](CONTEXT.md) is the source of truth for terms (Library, Envelope, Progression, Slot, Slot scale, Chord / scale tone, Etude, Open etude, Etude picker, Melody event, Caret, Owning slot, Length / Rest latch, Nudge, Out-of-scale mark, Control header, Chart zoom, Tune / Improvise / Write etude / Read etude, Transport, Docked hex, Fit range, Pitch anchor, Degree colour, Note sphere, Clef, Instrument view, …). Avoid "passing note".
+[CONTEXT.md](CONTEXT.md) is the source of truth for terms (Library, Envelope, Progression, Slot, Slot scale, Chord / scale tone, Etude, Open etude, Etude picker, Melody event, Caret, Owning slot, Length / Rest latch, Nudge, Out-of-scale mark, Control header, Chart zoom, the six modes, Move on, Transport, Docked hex, Fit range, Pitch anchor, Degree colour, Note sphere, Clef, Instrument view, …). Avoid "passing note".
 
 ## 14. Test tables the build must ship
 

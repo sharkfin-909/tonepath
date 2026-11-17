@@ -1,26 +1,34 @@
-// The mode panel (SPEC §3.0, §3.1): top left of the header, sharing a pill with Ins: — the mode dropdown: the four modes (Tune ·
-// Improvise · Write etude · Read etude), each with what it is for and what it uses or edits, and the keys to switch.
-// The mode alone decides whether the mic listens (no Audio input switch).
-import { MODES, MODE_LABELS, type Mode } from '../session';
+// The mode panel (SPEC §3.0, §3.1): top left of the header, sharing a pill with Ins: — the mode dropdown: the six modes,
+// the hex grid's three, a line, then the instrument's three; each with what it is for and what it uses or edits, and the
+// keys to switch. The button shows the mode's short name. The mode alone decides whether the mic listens.
+import { MODES, MODE_LABELS, MODE_SHORT, type Mode } from '../session';
 import { Dropdown } from './Dropdown';
 import { ModeIcon } from './ModeIcon';
 
 /** What each mode is for, and what it uses or lets you edit (SPEC §3.0): the tags beside its name. */
 export const MODE_INFO: Record<Mode, { blurb: string; uses: string[] }> = {
+  progression: {
+    blurb: 'Enter the chords and pick their scales. Click the hex to hear a scale; ▶ plays the progression back.',
+    uses: ['edit chords'],
+  },
+  write: {
+    blurb: 'Write your line. Pick notes on the hex grid to enter them at the caret; set lengths and rests, step through what you wrote to hear it.',
+    uses: ['edit melody'],
+  },
+  grid: {
+    blurb: 'Improvise on the hex grid. The chords move on after a number of notes you pick, or in time with a click.',
+    uses: ['hex'],
+  },
   tune: {
-    blurb: 'Warm up and tune. The hex lights every note you play; no chart, no chords. Every open starts here.',
+    blurb: 'Warm up and tune. The hex lights every note you play; no chords.',
     uses: ['mic'],
   },
   improvise: {
-    blurb: 'Play over the changes. Enter or import chords and then play them with a metronome. You will see the coming target chord tones ringed in the grid. Stop playback to step chords by hand or edit them.',
-    uses: ['mic', 'transport', 'edit tonality'],
-  },
-  write: {
-    blurb: 'Write your line. Pick notes on the hex at the caret; set lengths and rests, edit bars, step through what you wrote.',
-    uses: ['edit'],
+    blurb: 'Play over the changes on your instrument, with a click and the chords. The coming chord tones are ringed on the hex.',
+    uses: ['mic', 'transport'],
   },
   read: {
-    blurb: 'Play the etude. Every bar on one page, a click and a moving playhead.',
+    blurb: 'Play the etude on your instrument: every bar on one page, a click and a moving playhead.',
     uses: ['transport'],
   },
 };
@@ -37,11 +45,19 @@ export function ModePanel({ mode, onMode }: ModePanelProps) {
       <Dropdown
         value={mode}
         label="Mode"
-        options={MODES.map((m) => ({ value: m, label: MODE_LABELS[m], icon: <ModeIcon mode={m} />, description: MODE_INFO[m].blurb, tags: MODE_INFO[m].uses }))}
+        options={MODES.map((m) => ({
+          value: m,
+          label: MODE_LABELS[m],
+          short: MODE_SHORT[m],
+          icon: <ModeIcon mode={m} />,
+          description: MODE_INFO[m].blurb,
+          tags: MODE_INFO[m].uses,
+          divider: m === 'tune', // the instrument's modes start here
+        }))}
         onChange={onMode}
         footer={
           <>
-            <kbd>[</kbd> <kbd>]</kbd> previous / next mode · <kbd>\</kbd> write ↔ read
+            <kbd>[</kbd> <kbd>]</kbd> previous / next mode · <kbd>\</kbd> etude ↔ ins read, grid ↔ ins improv
           </>
         }
       />

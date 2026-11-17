@@ -7,12 +7,19 @@ import { ModeIcon } from './ModeIcon';
 
 /** Help's own, longer word on a mode (a paragraph, or several), where it has one; else the mode menu's blurb (`MODE_INFO`). */
 const HELP_MODE_TEXT: Partial<Record<Mode, string | string[]>> = {
+  progression: [
+    'Enter some chords. Click a chord\'s spot and type a symbol; click the scale name to pick another scale for it. Add, copy and delete bars here too.',
+    'Click the hex to hear the scale you picked, or press ▶ to play the progression back.',
+  ],
+  grid: [
+    'Create a line against the chords using the hex grid. Choose how the chords move on: by notes, where the next chord comes after a certain number of notes you pick (a nice way to get the flow of the chords), or in time, with a tempo and a click.',
+    'You can get accompaniment as you do this (chord or bass note or both). Pick some bars to loop if you want.',
+  ],
   tune:
     "Warm up and tune. Get your device's mic working and the tuner will help to get your ear in. Choose your instrument in the header to make the hex grid display your exact range and also to set the app to transpose for you if you have a transposing instrument. You can then explore the hex grid by playing into it with your instrument and making patterns that way. The grid without any chord tones or scales is just C major with accidentals between. This will give you a sense of how it works.",
   improvise: [
-    'Enter some chords and then create a line against them. You can use the grid or your instrument. If using the grid, you can use the chord bump feature to make the next chord come after a certain number of notes. This is a nice way to get the flow of the chords.',
+    'Play a line against the chords on your instrument. Create a practice backing track by choosing a tempo and time signature and playing the chords with a metronome. Pick some bars to loop if you want.',
     'You can get accompaniment as you do this (chord or bass note or both).',
-    'You can also create a practice backing track by choosing a tempo and time signature and playing the chords with a metronome. Pick some bars to loop if you want.',
   ],
   write: 'Write your line. Pick notes on the hex grid to enter notes into the chart. Set lengths and rests, edit bars, step through what you wrote to hear it.',
   read: 'Play the etude on your instrument, with a metronome and chords if you wish.',
@@ -35,8 +42,11 @@ export function HelpModal({ mode, onClose, onShortcuts }: { mode: Mode; onClose:
       </p>
 
       <section className="help-section help-box">
-        <h2>The four modes</h2>
-        <p>Pick one in the mode pill at the top left, or step through them with [ and ].</p>
+        <h2>The six modes</h2>
+        <p>
+          Three on the hex grid, then three with your instrument. Pick one in the mode pill at the top left, step through
+          them with [ and ], or jump to the same work on the other side with \ (etude ↔ ins read, grid ↔ ins improv).
+        </p>
         <dl className="help-modes">
           {MODES.map((m) => (
             <div key={m} className={m === mode ? 'help-mode current' : 'help-mode'}>
@@ -63,13 +73,13 @@ export function HelpModal({ mode, onClose, onShortcuts }: { mode: Mode; onClose:
           <li>Each cell is a note of the current chord's scale. One cell to the right is the next note up the scale; up and to the left is a third higher.</li>
           <li>The coloured cells are the chord's root, 3rd and 5th; in a four-note chord the outlined cell is its 7th (or 6th), the guide tone. The taupe cells are the rest of the scale.</li>
           <li>The number on each ball is the note's degree in the scale (1 is the root); the colour follows the degree.</li>
-          <li>Click a cell to hear it. In Write etude, clicking writes it at the caret.</li>
+          <li>Click a cell to hear it. In edit etude, clicking writes it at the caret.</li>
           <li>Grid (bottom left) switches between the honeycomb and a single row with an octave switch.</li>
         </ul>
       </section>
 
       <section className="help-section">
-        <h2>Entering chords</h2>
+        <h2>Entering chords (edit progression)</h2>
         <ul>
           <li>Click a chord's spot (the + on an empty slot) and type a symbol: Dm7, G7, Bdim, C maj7, F#m7b5, C/E … Suggestions appear as you type.</li>
           <li>Two chords with a space between them split the bar in two. Enter or Tab moves on to the next slot.</li>
@@ -80,19 +90,19 @@ export function HelpModal({ mode, onClose, onShortcuts }: { mode: Mode; onClose:
       </section>
 
       <section className="help-section">
-        <h2>Listening (Tune and Improvise)</h2>
+        <h2>Listening (ins tune and ins improv)</h2>
         <ul>
           <li>Allow the microphone when asked. The tuner shows the note you play and how far off it is — green when you're within 15 cents.</li>
           <li>Set the input level (in) so playing pushes the meter past the white mark and silence stays below it.</li>
           <li>The notes you play light up on the hex.</li>
-          <li>Chord bump (Improvise): after the number of notes you set, picked on the hex, the form moves on to the next chord.</li>
         </ul>
       </section>
 
       <section className="help-section">
         <h2>Playing along</h2>
         <ul>
-          <li>The transport (Improvise, Read etude) runs the chords in time: set the tempo and click sound, then ▶.</li>
+          <li>The transport (in time on the grid, ins improv, ins read) runs the chords in time: set the tempo and click sound, then ▶.</li>
+          <li>On the grid, by notes: after the number of notes you set, picked on the hex, the form moves on to the next chord.</li>
           <li>To loop a few bars, click a bar number (⇧-click another to extend), or pick the first and last bar in the transport. × goes back to the whole sequence.</li>
           <li>Audio on chord plays the chord, its root or its bass as each chord arrives. ▶ chord, bass and scale play them on demand.</li>
         </ul>

@@ -17,7 +17,7 @@ import type { StoredProgression } from './storage';
 import { HONEYCOMB, linearOctaves, type HexShape } from './hex';
 import { keyIntent } from './keymap';
 import { clickUnderPointer, trackPointer } from './pointerClick';
-import { ChordBumpControls } from './listen/ChordBumpControls';
+import { MoveOnControls } from './rail/MoveOnControls';
 import { ListenPill } from './listen/ListenPill';
 import { TransportBar } from './rail/TransportBar';
 import { HEX_HIDDEN, HEX_LINEAR } from './deviceSettings';
@@ -73,7 +73,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
   const chart = useChartSession({ initial, onDeleted: onLibrary, onTransportRestart: () => transport.restart(), carried });
   const { doc, progression, view, session, dispatch } = chart;
   const { mode, running } = session;
-  const profile = modeProfile(mode, running);
+  const profile = modeProfile(mode, running, session.moveBy);
   useEffect(() => onCarry?.({ mode, clip: session.clip }), [mode, session.clip, onCarry]);
   /** The open etude: its melody (Write etude, Read etude) and its instrument (every mode). */
   const etude = etudeOf(progression, session.etude);
@@ -145,7 +145,6 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
   const [heardConcert, setHeardConcert] = useState<number | null>(null);
   const [tunerSlot, setTunerSlot] = useState<HTMLDivElement | null>(null);
   const [levelsSlot, setLevelsSlot] = useState<HTMLDivElement | null>(null);
-  const [bumpSlot, setBumpSlot] = useState<HTMLDivElement | null>(null);
   /** Read etude: scale names in the chart header (off by default). */
   const [showReadScales, setShowReadScales] = useState(false);
   useEffect(() => {
@@ -274,11 +273,13 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
   );
   const tune = mode === 'tune';
   const read = mode === 'read';
-  const improvise = mode === 'improvise';
-  /** Hide hex: Improvise only (SPEC §3.1); Read etude has no hex at all. */
+  /** The lead sheet's modes (progression, grid improv, ins improv); Tune lays its hidden pane out as one too. */
+  const leadSheet = profile.chart === 'lead' && !tune;
+  /** Hide hex: ins improv only (SPEC §3.1); Read etude has no hex at all. */
   const hideHex = profile.hexHideable && hexHidden;
-  const dockedBottom = improvise || tune;
-  /** Tablet and down, hex showing: the input level and chord bump pills move from the listen row into the hex panel. */
+  /** The hex panel (and the listen row, when listening) overlays the bottom of the chart, which scrolls above it. */
+  const dockedBottom = profile.chart === 'lead';
+  /** Tablet and down, hex showing: the input level pill moves from the listen row into the hex panel. */
   const listenInDock = tablet && profile.hex && !hideHex;
   const area = chartArea(profile.chartBudget, profile.chart, mainHeight, dockedBottom ? dockWrapHeight : 0, hexShare);
   useLayoutEffect(() => {
@@ -301,6 +302,25 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
     </div>
   );
 
+  /** The loop pickers: loop bars `from`–`to`. */
+  const pickBars = (from: number, to: number) => {
+    dispatch({ type: 'bar-select', bar: from, extend: false });
+    if (to !== from) dispatch({ type: 'bar-select', bar: to, extend: true });
+  };
+  /** Grid improv: by notes (chord bump) or in time (the transport bar beside it). */
+  const moveOnControls = profile.moveOn && (
+    <MoveOnControls
+      moveBy={session.moveBy}
+      onMoveBy={(moveBy) => dispatch({ type: 'set-move-by', moveBy })}
+      notes={session.chordBumpNotes}
+      onNotes={(notes) => dispatch({ type: 'set-chord-bump-notes', notes })}
+      bars={session.selection}
+      onAllBars={() => dispatch({ type: 'clear-selection' })}
+      barCount={progression.bars.length}
+      onPickBars={pickBars}
+    />
+  );
+
   const transportControls = profile.transportBar && (
     <TransportBar
       bpm={transport.bpm}
@@ -315,10 +335,8 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
       bars={session.selection}
       onAllBars={() => dispatch({ type: 'clear-selection' })}
       barCount={progression.bars.length}
-      onPickBars={(from, to) => {
-        dispatch({ type: 'bar-select', bar: from, extend: false });
-        if (to !== from) dispatch({ type: 'bar-select', bar: to, extend: true });
-      }}
+      onPickBars={pickBars}
+      loopPickers={profile.loopPickers}
       showScales={read ? showReadScales : undefined}
       onShowScales={read ? setShowReadScales : undefined}
     />
@@ -405,9 +423,10 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
         if (el.closest('.dropdown-option') || (el.closest('button') && !el.closest('.inline-value') && !el.closest('.dropdown'))) focusHex();
       }}
     >
-      {tablet && (editControls || transportControls) && (
+      {tablet && (editControls || moveOnControls || transportControls) && (
         <div className="sound-bar-row">
           {editControls}
+          {moveOnControls}
           {transportControls}
         </div>
       )}
@@ -527,6 +546,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
             {/* Tablet and down: edit and transport sit in the bottom stack, above the sound pill; Improvise's form
                 group stays here. */}
             {formControls}
+            {!tablet && moveOnControls}
             {!tablet && transportControls}
             {!tablet && editControls}
         </div>
@@ -538,7 +558,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
           read && 'read',
           writing && 'write',
           tune && 'tuner-mode',
-          improvise && 'improvise',
+          leadSheet && 'lead',
           hideHex && 'hex-hidden',
         ]
           .filter(Boolean)
@@ -605,24 +625,13 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
               <div className="listen-row">
                 {!listenInDock && <div className="levels-slot" ref={setLevelsSlot} />}
                 <div className="tuner-slot" ref={setTunerSlot} />
-                {improvise && !hideHex && !listenInDock && <div className="bump-slot" ref={setBumpSlot} />}
                 {tablet && hexToggle && <div className="hex-toggle-slot">{hexToggle}</div>}
               </div>
             )}
-            {improvise && profile.listens && !hideHex && (
-              <ChordBumpControls
-                slot={bumpSlot}
-                on={session.chordBump}
-                notes={session.chordBumpNotes}
-                onToggle={(on) => dispatch({ type: 'set-chord-bump', on })}
-                onNotes={(notes) => dispatch({ type: 'set-chord-bump-notes', notes })}
-              />
-            )}
             {profile.hex && !hideHex && (
               <section ref={dockRef} className={linear ? 'dock linear' : 'dock'} aria-label="Docked hex" tabIndex={-1}>
-                {/* Tablet and down: the input level and chord bump pills sit in the hex panel's top corners. */}
+                {/* Tablet and down: the input level pill sits in the hex panel's top left corner. */}
                 {listenInDock && <div className="levels-slot" ref={setLevelsSlot} />}
-                {listenInDock && improvise && <div className="bump-slot" ref={setBumpSlot} />}
                 {!narrow && (
                   <button
                     type="button"
