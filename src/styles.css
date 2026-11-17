@@ -1569,6 +1569,12 @@ button.dock-label {
   --slot-paper: var(--bg);
   box-shadow: 0 1px 2px rgba(29, 27, 25, 0.06), 0 2px 8px rgba(29, 27, 25, 0.08);
 }
+/* The improvs (grid, ins): the current chord's card ringed and tinted in the hex's highlight green (--hex-trigger), so
+   the eye finds it from the hex. The tint is light, so the chord and scale stay readable. */
+.main.improv .slot.lead.active {
+  --slot-tint: color-mix(in srgb, var(--hex-trigger) 22%, transparent);
+  box-shadow: 0 0 0 2px var(--hex-trigger), 0 1px 2px rgba(29, 27, 25, 0.06), 0 2px 8px rgba(29, 27, 25, 0.08);
+}
 
 .chord-label:disabled {
   color: var(--ink);
@@ -2830,10 +2836,41 @@ select {
 .move-on-switch {
   gap: var(--chip-gap);
 }
-/* Chord bump off: the choices (and notes) greyed — the chords move by hand. */
+/* Chord bump off: the choices and the by notes pill greyed — the chords move by hand. */
 .move-on.off .move-on-choice,
-.move-on.off .move-on-notes {
+.by-notes.off .move-on-notes {
   opacity: 0.4;
+}
+/* By notes' own pill: notes: N, then the notes picked so far. It shares one grid cell with the transport bar (the
+   metronome) — both laid out, one shown — so they are the same length: the by notes pill stretches to the cell. */
+.pace-slot {
+  display: inline-grid;
+}
+.pace-slot > * {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+.pace-hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+.pace-transport {
+  display: flex;
+}
+.pace-transport > .transport-bar {
+  flex: 1;
+}
+.move-on-tally {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pill-gap);
+}
+.by-notes {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pill-gap);
+  white-space: nowrap;
 }
 /* By notes: the notes picked in this chord so far (→ for none, then 1 … N−1). Tabular, at a fixed width (up to 31). */
 .move-on-count {

@@ -332,32 +332,10 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
     dispatch({ type: 'bar-select', bar: from, extend: false });
     if (to !== from) dispatch({ type: 'bar-select', bar: to, extend: true });
   };
-  /** Grid improv: by notes (chord bump) or in time (the transport bar beside it). */
-  const moveOnControls = profile.moveOn && (
-    <MoveOnControls
-      on={session.chordBump}
-      onToggle={(on) => dispatch({ type: 'set-chord-bump', on })}
-      moveBy={session.moveBy}
-      onMoveBy={(moveBy) => dispatch({ type: 'set-move-by', moveBy })}
-      notes={session.chordBumpNotes}
-      onNotes={(notes) => dispatch({ type: 'set-chord-bump-notes', notes })}
-      count={session.bumpCount}
-    />
-  );
-  /** The practice modes' loop pill (SPEC §3.7): Loop, whole form, the bar pickers. */
+  /** Loop: the loop pill's, or edit progression's transport. */
   const setLoop = (on: boolean) => dispatch({ type: 'set-loop', on });
-  const loopControls = profile.loopPill && (
-    <LoopPill
-      loop={session.loop}
-      onLoop={setLoop}
-      bars={session.selection}
-      onWholeForm={() => dispatch({ type: 'clear-selection' })}
-      barCount={progression.bars.length}
-      onPickBars={pickBars}
-    />
-  );
-
-  const transportControls = profile.transportBar && (
+  /** The transport bar — grid improv keeps it in the chord bump slot, sharing its width with the by notes pill. */
+  const transportBar = (
     <TransportBar
       bpm={transport.bpm}
       onBpm={transport.setBpm}
@@ -369,6 +347,33 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
       loop={profile.loopPill ? undefined : { on: session.loop, onChange: setLoop }}
       showScales={read ? showReadScales : undefined}
       onShowScales={read ? setShowReadScales : undefined}
+    />
+  );
+
+  const transportControls = profile.transportBar && !profile.moveOn && transportBar;
+
+  /** Grid improv: by notes (chord bump) or in time (the transport bar beside it). */
+  const moveOnControls = profile.moveOn && (
+    <MoveOnControls
+      on={session.chordBump}
+      onToggle={(on) => dispatch({ type: 'set-chord-bump', on })}
+      moveBy={session.moveBy}
+      onMoveBy={(moveBy) => dispatch({ type: 'set-move-by', moveBy })}
+      notes={session.chordBumpNotes}
+      onNotes={(notes) => dispatch({ type: 'set-chord-bump-notes', notes })}
+      count={session.bumpCount}
+      transport={transportBar}
+    />
+  );
+  /** The practice modes' loop pill (SPEC §3.7): Loop, whole form, the bar pickers. */
+  const loopControls = profile.loopPill && (
+    <LoopPill
+      loop={session.loop}
+      onLoop={setLoop}
+      bars={session.selection}
+      onWholeForm={() => dispatch({ type: 'clear-selection' })}
+      barCount={progression.bars.length}
+      onPickBars={pickBars}
     />
   );
 
@@ -591,6 +596,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
           writing && 'write',
           tune && 'tuner-mode',
           leadSheet && 'lead',
+          (mode === 'grid' || mode === 'improvise') && 'improv',
           hideHex && 'hex-hidden',
         ]
           .filter(Boolean)
