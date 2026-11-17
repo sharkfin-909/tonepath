@@ -1,6 +1,6 @@
 // Voicings for ▶ Chord, ▶ Scale and Root note (SPEC §9).
 import { describe, expect, it } from 'vitest';
-import { bassNote, chordVoicing, midiToHz, rootNote, scaleRun } from './audio';
+import { BASS_FLOOR, bassNote, chordVoicing, midiToHz, rootNote, scaleRun } from './audio';
 import { onArrivalOf } from './device';
 import { slotHarmony } from './harmony';
 
@@ -59,6 +59,16 @@ describe('Bass note', () => {
     expect(bassNote(h('G7'))).toBe(43);
     expect(bassNote(h('C/Bb'))).toBe(46);
     expect(bassNote(h('N.C.'))).toBeNull();
+  });
+  it('never below E2 (a sine that low is lost on small speakers): C to D♯ sound an octave up, E2–D♯3 in all', () => {
+    expect(bassNote(h('E7'))).toBe(40); // E2, the floor
+    expect(bassNote(h('Eb7'))).toBe(51); // D♯3, not D♯2
+    expect(bassNote(h('C7'))).toBe(48); // C3, not C2
+    expect(bassNote(h('Am/D'))).toBe(50); // the slash bass, raised too
+    for (const c of ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B']) {
+      const m = bassNote(h(c))!;
+      expect(m >= BASS_FLOOR && m < BASS_FLOOR + 12).toBe(true);
+    }
   });
   it('the on-arrival setting reads every option; anything else is Silent', () => {
     for (const v of ['silent', 'chord', 'root', 'bass', 'bass-chord'] as const) expect(onArrivalOf({ playArrival: v })).toBe(v);

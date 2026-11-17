@@ -1,10 +1,11 @@
-// The transport bar (SPEC §3.7): Improvise's and Read etude's — tempo, the click sound, rewind, start / stop, Loop, then
-// the looped bars' chip (× for the whole form). It *is* the metronome: there is no switch, and nothing played moves
-// the form on.
+// The transport bar (SPEC §3.7): tempo, the click sound, rewind, start / stop (Space) — and, in edit progression
+// only, Loop. The practice modes keep Loop and the looped bars in their own pill (`LoopPill.tsx`). It *is* the
+// metronome: there is no switch, and nothing played moves the form on.
 import { useEffect, useState } from 'react';
 import { BPM, METRONOME_SOUNDS } from '../metronome';
 import type { ClickSound } from '../audio';
 import { Dropdown } from './Dropdown';
+import { LoopSwitch } from './LoopPill';
 
 export interface TransportBarProps {
   bpm: number;
@@ -14,44 +15,11 @@ export interface TransportBarProps {
   running: boolean;
   onStartStop: () => void;
   onRewind: () => void;
-  loop: boolean;
-  onLoop: (on: boolean) => void;
-  /** The looped bars (0-based, inclusive), or null (the whole form); × goes back to the whole form. */
-  bars: { from: number; to: number } | null;
-  onAllBars: () => void;
-  /** How many bars the form has: the loop pickers' choices. */
-  barCount: number;
-  /** The loop pickers: loop bars `from`–`to` (0-based, inclusive; either order). */
-  onPickBars: (from: number, to: number) => void;
-  /** The loop status (pickers, or the looped bars with ×): off in progression, which only plays the form back. */
-  loopPickers?: boolean;
+  /** Edit progression only: a plain Loop switch here (the practice modes have the loop pill, `LoopPill.tsx`). */
+  loop?: { on: boolean; onChange: (on: boolean) => void };
   /** Read etude only: show scale names above each chord. */
   showScales?: boolean;
   onShowScales?: (on: boolean) => void;
-}
-
-/**
- * The loop pickers (nothing looped yet): bars [first ▾] – [last ▾]. Picking both loops them; the last bar's choices
- * start at the first bar's. Fresh each time (they unmount while bars are looped).
- */
-function LoopPickers({ barCount, onPick }: { barCount: number; onPick: (from: number, to: number) => void }) {
-  const [from, setFrom] = useState<number | null>(null);
-  const [to, setTo] = useState<number | null>(null);
-  const bar = (i: number) => ({ value: i, label: String(i + 1) });
-  const all = Array.from({ length: barCount }, (_, i) => bar(i));
-  const pick = (f: number | null, t: number | null) => {
-    setFrom(f);
-    setTo(t);
-    if (f !== null && t !== null) onPick(f, t);
-  };
-  return (
-    <span className="transport-bars picking">
-      <span className="pill-label">bars</span>
-      <Dropdown label="First looped bar" value={from ?? -1} placeholder="–" options={all} onChange={(f) => pick(f, to !== null && to < f ? null : to)} />
-      <span className="pill-label">–</span>
-      <Dropdown label="Last looped bar" value={to ?? -1} placeholder="–" options={from === null ? all : all.slice(from)} onChange={(t) => pick(from, t)} />
-    </span>
-  );
 }
 
 /**
@@ -105,14 +73,8 @@ export function TransportBar({
   onStartStop,
   onRewind,
   loop,
-  onLoop,
-  bars,
-  onAllBars,
-  barCount,
-  onPickBars,
   showScales,
   onShowScales,
-  loopPickers = true,
 }: TransportBarProps) {
   return (
     <div className="transport-bar pill">
@@ -135,26 +97,7 @@ export function TransportBar({
           {running ? icon('M3 3h6v6H3z') : icon('M3.5 2v8L10 6z')}
         </button>
       </span>
-      {/* Loop: a switch with a loop icon — on, the form (or the looped bars) goes round again; off, it stops at the end. */}
-      <button
-        type="button"
-        role="switch"
-        aria-checked={loop}
-        aria-label="Loop"
-        className={loop ? 'switch chip transport-loop on' : 'switch chip transport-loop'}
-        title={bars ? 'Loop: round the looped bars again at their end' : 'Loop: round the form again at its end (click bar numbers to loop just them)'}
-        onClick={() => onLoop(!loop)}
-      >
-        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden className="transport-loop-icon">
-          <path d="M3 7.5V6a2 2 0 0 1 2-2h7" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-          <path d="M10 2l2.2 2L10 6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M13 8.5V10a2 2 0 0 1-2 2H4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-          <path d="M6 14l-2.2-2L6 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        <span className="switch-track" aria-hidden>
-          <span className="switch-knob" />
-        </span>
-      </button>
+      {loop && <LoopSwitch on={loop.on} onChange={loop.onChange} />}
       {onShowScales && (
         <button
           type="button"
@@ -171,32 +114,6 @@ export function TransportBar({
           </span>
         </button>
       )}
-      {loopPickers && <LoopStatus bars={bars} onAllBars={onAllBars} barCount={barCount} onPickBars={onPickBars} />}
     </div>
-  );
-}
-
-/**
- * The loop status, always there at a fixed width so its pill never changes length: with nothing looped, a picker for
- * the first and the last bar (both picked: they loop); looping, the looped bars with × (back to the whole form). In the
- * transport bar, and in grid improv's move-on pill while it moves on by notes.
- */
-export function LoopStatus({
-  bars,
-  onAllBars,
-  barCount,
-  onPickBars,
-}: Pick<TransportBarProps, 'bars' | 'onAllBars' | 'barCount' | 'onPickBars'>) {
-  return bars ? (
-    <span className="transport-bars looping">
-      <span className="transport-bars-text" role="status">
-        {bars.from === bars.to ? `bar ${bars.from + 1}` : `bars ${bars.from + 1}–${bars.to + 1}`}
-      </span>
-      <button type="button" className="transport-bars-clear chip" aria-label="Loop the whole form" title="Loop the whole form" onClick={onAllBars}>
-        ×
-      </button>
-    </span>
-  ) : (
-    <LoopPickers barCount={barCount} onPick={onPickBars} />
   );
 }

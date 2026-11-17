@@ -9,7 +9,7 @@ import { modeProfile } from '../modeProfile';
 /** What each mode is for, and what it uses or lets you edit (SPEC §3.0): the tags beside its name. */
 export const MODE_INFO: Record<Mode, { blurb: string; uses: string[] }> = {
   progression: {
-    blurb: 'Enter the chords and pick their scales. Click the hex to hear a scale; ▶ plays the progression back.',
+    blurb: 'Enter the chords and pick their scales, with the whole screen for the chart; ▶ plays the progression back.',
     uses: ['edit chords'],
   },
   write: {
@@ -17,7 +17,7 @@ export const MODE_INFO: Record<Mode, { blurb: string; uses: string[] }> = {
     uses: ['edit melody'],
   },
   grid: {
-    blurb: 'Improvise on the hex grid. The chords move on after a number of notes you pick, or in time with a click.',
+    blurb: 'Improvise on the hex grid. Chord bump moves the chords on after a number of notes you pick, or with the metronome.',
     uses: ['hex'],
   },
   tune: {
@@ -25,7 +25,7 @@ export const MODE_INFO: Record<Mode, { blurb: string; uses: string[] }> = {
     uses: ['mic'],
   },
   improvise: {
-    blurb: 'Play over the changes on your instrument, with a click and the chords. The coming chord tones are ringed on the hex.',
+    blurb: 'Play over the changes on your instrument, with a click and the chords. The hex follows each chord as it comes.',
     uses: ['mic', 'transport'],
   },
   read: {

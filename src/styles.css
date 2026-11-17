@@ -2816,7 +2816,7 @@ select {
     margin-bottom: calc(var(--sound-bar-h, 0px) + 10px); /* + the row's 6px gap: 8px clear of the bottom stack */
   }
 }
-/* Grid improv's move-on pill (SPEC §3.11): by notes | in time, then (by notes) the notes count and the loop status. */
+/* Grid improv's chord bump pill (SPEC §3.11): the switch, by notes | metronome, then (by notes) notes: N and the count. */
 .move-on {
   display: inline-flex;
   align-items: center;
@@ -2826,6 +2826,24 @@ select {
 .move-on-choice {
   display: inline-flex;
   gap: var(--chip-gap);
+}
+.move-on-switch {
+  gap: var(--chip-gap);
+}
+/* Chord bump off: the choices (and notes) greyed — the chords move by hand. */
+.move-on.off .move-on-choice,
+.move-on.off .move-on-notes {
+  opacity: 0.4;
+}
+/* By notes: the notes picked in this chord so far (→ for none, then 1 … N−1). Tabular, at a fixed width (up to 31). */
+.move-on-count {
+  display: inline-flex;
+  justify-content: flex-end;
+  align-items: center;
+  min-width: 2.2ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
 }
 .move-on-notes {
   display: inline-flex;
@@ -3326,4 +3344,19 @@ select {
 .library-list.standards .library-title {
   display: inline-flex;
   align-items: center;
+}
+
+/* The loop pill (SPEC §3.7): Loop, whole form, and — whole form off — the bar pickers. */
+.loop-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pill-gap);
+  white-space: nowrap;
+}
+.loop-whole {
+  gap: var(--chip-gap);
+}
+/* Whole form on: the bar pickers stay (the pill keeps its width), greyed and not clickable. */
+.transport-bars.off {
+  opacity: 0.4;
 }

@@ -310,9 +310,9 @@ describe('browsing in Write etude', () => {
 });
 
 describe('sound, mute and settings', () => {
-  it('C / B / ⇧Space sound the active slot (concert)', () => {
+  it('C / B / ⇧Space sound the active slot (concert); B is the bass note, an octave below the root note', () => {
     const r = run([{ type: 'sound', what: 'chord' }, { type: 'sound', what: 'bass' }, { type: 'sound', what: 'scale' }]);
-    expect(show(r.effects)).toEqual(['chord D', 'root D', 'scale D']);
+    expect(show(r.effects)).toEqual(['chord D', 'bass D', 'scale D']);
   });
 
   it('mute and On arrival are remembered on the device', () => {
@@ -593,12 +593,44 @@ describe('grid improv', () => {
     expect(grid([...loop, pick(62), pick(64), pick(62), pick(64)]).state.slot).toBe(1); // not 3
   });
 
+  it('by notes without Loop: at the last chord (of the form, or the looped bars) it stays', () => {
+    expect(grid([{ type: 'set-loop', on: false }, { type: 'slot-click', index: 3 }, pick(62), pick(64)]).state.slot).toBe(3);
+    const loop: Intent[] = [{ type: 'bar-select', bar: 1, extend: false }, { type: 'bar-select', bar: 2, extend: true }];
+    expect(grid([{ type: 'set-loop', on: false }, ...loop, pick(62), pick(64), pick(62), pick(64)]).state.slot).toBe(2);
+  });
+
+  it('Loop is remembered on the device (shared with the transport)', () => {
+    const r = grid([{ type: 'set-loop', on: false }]);
+    expect(r.state.loop).toBe(false);
+    expect(r.effects).toContainEqual({ type: 'device', patch: { practiceLoop: false } });
+    expect(initialSession(prog(), { onArrival: 'silent', loop: false }).loop).toBe(false);
+    expect(initialSession(prog(), { onArrival: 'silent' }).loop).toBe(true);
+  });
+
   it('in time: the transport moves the form, picks never do; by notes has no transport', () => {
     const time = grid([{ type: 'set-move-by', moveBy: 'time' }, pick(62), pick(64)]);
     expect(time.state).toMatchObject({ moveBy: 'time', slot: 0 });
     expect(time.effects).toContainEqual({ type: 'device', patch: { moveBy: 'time' } });
     expect(grid([{ type: 'set-move-by', moveBy: 'time' }, { type: 'transport', run: true }]).state.running).toBe(true);
     expect(grid([{ type: 'transport', run: true }]).state.running).toBe(false);
+  });
+
+  it('chord bump off: picks never move the form, and there is no transport; on again, the choice is kept', () => {
+    const off = grid([{ type: 'set-chord-bump', on: false }, pick(62), pick(64), { type: 'transport', run: true }]);
+    expect(off.state).toMatchObject({ chordBump: false, slot: 0, running: false });
+    expect(off.effects).toContainEqual({ type: 'device', patch: { chordBump: false } });
+    const time = grid([{ type: 'set-move-by', moveBy: 'time' }, { type: 'set-chord-bump', on: false }, { type: 'set-chord-bump', on: true }, { type: 'transport', run: true }]);
+    expect(time.state).toMatchObject({ moveBy: 'time', running: true });
+  });
+
+  it('switching chord bump off stops the metronome', () => {
+    const r = grid([{ type: 'set-move-by', moveBy: 'time' }, { type: 'transport', run: true }, { type: 'set-chord-bump', on: false }]);
+    expect(r.state.running).toBe(false);
+  });
+
+  it('a first open has chord bump on (by notes)', () => {
+    expect(initialSession(prog(), { onArrival: 'silent' })).toMatchObject({ chordBump: true, moveBy: 'notes' });
+    expect(initialSession(prog(), { onArrival: 'silent', chordBump: false }).chordBump).toBe(false);
   });
 
   it('switching to by notes stops the transport', () => {
@@ -615,11 +647,12 @@ describe('grid improv', () => {
 describe('progression', () => {
   const progression = (more: Intent[]) => run([{ type: 'mode', mode: 'progression' }, ...more], { onArrival: 'chord' });
 
-  it('edits the form; the hex auditions and writes nothing', () => {
+  it('edits the form; there is no hex panel, so a pick (A) does nothing', () => {
     expect(progression([{ type: 'append-bar' }]).p.bars).toHaveLength(5);
     const r = progression([pick(62), pick(64)]);
     expect(melodyOf(r.p)).toEqual([]);
-    expect(r.state.slot).toBe(0); // no chord bump
+    expect(r.effects).toEqual([]);
+    expect(r.state.slot).toBe(0);
   });
 
   it('edits the lead sheet\'s form: time signature, undo, "+", trash and the ⋯ bar menu', () => {

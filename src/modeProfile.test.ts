@@ -23,13 +23,13 @@ describe('mode profile', () => {
   });
 
   it.each<[Mode, boolean, ReturnType<typeof pick>]>([
-    ['progression', false, { listens: false, transport: true, editsMelody: false, editsForm: true, movesByHand: true, chartInert: false, chart: 'lead', chartBudget: 'fill', hex: true, heardLights: false, targets: false }],
-    ['progression', true, { listens: false, transport: true, editsMelody: false, editsForm: false, movesByHand: false, chartInert: false, chart: 'lead', chartBudget: 'fill', hex: true, heardLights: false, targets: true }],
+    ['progression', false, { listens: false, transport: true, editsMelody: false, editsForm: true, movesByHand: true, chartInert: false, chart: 'lead', chartBudget: 'fill', hex: false, heardLights: false, targets: false }],
+    ['progression', true, { listens: false, transport: true, editsMelody: false, editsForm: false, movesByHand: false, chartInert: false, chart: 'lead', chartBudget: 'fill', hex: false, heardLights: false, targets: false }],
     ['write', false, { listens: false, transport: false, editsMelody: true, editsForm: false, movesByHand: true, chartInert: false, chart: 'write', chartBudget: 'half', hex: true, heardLights: false, targets: false }],
     ['grid', false, { listens: false, transport: false, editsMelody: false, editsForm: false, movesByHand: true, chartInert: false, chart: 'lead', chartBudget: 'fill', hex: true, heardLights: false, targets: false }],
     ['tune', false, { listens: true, transport: false, editsMelody: false, editsForm: false, movesByHand: true, chartInert: false, chart: 'lead', chartBudget: 'half', hex: true, heardLights: true, targets: false }],
     ['improvise', false, { listens: true, transport: true, editsMelody: false, editsForm: false, movesByHand: true, chartInert: false, chart: 'lead', chartBudget: 'fill', hex: true, heardLights: true, targets: false }],
-    ['improvise', true, { listens: true, transport: true, editsMelody: false, editsForm: false, movesByHand: false, chartInert: false, chart: 'lead', chartBudget: 'fill', hex: true, heardLights: false, targets: true }],
+    ['improvise', true, { listens: true, transport: true, editsMelody: false, editsForm: false, movesByHand: false, chartInert: false, chart: 'lead', chartBudget: 'fill', hex: true, heardLights: false, targets: false }],
     ['read', false, { listens: false, transport: true, editsMelody: false, editsForm: false, movesByHand: true, chartInert: false, chart: 'read', chartBudget: 'full', hex: false, heardLights: false, targets: false }],
     ['read', true, { listens: false, transport: true, editsMelody: false, editsForm: false, movesByHand: false, chartInert: true, chart: 'read', chartBudget: 'full', hex: false, heardLights: false, targets: false }],
   ])('%s (running: %s)', (mode, running, expected) => {
@@ -42,10 +42,14 @@ describe('mode profile', () => {
     expect(modeProfile('grid', true, 'notes').running).toBe(false); // no transport to run
     const time = modeProfile('grid', false, 'time');
     expect(time).toMatchObject({ chordBump: false, transport: true, transportBar: true, moveOn: true });
-    expect(modeProfile('grid', true, 'time')).toMatchObject({ running: true, targets: true, movesByHand: false });
+    expect(modeProfile('grid', true, 'time')).toMatchObject({ running: true, targets: false, movesByHand: false }); // no next-chord hint
     // Chord bump is grid improv's alone; the move-on choice too.
     expect(MODES.filter((m) => modeProfile(m).chordBump)).toEqual(['grid']);
     expect(MODES.filter((m) => modeProfile(m).moveOn)).toEqual(['grid']);
+  });
+
+  it('grid improv with chord bump off: nothing moves the form on (no chord bump, no transport)', () => {
+    expect(modeProfile('grid', false, 'off')).toMatchObject({ chordBump: false, transport: false, transportBar: false, moveOn: true });
   });
 
   it('only a mode with a transport runs', () => {
@@ -58,8 +62,11 @@ describe('mode profile', () => {
     expect(MODES.filter((m) => modeProfile(m).formGroup)).toEqual(['progression']);
     expect(modeProfile('progression', true).formGroup).toBe(false);
     expect(MODES.filter((m) => modeProfile(m).transportBar)).toEqual(['progression', 'improvise', 'read']);
-    // Progression plays the form back to hear it: nothing to practise, so no looped bars.
-    expect(MODES.filter((m) => modeProfile(m, false, 'time').loopPickers)).toEqual(['grid', 'improvise', 'read']);
+    // The loop pill (Loop, whole form, the bar pickers): the modes you practise in — grid improv either way.
+    expect(MODES.filter((m) => modeProfile(m).loopPill)).toEqual(['grid', 'improvise', 'read']);
+    expect(modeProfile('grid', false, 'time').loopPill).toBe(true);
+    // Progression plays the form back to hear it: its transport keeps a plain Loop switch, no looped bars.
+    expect(MODES.filter((m) => modeProfile(m).transport && !modeProfile(m).loopPill)).toEqual(['progression']);
   });
 
   it("a slot reached by hand waits for the first note picked or played to sound (On arrival): the lead sheet's modes but Tune", () => {
@@ -68,7 +75,7 @@ describe('mode profile', () => {
   });
 
   it('a standard (locked): edit progression shows it read-only — no form group, nothing edits; ▶ still plays', () => {
-    expect(modeProfile('progression', false, 'notes', true)).toMatchObject({ editsForm: false, formGroup: false, transport: true, hex: true });
+    expect(modeProfile('progression', false, 'notes', true)).toMatchObject({ editsForm: false, formGroup: false, transport: true, hex: false });
     expect(modeProfile('write', false, 'notes', true)).toMatchObject({ editsMelody: true, editPill: true });
   });
 

@@ -30,6 +30,7 @@ describe('keymap (SPEC §11)', () => {
       expect(intent(key(' '), ctx(mode, { running: true }))).toEqual({ type: 'transport', run: false });
     }
     expect(intent(key(' '), ctx('grid', { moveBy: 'time' }))).toEqual({ type: 'transport', run: true });
+    expect(keyIntent(key(' '), ctx('grid', { moveBy: 'off' }))).toEqual({ intent: null, handled: true }); // chord bump off
     for (const c of [ctx('grid', { moveBy: 'notes' }), ctx('grid'), ctx('write', { hovered: 67 }), ctx('tune', { hovered: 67 })]) {
       expect(keyIntent(key(' '), c)).toEqual({ intent: null, handled: true }); // no transport: nothing (no page scroll)
     }

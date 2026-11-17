@@ -26,9 +26,9 @@ describe('hex lighting', () => {
     expect(light('tune', false, { heard: null }).heard).toBeNull();
   });
 
-  it("Improvise running: the upcoming chord's tones ringed, the hex held still", () => {
+  it('running: no hint of the next chord (no target rings); the hex held still', () => {
     const l = light('improvise', true);
-    expect([...l.targets!.pcs].sort((a, b) => a - b)).toEqual([1, 4, 7, 9]); // G7 written for B♭ trumpet: A C♯ E G
+    expect(l.targets).toBeNull();
     expect(l.still).toBe(true);
     expect(light('improvise', false).targets).toBeNull();
     expect(light('improvise', false).still).toBe(false);

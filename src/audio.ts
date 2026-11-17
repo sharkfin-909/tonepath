@@ -47,10 +47,17 @@ export function rootNote(h: SlotHarmony): number | null {
   return OCTAVE_3 + pc(h.bass ?? h.root);
 }
 
-/** *On arrival: Bass note*: the chord's bass (slash bass if any) an octave below the root note (concert octave 2). */
+/** The bass note's lowest pitch: E2 (82 Hz). A sine any lower is lost on laptop and phone speakers. */
+export const BASS_FLOOR = 40;
+
+/**
+ * *On arrival: Bass note* (and ▶ Bass / B): the chord's bass (slash bass if any) an octave below the root note —
+ * but never below E2: C2–D♯2 sound an octave up, so the bass is always E2–D♯3.
+ */
 export function bassNote(h: SlotHarmony): number | null {
   const m = rootNote(h);
-  return m === null ? null : m - 12;
+  if (m === null) return null;
+  return m - 12 < BASS_FLOOR ? m : m - 12;
 }
 
 export const midiToHz = (m: number) => 440 * 2 ** ((m - 69) / 12);

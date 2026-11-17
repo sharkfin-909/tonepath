@@ -1,11 +1,11 @@
-// The transport in React (SPEC §3.7): Improvise's and Read etude's tempo, click sound and Loop (device settings),
+// The transport in React (SPEC §3.7): the tempo and click sound (device settings), Loop (the session's),
 // the looped bars as a slot range, and the metronome run on the audio clock while the session says it runs.
 // The session's current slot is the one playhead: the run announces each slot (`onSlot` → the session), and any
 // fresh run — started, rewound (`restart()`), or after a change of tempo, sound or form — begins on it.
 // The timing logic — lookahead, loop, end — is `metronomeRun.ts`; this is its adapter.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { audioNow, playClick, unlockAudio, type ClickSound } from './audio';
-import { METRONOME_BPM, METRONOME_SOUND, TRANSPORT_LOOP } from './deviceSettings';
+import { METRONOME_BPM, METRONOME_SOUND } from './deviceSettings';
 import { startMetronomeRun, type Clock } from './metronomeRun';
 import type { ModeProfile } from './modeProfile';
 import { loopRange, transportForm, type SlotRange } from './transport';
@@ -32,6 +32,8 @@ export interface TransportOptions {
   selection: { from: number; to: number } | null;
   /** The session's current slot: where a run starts. */
   slot: number;
+  /** Loop (the session's, SPEC §3.7): at the end, round again; else stop. */
+  loop: boolean;
   /** A slot starts (the session's `transport-chord`). */
   onSlot: (index: number) => void;
   /** The form (or the looped bars) ended without Loop (the session's `transport-end`). */
@@ -43,8 +45,6 @@ export interface Transport {
   setBpm: (bpm: number) => void;
   sound: ClickSound;
   setSound: (sound: ClickSound) => void;
-  loop: boolean;
-  setLoop: (loop: boolean) => void;
   /** The looped bars as slots, in a mode with a transport; else null. */
   range: SlotRange | null;
   /** Start afresh from the current slot (the session's `transport-restart` effect: a rewind while running). */
@@ -52,7 +52,6 @@ export interface Transport {
 }
 
 export function useTransport(o: TransportOptions): Transport {
-  const [loop, setLoop] = useDeviceSetting(TRANSPORT_LOOP);
   const [bpm, setBpm] = useDeviceSetting(METRONOME_BPM);
   const [sound, setSound] = useDeviceSetting(METRONOME_SOUND);
   const [restarts, setRestarts] = useState(0);
@@ -61,8 +60,8 @@ export function useTransport(o: TransportOptions): Transport {
   const range = useMemo(() => (profile.transport ? loopRange(view.slots, selection) : null), [profile.transport, view.slots, selection]);
   const form = useMemo(() => transportForm(view, range), [view, range]);
 
-  const live = useRef({ ...o, loop });
-  live.current = { ...o, loop };
+  const live = useRef(o);
+  live.current = o;
 
   const running = profile.running;
   const { meter } = view;
@@ -84,5 +83,5 @@ export function useTransport(o: TransportOptions): Transport {
     return run.stop;
   }, [running, bpm, sound, meter, form, restarts]);
 
-  return { bpm, setBpm, sound, setSound, loop, setLoop, range, restart: () => setRestarts((n) => n + 1) };
+  return { bpm, setBpm, sound, setSound, range, restart: () => setRestarts((n) => n + 1) };
 }

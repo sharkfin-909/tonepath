@@ -28,7 +28,7 @@ export interface HexLighting {
   heard: number | null;
   targets: { pcs: Set<number>; midi: null } | null;
   sounded: { midi: number; n: number } | null;
-  /** The hex holds still (no slot-change motion) while the transport rings targets. */
+  /** The hex holds still (no slot-change motion) while the transport runs: each chord lands at once. */
   still: boolean;
 }
 
@@ -40,6 +40,6 @@ export function hexLighting(i: HexLightingInput): HexLighting {
     heard: m.heardLights && i.heard !== null ? view.toWritten(i.heard) : null,
     targets: pcs && { pcs, midi: null },
     sounded: m.writeLights && i.sounded ? { midi: view.toWritten(i.sounded.midi), n: i.sounded.n } : null,
-    still: m.targets,
+    still: m.running,
   };
 }

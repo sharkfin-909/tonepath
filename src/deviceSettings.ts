@@ -29,6 +29,9 @@ export type ChordBumpNotes = (typeof CHORD_BUMP_NOTES_OPTIONS)[number];
 /** Grid improv: the chords move on by notes (chord bump, default) or in time (the transport). */
 export const MOVE_BY: DeviceSetting<MoveBy> = { key: 'moveBy', read: (raw) => (raw === 'time' ? 'time' : 'notes') };
 
+/** Grid improv's chord bump switch: on by default (by notes or with the metronome); off, the chords move by hand. */
+export const CHORD_BUMP: DeviceSetting<boolean> = { key: 'chordBump', read: (raw) => raw !== false };
+
 /** The mode last used: the next open starts there (none yet: grid improv). */
 export const LAST_MODE: DeviceSetting<Mode | undefined> = { key: 'lastMode', read: (raw) => (isMode(raw) ? raw : undefined) };
 

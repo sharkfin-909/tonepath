@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { playBass, playChord, playNote, playRoot, playScale, setMuted } from './audio';
 import { onArrivalOf, readDevice, readSetting, writeDevice } from './device';
-import { CHORD_BUMP_NOTES, LAST_MODE, MOVE_BY } from './deviceSettings';
+import { CHORD_BUMP, CHORD_BUMP_NOTES, LAST_MODE, MOVE_BY, TRANSPORT_LOOP } from './deviceSettings';
 import { isStandardId } from './standards';
 import { openDocument, type ProgressionDocument } from './document';
 import { NEW_INTAKE, appSounded, isPlayed, type MicIntake } from './micIntake';
@@ -73,7 +73,9 @@ export function useChartSession(o: ChartSessionOptions): ChartSession {
         muted: device.muted,
         onArrival: onArrivalOf(device),
         moveBy: readSetting(localStorage, MOVE_BY),
+        chordBump: readSetting(localStorage, CHORD_BUMP),
         lastMode: readSetting(localStorage, LAST_MODE),
+        loop: readSetting(localStorage, TRANSPORT_LOOP),
         chordBumpNotes: readSetting(localStorage, CHORD_BUMP_NOTES),
       },
       doc.progression.openEtudeId,

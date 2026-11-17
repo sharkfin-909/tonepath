@@ -9,10 +9,10 @@ import { ModeIcon } from './ModeIcon';
 const HELP_MODE_TEXT: Partial<Record<Mode, string | string[]>> = {
   progression: [
     'Enter some chords. Click a chord\'s spot and type a symbol; click the scale name to pick another scale for it. Add, copy and delete bars here too.',
-    'Click the hex to hear the scale you picked, or press ▶ to play the progression back.',
+    'The chart takes the whole screen here (no hex grid). ▶ Scale, or S, plays the scale you picked; ▶ in the transport plays the progression back.',
   ],
   grid: [
-    'Create a line against the chords using the hex grid. Choose how the chords move on: by notes, where the next chord comes after a certain number of notes you pick (a nice way to get the flow of the chords), or in time, with a tempo and a click.',
+    'Create a line against the chords using the hex grid. With chord bump on, the chords move on by themselves: by notes, where the next chord comes after a certain number of notes you pick (a nice way to get the flow of the chords), or with the metronome, at a tempo with a click. Switch it off to move through the chords by hand.',
     'You can get accompaniment as you do this (chord or bass note or both). Pick some bars to loop if you want.',
   ],
   tune:
@@ -101,7 +101,7 @@ export function HelpModal({ mode, onClose, onShortcuts }: { mode: Mode; onClose:
       <section className="help-section">
         <h2>Playing along</h2>
         <ul>
-          <li>The transport (in time on the grid, ins improv, ins read) runs the chords in time: set the tempo and click sound, then ▶.</li>
+          <li>The transport (the metronome on the grid, ins improv, ins read) runs the chords in time: set the tempo and click sound, then ▶.</li>
           <li>On the grid, by notes: after the number of notes you set, picked on the hex, the form moves on to the next chord.</li>
           <li>To loop a few bars, click a bar number (⇧-click another to extend), or pick the first and last bar in the transport. × goes back to the whole sequence.</li>
           <li>Audio on chord plays the chord, its root or its bass as each chord arrives. ▶ chord, bass and scale play them on demand.</li>

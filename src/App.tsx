@@ -17,6 +17,7 @@ import type { StoredProgression } from './storage';
 import { HONEYCOMB, linearOctaves, type HexShape } from './hex';
 import { keyIntent } from './keymap';
 import { MoveOnControls } from './rail/MoveOnControls';
+import { LoopPill } from './rail/LoopPill';
 import { ListenPill } from './listen/ListenPill';
 import { TransportBar } from './rail/TransportBar';
 import { HEX_HIDDEN, HEX_LINEAR } from './deviceSettings';
@@ -30,7 +31,7 @@ import { useChartSession } from './useChartSession';
 import { Logo } from './Logo';
 import { useTransport } from './useTransport';
 import { etudeOf, hasChords } from './progression';
-import type { Carried } from './session';
+import { moveOn, type Carried } from './session';
 import { EtudePicker } from './rail/EtudePicker';
 import type { LibraryCurrent } from './library/LibraryScreen';
 import { HamburgerMenu } from './rail/HamburgerMenu';
@@ -74,7 +75,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
   const chart = useChartSession({ initial, onDeleted: onLibrary, onTransportRestart: () => transport.restart(), carried });
   const { doc, progression, view, session, dispatch } = chart;
   const { mode, running } = session;
-  const profile = modeProfile(mode, running, session.moveBy, session.locked);
+  const profile = modeProfile(mode, running, moveOn(session), session.locked);
   useEffect(() => onCarry?.({ mode, clip: session.clip }), [mode, session.clip, onCarry]);
   /** The open etude: its melody (Write etude, Read etude) and its instrument (every mode). */
   const etude = etudeOf(progression, session.etude);
@@ -184,6 +185,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
     profile,
     selection: session.selection,
     slot: session.slot,
+    loop: session.loop,
     onSlot: (index) => dispatch({ type: 'transport-chord', index }),
     onEnd: () => dispatch({ type: 'transport-end' }),
   });
@@ -229,7 +231,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
         running: s.running,
         selection: s.selection,
         hovered: hovered.current,
-        moveBy: s.moveBy,
+        moveBy: moveOn(s),
       });
       if (r.handled) e.preventDefault(); // no page scroll, no button activation, no browser back
       if (r.intent) dispatch(r.intent);
@@ -333,12 +335,23 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
   /** Grid improv: by notes (chord bump) or in time (the transport bar beside it). */
   const moveOnControls = profile.moveOn && (
     <MoveOnControls
+      on={session.chordBump}
+      onToggle={(on) => dispatch({ type: 'set-chord-bump', on })}
       moveBy={session.moveBy}
       onMoveBy={(moveBy) => dispatch({ type: 'set-move-by', moveBy })}
       notes={session.chordBumpNotes}
       onNotes={(notes) => dispatch({ type: 'set-chord-bump-notes', notes })}
+      count={session.bumpCount}
+    />
+  );
+  /** The practice modes' loop pill (SPEC §3.7): Loop, whole form, the bar pickers. */
+  const setLoop = (on: boolean) => dispatch({ type: 'set-loop', on });
+  const loopControls = profile.loopPill && (
+    <LoopPill
+      loop={session.loop}
+      onLoop={setLoop}
       bars={session.selection}
-      onAllBars={() => dispatch({ type: 'clear-selection' })}
+      onWholeForm={() => dispatch({ type: 'clear-selection' })}
       barCount={progression.bars.length}
       onPickBars={pickBars}
     />
@@ -353,13 +366,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
       running={running}
       onStartStop={() => dispatch({ type: 'transport', run: !running })}
       onRewind={() => dispatch({ type: 'rewind' })}
-      loop={transport.loop}
-      onLoop={transport.setLoop}
-      bars={session.selection}
-      onAllBars={() => dispatch({ type: 'clear-selection' })}
-      barCount={progression.bars.length}
-      onPickBars={pickBars}
-      loopPickers={profile.loopPickers}
+      loop={profile.loopPill ? undefined : { on: session.loop, onChange: setLoop }}
       showScales={read ? showReadScales : undefined}
       onShowScales={read ? setShowReadScales : undefined}
     />
@@ -439,11 +446,12 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
         if (el.closest('.dropdown-option') || (el.closest('button') && !el.closest('.inline-value') && !el.closest('.dropdown'))) focusHex();
       }}
     >
-      {tablet && (editControls || moveOnControls || transportControls) && (
+      {tablet && (editControls || moveOnControls || transportControls || loopControls) && (
         <div className="sound-bar-row">
           {editControls}
           {moveOnControls}
           {transportControls}
+          {loopControls}
         </div>
       )}
       <div className="sound-section pill">
@@ -571,6 +579,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
             {lockedBanner}
             {!tablet && moveOnControls}
             {!tablet && transportControls}
+            {!tablet && loopControls}
             {!tablet && editControls}
         </div>
       </header>
