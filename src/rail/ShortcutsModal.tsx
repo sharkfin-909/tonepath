@@ -11,7 +11,7 @@ const GROUPS: Group[] = [
     id: 'everywhere',
     title: 'Everywhere',
     rows: [
-      { keys: ['Space'], what: 'Click whatever is under the pointer' },
+      { keys: ['Space'], what: 'Start / stop the transport (where there is one)' },
       { keys: ['A'], what: 'Play the hex note under the pointer (edit etude: write it)' },
       { keys: ['['], what: 'Previous mode' },
       { keys: [']'], what: 'Next mode' },

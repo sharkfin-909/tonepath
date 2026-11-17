@@ -4,7 +4,7 @@
 // The caller ignores keys while a text field has focus (native undo and typing there).
 
 import type { Duration } from './progression';
-import { modeProfile } from './modeProfile';
+import { modeProfile, type MoveBy } from './modeProfile';
 import type { Intent, Mode } from './session';
 
 export interface KeyPress {
@@ -24,31 +24,24 @@ export interface KeyContext {
   selection: { from: number } | null;
   /** The written pitch A would pick: the hovered hex cell or ♯ / ♭ button, if playable. */
   hovered: number | null;
+  /** Grid improv's move-on choice: in time, it has a transport (Space starts it). Default by notes. */
+  moveBy?: MoveBy;
 }
 
 export interface KeyResult {
   intent: Intent | null;
   /** Suppress the browser default. */
   handled: boolean;
-  /** Space: click whatever is under the pointer (the caller does it; SPEC §11). */
-  click?: boolean;
 }
 
 const NONE: KeyResult = { intent: null, handled: false };
 const handled = (intent: Intent | null = null): KeyResult => ({ intent, handled: true });
 const LENGTHS: Duration[] = ['w', 'h', 'q', 'e', 's'];
 
-/** Space (no ⇧): a click under the pointer, in every mode. */
-const CLICK: KeyResult = { intent: null, handled: true, click: true };
-
-/** Keys shared by Write etude, Improvise and Read etude: A picks, S / ⇧Space scale, C / B sound, < > browse, ⇧M mute. */
+/** Keys shared by the chart's modes: A picks, S / ⇧Space scale, C / B sound, < > browse, ⇧M mute. */
 function shared(e: KeyPress, ctx: KeyContext): KeyResult | null {
   const k = e.key.toLowerCase();
-  if (e.key === ' ') {
-    if (e.repeat) return handled();
-    if (e.shiftKey) return handled({ type: 'sound', what: 'scale' });
-    return CLICK;
-  }
+  if (e.key === ' ') return handled(e.repeat ? null : { type: 'sound', what: 'scale' }); // ⇧Space (plain Space: the transport)
   if (k === 'a') return handled(!e.repeat && ctx.hovered !== null ? { type: 'pick', written: ctx.hovered } : null);
   if (k === 'c' || k === 'b' || k === 's') {
     return handled(e.repeat ? null : { type: 'sound', what: k === 'c' ? 'chord' : k === 'b' ? 'bass' : 'scale' });
@@ -69,10 +62,17 @@ export function keyIntent(e: KeyPress, ctx: KeyContext): KeyResult {
   if (plain && e.key === '\\') return handled({ type: 'mode', mode: 'partner' });
   if (plain && (e.key === '[' || e.key === ']')) return handled(e.repeat ? null : { type: 'mode', mode: e.key === '[' ? 'prev' : 'next' });
 
+  // Space: start / stop the transport, where the mode has one (SPEC §11); elsewhere nothing (and no page scroll).
+  if (plain && e.key === ' ' && !e.shiftKey) {
+    if (e.repeat) return handled();
+    const moveBy = ctx.running ? 'time' : (ctx.moveBy ?? 'notes'); // running: it has a transport
+    return handled(modeProfile(ctx.mode, ctx.running, moveBy).transport ? { type: 'transport', run: !ctx.running } : null);
+  }
+
   if (ctx.mode === 'tune') {
-    // Tune: Space = click, A picks, ⇧M; no chord to sound (C, B, S do nothing), no chart.
+    // Tune: A picks, ⇧M; no chord to sound (C, B, S, ⇧Space do nothing), no chart, no transport.
     if (!plain) return NONE;
-    if (e.key === ' ') return e.repeat || e.shiftKey ? handled() : CLICK;
+    if (e.key === ' ') return handled();
     const k = e.key.toLowerCase();
     if (k === 'a') return handled(!e.repeat && ctx.hovered !== null ? { type: 'pick', written: ctx.hovered } : null);
     if (k === 'm' && e.shiftKey) return handled({ type: 'toggle-mute' });

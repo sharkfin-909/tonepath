@@ -24,11 +24,20 @@ describe('keymap (SPEC §11)', () => {
     expect(keyIntent(key('`', { repeat: true }), w)).toEqual({ intent: null, handled: true });
   });
 
-  it('Space clicks under the pointer in every mode (no repeat); A picks the hovered pitch; ⇧Space plays the scale', () => {
-    const over = ctx('write', { hovered: 67 });
-    for (const mode of ['progression', 'write', 'grid', 'tune', 'improvise', 'read'] as const) {
-      expect(keyIntent(key(' '), ctx(mode, { hovered: 67 }))).toEqual({ intent: null, handled: true, click: true });
+  it('Space starts / stops the transport where there is one (no repeat); elsewhere it does nothing', () => {
+    for (const mode of ['progression', 'improvise', 'read'] as const) {
+      expect(intent(key(' '), ctx(mode))).toEqual({ type: 'transport', run: true });
+      expect(intent(key(' '), ctx(mode, { running: true }))).toEqual({ type: 'transport', run: false });
     }
+    expect(intent(key(' '), ctx('grid', { moveBy: 'time' }))).toEqual({ type: 'transport', run: true });
+    for (const c of [ctx('grid', { moveBy: 'notes' }), ctx('grid'), ctx('write', { hovered: 67 }), ctx('tune', { hovered: 67 })]) {
+      expect(keyIntent(key(' '), c)).toEqual({ intent: null, handled: true }); // no transport: nothing (no page scroll)
+    }
+    expect(keyIntent(key(' ', { repeat: true }), ctx('improvise'))).toEqual({ intent: null, handled: true });
+  });
+
+  it('A picks the hovered pitch; ⇧Space plays the scale', () => {
+    const over = ctx('write', { hovered: 67 });
     expect(intent(key('a'), over)).toEqual({ type: 'pick', written: 67 });
     expect(keyIntent(key(' ', { repeat: true }), over)).toEqual({ intent: null, handled: true });
     expect(intent(key(' ', { shiftKey: true }), over)).toEqual({ type: 'sound', what: 'scale' });

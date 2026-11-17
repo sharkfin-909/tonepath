@@ -16,7 +16,6 @@ import { DockedHex } from './hex/DockedHex';
 import type { StoredProgression } from './storage';
 import { HONEYCOMB, linearOctaves, type HexShape } from './hex';
 import { keyIntent } from './keymap';
-import { clickUnderPointer, trackPointer } from './pointerClick';
 import { MoveOnControls } from './rail/MoveOnControls';
 import { ListenPill } from './listen/ListenPill';
 import { TransportBar } from './rail/TransportBar';
@@ -230,17 +229,13 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
         running: s.running,
         selection: s.selection,
         hovered: hovered.current,
+        moveBy: s.moveBy,
       });
       if (r.handled) e.preventDefault(); // no page scroll, no button activation, no browser back
-      if (r.click) clickUnderPointer();
       if (r.intent) dispatch(r.intent);
     };
     window.addEventListener('keydown', onKey);
-    const untrack = trackPointer();
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      untrack();
-    };
+    return () => window.removeEventListener('keydown', onKey);
   }, [current, dispatch]);
 
   const onRefusalShown = useCallback(() => dispatch({ type: 'refusal-shown' }), [dispatch]);

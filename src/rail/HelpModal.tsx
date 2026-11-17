@@ -36,7 +36,7 @@ export function HelpModal({ mode, onClose, onShortcuts }: { mode: Mode; onClose:
       </p>
       <p className="help-lead">
         You can use this to explore the tonality of a series of chords, either by using your mouse and triggering notes
-        with the space bar (no tiring clicking necessary) or by playing them on your instrument using the hex grid as a
+        with the A key (no tiring clicking necessary) or by playing them on your instrument using the hex grid as a
         guide. You can also use the hex grid to write your own etude over the changes, and then play that using your
         instrument.
       </p>
