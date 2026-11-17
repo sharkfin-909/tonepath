@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { prettyName } from '../spelling';
 import { readDevice, writeDevice } from '../device';
-import { INPUT_GAIN_DB, micProblem, startListening, type Listening, type MicProblem } from './mic';
+import { INPUT_GAIN_DB, micAllowedHere, micProblem, startListening, type Listening, type MicProblem } from './mic';
 import { ONSET_GATE, meterPosition } from './pitch';
 
 export interface ListenPillProps {
@@ -102,7 +102,10 @@ export function ListenPill({ onHeard, nameOf, onNote, auto = false, tunerSlot = 
 
   // The listening modes turn it on — at once on an open into Tune (the browser may ask for the mic straight away) —
   // and off again when they end.
+  // In a frame that may not use the mic (the site tour's still picture), it isn't asked for: the tuner shows idle.
+  const [micless] = useState(() => !micAllowedHere());
   useEffect(() => {
+    if (micless) return;
     if (auto && !on && !autoStarted.current) {
       autoStarted.current = true;
       void toggle(true).then((started) => (autoStarted.current = started));
@@ -134,6 +137,7 @@ export function ListenPill({ onHeard, nameOf, onNote, auto = false, tunerSlot = 
   const mark = meterPosition(ONSET_GATE); // where a note starts to count
   return (
     <>
+    {micless && auto && tunerSlot && createPortal(<Tuner name={null} cents={0} />, tunerSlot)}
     {on && !held && tunerSlot && createPortal(<Tuner name={frame.midi === null ? null : nameOf(frame.midi)} cents={frame.cents} />, tunerSlot)}
     {on && held && tunerSlot && createPortal(<div className="tuner pill tuner-message" role="status">tap to start listening</div>, tunerSlot)}
     {auto && !on && asking && tunerSlot && createPortal(<div className="tuner pill tuner-message" role="status">allow the microphone to start listening</div>, tunerSlot)}

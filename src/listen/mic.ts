@@ -64,6 +64,23 @@ export function micProblem(err: unknown): MicProblem {
   return 'no-device';
 }
 
+/**
+ * Whether this page may use the mic at all. A frame on another site gets it only when the frame says
+ * `allow="microphone"`; without that, asking is refused at once, so the caller shows the idle tuner rather than an
+ * error (the site tour frames the app as a still picture). `allowsFeature` is Chromium's; elsewhere a frame on
+ * another site is taken as not allowed, the default for the microphone.
+ */
+export function micAllowedHere(win: Window = window): boolean {
+  const policy = (win.document as Document & { featurePolicy?: { allowsFeature(f: string): boolean } }).featurePolicy;
+  if (policy) return policy.allowsFeature('microphone');
+  if (win.top === win) return true;
+  try {
+    return win.top?.location.origin === win.location.origin;
+  } catch {
+    return false; // another site's frame: its location can't be read
+  }
+}
+
 /** The input level control's range, in dB. */
 export const INPUT_GAIN_DB = { min: -12, max: 24 } as const;
 
