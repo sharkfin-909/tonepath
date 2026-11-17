@@ -58,6 +58,8 @@ The **Mode:** dropdown offers six modes in two families ([Mode families](issues/
 | improvise on instrument | ins improv | `improvise` | §3.3 |
 | read etude on instrument | ins read | `read` | §3.4 |
 
+A launch URL may name a mode by its id, e.g. `?mode=grid` (any of the six ids above, lower case; anything else is ignored). It is read once, at launch, ahead of the device's last mode, so a link (e.g. a TrueLathe site-tour slide) can open any mode; the URL is not updated as the mode changes. Edit etude and ins read still fall back to edit progression when the progression has no chords.
+
 Each is a fixed set of panels; nothing is toggled per mode except **Hide hex** in ins improv and grid improv's **move on** choice.
 
 | | **progression** | **etude** | **grid improv** | **ins tune** | **ins improv** | **ins read** |

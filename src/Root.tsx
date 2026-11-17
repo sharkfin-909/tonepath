@@ -29,7 +29,7 @@ import { exportAll, exportOne } from './schema';
 import { download } from './download';
 import { decodeShare, tokenIn } from './share';
 import { isReadOnly } from './readOnly';
-import type { Carried } from './session';
+import { modeFromUrl, type Carried } from './session';
 import { FIRST_STANDARD, STANDARDS, listMine } from './standards';
 
 /** The open progression (null: none, e.g. an empty library) — `n` re-mounts the chart when it changes underneath. */
@@ -50,8 +50,10 @@ export function Root() {
   /** The library modal: open over the chart — always, when no progression is open. */
   const [libraryOpen, setLibraryOpen] = useState(() => chart === null);
   const showLibrary = libraryOpen || chart === null;
-  /** The chart's mode and bar clipboard: opening another progression keeps them (a reload starts afresh, SPEC §3.0). */
-  const carried = useRef<Carried | undefined>(undefined);
+  /** The chart's mode and bar clipboard: opening another progression keeps them (a launch starts in the URL's `?mode=`,
+   *  else the device's last mode, SPEC §3.0). */
+  const [launchMode] = useState(() => modeFromUrl(window.location.search));
+  const carried = useRef<Carried | undefined>(launchMode && { mode: launchMode, clip: null });
   const onCarry = useCallback((c: Carried) => {
     carried.current = c;
   }, []);

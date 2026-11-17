@@ -90,6 +90,12 @@ export const MODE_SHORT: Record<Mode, string> = {
 /** `\`: the same work in the other family (progression and ins tune have none). */
 export const MODE_PARTNER: Partial<Record<Mode, Mode>> = { write: 'read', read: 'write', grid: 'improvise', improvise: 'grid' };
 export const isMode = (v: unknown): v is Mode => typeof v === 'string' && (MODES as readonly string[]).includes(v);
+
+/** The mode a launch URL asks for by its id, e.g. `?mode=improvise` (SPEC §3.0); anything else → undefined. */
+export function modeFromUrl(search: string): Mode | undefined {
+  const asked = new URLSearchParams(search).get('mode');
+  return isMode(asked) ? asked : undefined;
+}
 // What each mode shows and lets through: `modeProfile.ts`.
 
 export interface SessionState {

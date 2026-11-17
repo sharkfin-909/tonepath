@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { melodyOf, withFlat } from './test-progression';
 import { TICKS } from './melody';
 import { newProgression, type Progression } from './progression';
-import { activeIndex, initialSession, reduce, type Effect, type Intent, type Outcome, type SessionState } from './session';
+import { activeIndex, initialSession, modeFromUrl, reduce, type Effect, type Intent, type Outcome, type SessionState } from './session';
 import type { OnArrival } from './device';
 
 const q = TICKS.q;
@@ -74,6 +74,21 @@ describe('Write etude: entry', () => {
     expect(activeIndex(r.state, r.p)).toBe(0);
     const again = reduce(r.state, r.p, pick(72));
     expect(melodyOf(again.edit!)[0]).toEqual({ pitch: 72, d: 'q' }); // overwrites from the start
+  });
+});
+
+describe('the launch URL\'s mode', () => {
+  it('names any of the six modes by id; anything else is no mode', () => {
+    expect(modeFromUrl('?mode=progression')).toBe('progression');
+    expect(modeFromUrl('?mode=grid')).toBe('grid');
+    expect(modeFromUrl('?mode=improvise')).toBe('improvise');
+    expect(modeFromUrl('?mode=write')).toBe('write');
+    expect(modeFromUrl('?x=1&mode=read')).toBe('read');
+    expect(modeFromUrl('?mode=tune')).toBe('tune');
+    expect(modeFromUrl('')).toBeUndefined();
+    expect(modeFromUrl('?mode=Write')).toBeUndefined();
+    expect(modeFromUrl('?mode=explore')).toBeUndefined();
+    expect(modeFromUrl('?mode=')).toBeUndefined();
   });
 });
 
