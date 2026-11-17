@@ -57,8 +57,17 @@ export const midiToHz = (m: number) => 440 * 2 ** ((m - 69) / 12);
 
 // ---------------------------------------------------------------- engine
 
-const NOTE = { gain: 0.22, attack: 0.01, decay: 0.9 };
-const CHORD = { gain: 0.06, attack: 0.04, decay: 3.2 };
+type Envelope = { gain: number; attack: number; decay: number; /** Held at full level before the decay (s). */ hold?: number };
+const NOTE: Envelope = { gain: 0.22, attack: 0.01, decay: 0.9 };
+const CHORD: Envelope = { gain: 0.06, attack: 0.04, decay: 3.2 };
+/** *Audio on chord*'s bass note sustains under the chord: held, then a long fade (~3.6 s in all). */
+const BASS: Envelope = { gain: 0.24, attack: 0.01, hold: 1.2, decay: 2.4 };
+/** How long each *Audio on chord* sound rings (ms): the mic's echo guard (`micIntake.ts`). */
+export const RING_MS = {
+  chord: (CHORD.attack + CHORD.decay) * 1000,
+  bass: (BASS.attack + (BASS.hold ?? 0) + BASS.decay) * 1000,
+  note: 1100, // a note's audible tail (its envelope's 0.9 s, and the room)
+} as const;
 const SCALE_GAP = 0.15;
 
 let ctx: AudioContext | null = null;
@@ -114,7 +123,7 @@ export function isMuted(): boolean {
   return muted;
 }
 
-function tone(midi: number, at: number, env: typeof NOTE, wave: OscillatorType = 'sine'): void {
+function tone(midi: number, at: number, env: Envelope, wave: OscillatorType = 'sine'): void {
   if (!ctx) return;
   const osc = ctx.createOscillator();
   const g = ctx.createGain();
@@ -122,10 +131,12 @@ function tone(midi: number, at: number, env: typeof NOTE, wave: OscillatorType =
   osc.frequency.value = midiToHz(midi);
   g.gain.setValueAtTime(0, at);
   g.gain.linearRampToValueAtTime(env.gain, at + env.attack);
-  g.gain.exponentialRampToValueAtTime(0.0001, at + env.attack + env.decay);
+  const held = at + env.attack + (env.hold ?? 0);
+  if (env.hold) g.gain.setValueAtTime(env.gain, held);
+  g.gain.exponentialRampToValueAtTime(0.0001, held + env.decay);
   osc.connect(g).connect(output(ctx));
   osc.start(at);
-  osc.stop(at + env.attack + env.decay + 0.05);
+  osc.stop(held + env.decay + 0.05);
 }
 
 function ready(): AudioContext | null {
@@ -165,7 +176,7 @@ export function playRoot(h: SlotHarmony): void {
 export function playBass(h: SlotHarmony): void {
   const c = ready();
   const m = bassNote(h);
-  if (c && m !== null) tone(m, c.currentTime, NOTE);
+  if (c && m !== null) tone(m, c.currentTime, BASS);
 }
 
 // ---------------------------------------------------------------- metronome

@@ -3,7 +3,7 @@
 // echo guard over *Audio on chord* and hex-pick auditions, merged while they ring. Lighting the hex needs no intake
 // (the heard pitch does that). Pure: times come in (ms), state comes back.
 
-import { chordVoicing, rootNote, bassNote } from './audio';
+import { RING_MS, chordVoicing, rootNote, bassNote } from './audio';
 import type { SlotHarmony } from './harmony';
 
 /**
@@ -24,7 +24,7 @@ export const ECHO_DEAF_MS = 250;
 /** A sound the app plays: *On arrival* (a slot's chord, root or bass) or a note (a hex pick's audition). */
 export type AppSound = { type: 'chord' | 'root' | 'bass'; harmony: SlotHarmony } | { type: 'note'; midi: number };
 
-/** The guard for sounds just played: chord (rings ~3 s), a note — root, bass or a hex pick (~1 s). Null when nothing sounded. */
+/** The guard for sounds just played: chord (rings ~3 s), the bass note (sustains ~3.6 s), a note — root or a hex pick (~1 s). Null when nothing sounded. */
 export function echoGuard(sounds: AppSound[], now: number): EchoGuard | null {
   const midis = new Set<number>();
   let ring = 0;
@@ -32,7 +32,7 @@ export function echoGuard(sounds: AppSound[], now: number): EchoGuard | null {
     const ms =
       e.type === 'note' ? [e.midi] : e.type === 'chord' ? chordVoicing(e.harmony) : [e.type === 'root' ? rootNote(e.harmony) : bassNote(e.harmony)].filter((m): m is number => m !== null);
     ms.forEach((m) => midis.add(m));
-    if (ms.length) ring = Math.max(ring, e.type === 'chord' ? 3200 : 1100);
+    if (ms.length) ring = Math.max(ring, e.type === 'chord' ? RING_MS.chord : e.type === 'bass' ? RING_MS.bass : RING_MS.note);
   }
   return midis.size ? { start: now, until: now + ring, midis } : null;
 }

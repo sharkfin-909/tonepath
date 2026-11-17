@@ -11,7 +11,12 @@ describe('echo guard: the mic hearing the app\'s own On arrival sound', () => {
     expect(isEcho(g, 71, 1000 + ECHO_DEAF_MS - 1)).toBe(true); // anything, too soon
     expect(isEcho(g, 55, 1400)).toBe(true); // G3: an octave off the bass note
     expect(isEcho(g, 71, 1400)).toBe(false); // B: the player
-    expect(isEcho(g, 43, 1000 + 1200)).toBe(false); // the bass note has died away
+    expect(isEcho(g, 43, 1000 + 3000)).toBe(true); // the bass note sustains (~3.6 s)
+    expect(isEcho(g, 43, 1000 + 3700)).toBe(false); // …then it has died away
+  });
+  it('the root note is a short note (~1 s)', () => {
+    const g = echoGuard([{ type: 'root', harmony: g7 }], 0)!;
+    expect([isEcho(g, 55, 900), isEcho(g, 55, 1200)]).toEqual([true, false]);
   });
   it('a chord rings longer and guards all its voices; no sound, no guard', () => {
     const g = echoGuard([{ type: 'chord', harmony: g7 }], 0)!;
