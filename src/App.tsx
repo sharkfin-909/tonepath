@@ -155,6 +155,8 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
   useEffect(() => {
     if (mode !== 'read') setShowReadScales(false);
   }, [mode]);
+  /** Bumped on each A pick: the docked hex pops the hovered ball (`DockedHex` keyPick). */
+  const [keyPick, setKeyPick] = useState(0);
   const [editRequest, setEditRequest] = useState<{ bar: number; part: number; n: number } | null>(null);
   /** Open a chord's field — from another mode, in edit progression (the chords are its alone, SPEC §3.10). */
   const editChord = (bar: number, part: number) => {
@@ -235,6 +237,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
       });
       if (r.handled) e.preventDefault(); // no page scroll, no button activation, no browser back
       if (r.intent) dispatch(r.intent);
+      if (r.intent?.type === 'pick') setKeyPick((n) => n + 1); // the hovered ball pops, as on a click
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -704,6 +707,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
                   dock={profile.noChord ? view.tunerDock(shape) : view.dock(active.index, shape)}
                   onLabelClick={() => editChord(active.bar, active.part)}
                   onPick={(written) => dispatch({ type: 'pick', written })}
+                  keyPick={keyPick}
                   onHoverPitch={(p) => {
                     hovered.current = p;
                   }}
@@ -749,6 +753,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
                 dock={view.dock(active.index, shape)}
                 onLabelClick={() => editChord(active.bar, active.part)}
                 onPick={(written) => dispatch({ type: 'pick', written })}
+                keyPick={keyPick}
                 onHoverPitch={(p) => {
                   hovered.current = p;
                 }}

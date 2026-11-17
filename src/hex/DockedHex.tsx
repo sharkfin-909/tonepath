@@ -54,8 +54,11 @@ export interface DockedHexProps {
   halo?: number | null;
   /** Clicking an unparseable slot's label focuses its chord field. */
   onLabelClick?: () => void;
-  /** The playable written pitch under the pointer (a cell or a border button), or null: what A would pick (Space clicks it). */
+  /** The playable written pitch under the pointer (a cell or a border button), or null: what A would pick. */
   onHoverPitch?: (written: number | null) => void;
+  /** Bumped on each A press that picked (SPEC §11): the hovered cell or button pops and lights as if clicked (the pick
+   *  itself went through the keymap). */
+  keyPick?: number;
   /** Listen (SPEC §9.2): the written pitch the mic hears; its cells light, or its border button if out of scale. */
   heard?: number | null;
   /** Improvise, transport running (SPEC §3.3): the upcoming chord's tones — pitch classes (written), or one exact note. Ringed. */
@@ -66,7 +69,7 @@ export interface DockedHexProps {
   still?: boolean;
 }
 
-export function DockedHex({ dock, onPick, halo, onLabelClick, onHoverPitch, heard = null, targets = null, sounded = null, still = false }: DockedHexProps) {
+export function DockedHex({ dock, onPick, halo, onLabelClick, onHoverPitch, keyPick = 0, heard = null, targets = null, sounded = null, still = false }: DockedHexProps) {
   const [ref, { width, height }] = useSize<HTMLDivElement>();
   const { hex, mode, label, labelEditsChord } = dock;
   const layout: HexLayout | null = width > 0 && height > 0 ? layoutHex(hex, width, height, T.borderButtonGap) : null;
@@ -123,6 +126,16 @@ export function DockedHex({ dock, onPick, halo, onLabelClick, onHoverPitch, hear
         light(midi);
       };
   const popOf = (at: string) => (pressed.at === at ? pressed.n : 0);
+  // A on the keyboard: the hovered cell or border button pops and lights, as a click would.
+  useEffect(() => {
+    if (!keyPick || !hover) return;
+    const { pick: midi } = resolve(hover);
+    if (midi === null) return;
+    const border = hover.kind === 'border' ? hex.borders.find((b) => b.r === hover.r && b.x === hover.x) : undefined;
+    setPressed((p) => ({ at: hover.kind === 'cell' ? `${hover.r}:${hover.c}` : border ? buttonKey(border, hover.i) : '', n: p.n + 1 }));
+    light(midi);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per A press
+  }, [keyPick]);
 
   // Travel (SPEC §8.2): in the same key, the balls and a copy of the coloured cells slide together by the plan's
   // cells; the real cells show plain until the copy lands, then take the colour back before the copy is removed.
