@@ -560,6 +560,11 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
         <div className="topbar-brand">
           <Logo className="brand-logo" />
           <span className="brand">TONEPATH</span>
+          <a className="brand-credit" href="https://truelathe.com" target="_blank" rel="noopener">
+            made by
+            <br />
+            truelathe
+          </a>
         </div>
         {/* Row 1, left: the mode panel and clef (Concert) + instrument, in one pill (SPEC §3.1). */}
         <div className="mode-ins-group pill">
