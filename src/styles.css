@@ -2745,6 +2745,14 @@ select {
   height: var(--hex-share, 50%); /* App: 50%, 60% from tablet down */
   max-height: var(--hex-share, 50%);
 }
+/* Tune: no chart to show — the tuner bar sits against the header and the hex takes the rest of the height. */
+.main.tuner-mode .hex-dock-wrap:has(.dock) {
+  height: 100%;
+  max-height: 100%;
+}
+.main.tuner-mode > .chart-area {
+  display: none;
+}
 .hex-dock-wrap .listen-row {
   position: static;
   transform: none;
