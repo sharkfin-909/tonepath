@@ -17,7 +17,7 @@ export const MODE_INFO: Record<Mode, { blurb: string; uses: string[] }> = {
     uses: ['edit melody'],
   },
   grid: {
-    blurb: 'Improvise on the hex grid. Chord bump moves the chords on after a number of notes you pick, or with the metronome.',
+    blurb: 'Improvise on the hex grid. The transport moves the chords, or chord bump does after a number of notes you pick.',
     uses: ['hex'],
   },
   tune: {

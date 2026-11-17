@@ -4,10 +4,8 @@
 
 import type { Mode } from './session';
 
-/** Grid improv's choice (SPEC §3.11), with chord bump on: the chords move on after N notes picked, or with the metronome (the transport). */
+/** How grid improv's chords move on (SPEC §3.11): chord bump on — after N notes picked (`notes`); off — the transport (`time`). */
 export type MoveBy = 'notes' | 'time';
-/** How grid improv's chords move on just now: chord bump off → `off` (by hand only). */
-export type MoveOn = MoveBy | 'off';
 
 /** How the chart draws its slots: Improvise's lead sheet, Write etude's cards, Read etude's continuous staves. */
 export type ChartKind = 'lead' | 'write' | 'read';
@@ -79,7 +77,7 @@ export interface ModeProfile {
 export function modeProfile(
   mode: Mode,
   running = false,
-  moveBy: MoveOn = 'notes',
+  moveBy: MoveBy = 'notes',
   /** A standard progression (SPEC §3.12): its chords never edit. */
   locked = false,
 ): ModeProfile {

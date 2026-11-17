@@ -4,7 +4,7 @@
 // The caller ignores keys while a text field has focus (native undo and typing there).
 
 import type { Duration } from './progression';
-import { modeProfile, type MoveOn } from './modeProfile';
+import { modeProfile, type MoveBy } from './modeProfile';
 import type { Intent, Mode } from './session';
 
 export interface KeyPress {
@@ -24,8 +24,8 @@ export interface KeyContext {
   selection: { from: number } | null;
   /** The written pitch A would pick: the hovered hex cell or ♯ / ♭ button, if playable. */
   hovered: number | null;
-  /** Grid improv's move-on (`moveOn`): with the metronome (`time`) it has a transport (Space starts it). Default by notes. */
-  moveBy?: MoveOn;
+  /** Grid improv's move-on (`moveOn`): chord bump off (`time`) it has a transport (Space starts it). Default by notes. */
+  moveBy?: MoveBy;
 }
 
 export interface KeyResult {

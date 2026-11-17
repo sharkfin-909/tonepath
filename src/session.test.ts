@@ -188,7 +188,7 @@ describe('Improvise (stopped)', () => {
   });
 
   it('no chord bump in ins improv: hex picks never move the form', () => {
-    const r = improvise([pick(62), pick(64)], { state: { chordBumpNotes: 2, moveBy: 'notes' } });
+    const r = improvise([pick(62), pick(64)], { state: { chordBumpNotes: 2, chordBump: true } });
     expect(r.state.slot).toBe(0);
   });
 
@@ -575,7 +575,7 @@ describe("a slot's trash goes through the mode", () => {
 
 describe('grid improv', () => {
   const grid = (more: Intent[], state: Partial<SessionState> = {}) =>
-    run([{ type: 'mode', mode: 'grid' }, ...more], { onArrival: 'chord', state: { chordBumpNotes: 2, ...state } });
+    run([{ type: 'mode', mode: 'grid' }, ...more], { onArrival: 'chord', state: { chordBump: true, chordBumpNotes: 2, ...state } });
 
   it('by notes (chord bump): hex picks in a slot move the form on after N notes', () => {
     expect(grid([pick(62)]).state).toMatchObject({ slot: 0, bumpCount: 1 });
@@ -607,35 +607,23 @@ describe('grid improv', () => {
     expect(initialSession(prog(), { onArrival: 'silent' }).loop).toBe(true);
   });
 
-  it('in time: the transport moves the form, picks never do; by notes has no transport', () => {
-    const time = grid([{ type: 'set-move-by', moveBy: 'time' }, pick(62), pick(64)]);
-    expect(time.state).toMatchObject({ moveBy: 'time', slot: 0 });
-    expect(time.effects).toContainEqual({ type: 'device', patch: { moveBy: 'time' } });
-    expect(grid([{ type: 'set-move-by', moveBy: 'time' }, { type: 'transport', run: true }]).state.running).toBe(true);
-    expect(grid([{ type: 'transport', run: true }]).state.running).toBe(false);
-  });
-
-  it('chord bump off: picks never move the form, and there is no transport; on again, the choice is kept', () => {
-    const off = grid([{ type: 'set-chord-bump', on: false }, pick(62), pick(64), { type: 'transport', run: true }]);
-    expect(off.state).toMatchObject({ chordBump: false, slot: 0, running: false });
+  it('chord bump off (the default): the transport moves the form — ▶, or slots by hand while stopped; picks never do', () => {
+    const off = grid([{ type: 'set-chord-bump', on: false }, pick(62), pick(64)]);
+    expect(off.state).toMatchObject({ chordBump: false, slot: 0 });
     expect(off.effects).toContainEqual({ type: 'device', patch: { chordBump: false } });
-    const time = grid([{ type: 'set-move-by', moveBy: 'time' }, { type: 'set-chord-bump', on: false }, { type: 'set-chord-bump', on: true }, { type: 'transport', run: true }]);
-    expect(time.state).toMatchObject({ moveBy: 'time', running: true });
+    expect(grid([{ type: 'set-chord-bump', on: false }, { type: 'transport', run: true }]).state.running).toBe(true);
+    expect(grid([{ type: 'set-chord-bump', on: false }, { type: 'step', dir: 1 }]).state.slot).toBe(1);
+    expect(grid([{ type: 'transport', run: true }]).state.running).toBe(false); // chord bump on: no transport
   });
 
-  it('switching chord bump off stops the metronome', () => {
-    const r = grid([{ type: 'set-move-by', moveBy: 'time' }, { type: 'transport', run: true }, { type: 'set-chord-bump', on: false }]);
-    expect(r.state.running).toBe(false);
+  it('switching chord bump on stops the transport', () => {
+    const r = grid([{ type: 'set-chord-bump', on: false }, { type: 'transport', run: true }, { type: 'set-chord-bump', on: true }]);
+    expect(r.state).toMatchObject({ chordBump: true, running: false });
   });
 
-  it('a first open has chord bump on (by notes)', () => {
-    expect(initialSession(prog(), { onArrival: 'silent' })).toMatchObject({ chordBump: true, moveBy: 'notes' });
-    expect(initialSession(prog(), { onArrival: 'silent', chordBump: false }).chordBump).toBe(false);
-  });
-
-  it('switching to by notes stops the transport', () => {
-    const r = grid([{ type: 'set-move-by', moveBy: 'time' }, { type: 'transport', run: true }, { type: 'set-move-by', moveBy: 'notes' }]);
-    expect(r.state).toMatchObject({ moveBy: 'notes', running: false });
+  it('a first open has chord bump off: the transport moves the chords', () => {
+    expect(initialSession(prog(), { onArrival: 'silent' }).chordBump).toBe(false);
+    expect(initialSession(prog(), { onArrival: 'silent', chordBump: true }).chordBump).toBe(true);
   });
 
   it('the chords are read-only here', () => {

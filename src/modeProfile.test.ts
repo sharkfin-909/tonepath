@@ -48,10 +48,6 @@ describe('mode profile', () => {
     expect(MODES.filter((m) => modeProfile(m).moveOn)).toEqual(['grid']);
   });
 
-  it('grid improv with chord bump off: nothing moves the form on (no chord bump, no transport)', () => {
-    expect(modeProfile('grid', false, 'off')).toMatchObject({ chordBump: false, transport: false, transportBar: false, moveOn: true });
-  });
-
   it('only a mode with a transport runs', () => {
     for (const mode of MODES) expect(modeProfile(mode, true).running).toBe(modeProfile(mode).transport);
     expect(MODES.filter((m) => modeProfile(m).editsForm)).toEqual(['progression']); // the chords: edit progression's alone

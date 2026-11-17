@@ -120,10 +120,12 @@ Entering the chords and their scales — **the only mode that edits them** — o
 
 ### 3.11 grid improv (improvise on the grid)
 
-Improvising on the hex grid, no mic: the **lead sheet**, read-only, the current chord highlighted; the hex always shown (no Hide hex); click or `A` plays a note. One **chord bump pill** in the header (from tablet down, the bottom stack): a **chord bump** switch (device setting `chordBump`, on by default), then `[by notes | metronome]` (device setting `moveBy`, default by notes); with by notes, its own **by notes pill** follows (`notes: N`, then `count:` and the count), as the transport bar does with the metronome. **Off**, the choices are greyed and the chords move **by hand** only (← / →, `<` / `>`, clicks) — no chord bump, no transport; switching off stops a running metronome. **On**, they move:
+Improvising on the hex grid, no mic: the **lead sheet**, read-only, the current chord highlighted; the hex always shown (no Hide hex); click or `A` plays a note. A **chord bump** switch in its own pill in the header (from tablet down, the bottom stack; device setting `chordBump`, **off by default**), then one slot holding either of two pills — both laid out, one shown, so they are the same length and nothing moves when the switch flips:
 
-- **by notes** (**chord bump**): after **N hex picks** in the current slot — `notes: N`, 1, 2, 4, 8, 16 or 32 (device setting, default 4), with the notes picked so far at the pill's end — a small **→** while none are (a chord just arrived), then `1` … `N−1` — the form moves on to the next slot, wrapping, within the **looped bars** when there are some. Loop and the looped bars: the **loop pill** (§3.7), as in the other practice modes. *On arrival* applies as when stepping by hand. ← / → and `<` / `>` step slots too.
-- **metronome**: the **transport bar** (§3.7) beside the pill runs the form; while it runs, the hex follows the current chord, held still, as in ins improv (no next-chord hint). Picks never move the form. Switching to by notes stops it.
+- **Off** (default): the **transport bar** (§3.7) moves the chords — ▶ (or Space) runs them; stopped, ← / → and `<` / `>` (and clicks) step slots by hand. While it runs, the hex follows the current chord, held still, as in ins improv (no next-chord hint). Picks never move the form.
+- **On** (**chord bump**): the **notes per chord** pill — `notes per chord: N` (1, 2, 4, 8, 16 or 32; device setting, default 4) and `count:`, the notes picked so far (a small **→** while none are, then `1` … `N−1`). After **N hex picks** in the current slot the form moves on to the next slot, wrapping, within the **looped bars** when there are some (without Loop it stays on the last chord). No transport: switching chord bump on stops a running one. *On arrival* applies as when stepping by hand.
+
+Loop and the looped bars: the **loop pill** (§3.7), as in the other practice modes.
 
 ### 3.12 Standard progressions — [Mode families](issues/084-mode-families-plan.md), slice 4
 

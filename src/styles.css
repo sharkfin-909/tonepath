@@ -2830,24 +2830,15 @@ select {
     margin-bottom: calc(var(--sound-bar-h, 0px) + 10px); /* + the row's 6px gap: 8px clear of the bottom stack */
   }
 }
-/* Grid improv's chord bump pill (SPEC §3.11): the switch, by notes | metronome, then (by notes) notes: N and the count. */
+/* Grid improv's chord bump pill (SPEC §3.11): the switch alone; its notes-per-chord pill (or the transport) follows. */
 .move-on {
   display: inline-flex;
   align-items: center;
   gap: var(--pill-gap);
   white-space: nowrap;
 }
-.move-on-choice {
-  display: inline-flex;
-  gap: var(--chip-gap);
-}
 .move-on-switch {
   gap: var(--chip-gap);
-}
-/* Chord bump off: the choices and the by notes pill greyed — the chords move by hand. */
-.move-on.off .move-on-choice,
-.by-notes.off .move-on-notes {
-  opacity: 0.4;
 }
 /* By notes' own pill: notes: N, then the notes picked so far. It shares one grid cell with the transport bar (the
    metronome) — both laid out, one shown — so they are the same length: the by notes pill stretches to the cell. */

@@ -355,13 +355,11 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
 
   const transportControls = profile.transportBar && !profile.moveOn && transportBar;
 
-  /** Grid improv: by notes (chord bump) or in time (the transport bar beside it). */
+  /** Grid improv: the chord bump switch, then its notes-per-chord pill or (off) the transport bar. */
   const moveOnControls = profile.moveOn && (
     <MoveOnControls
       on={session.chordBump}
       onToggle={(on) => dispatch({ type: 'set-chord-bump', on })}
-      moveBy={session.moveBy}
-      onMoveBy={(moveBy) => dispatch({ type: 'set-move-by', moveBy })}
       notes={session.chordBumpNotes}
       onNotes={(notes) => dispatch({ type: 'set-chord-bump-notes', notes })}
       count={session.bumpCount}

@@ -28,7 +28,7 @@ import { backspaceAt, caretFromClick, deleteAt, insertWrapping, melodyEnd, nudge
 import type { OnArrival } from './device';
 import { enterChord } from './chordEntry';
 import type { ScaleId } from './harmony';
-import { modeProfile, type MoveBy, type MoveOn } from './modeProfile';
+import { modeProfile, type MoveBy } from './modeProfile';
 import { loopRange, upcomingSlot } from './transport';
 import {
   clearEverything,
@@ -127,9 +127,8 @@ export interface SessionState {
   onArrival: OnArrival;
   /** Grid improv, by notes: hex picks in the current slot toward moving on (chord bump). */
   bumpCount: number;
-  /** Grid improv: chord bump on — the chords move on by notes or with the metronome (`moveBy`); off — by hand only. */
+  /** Grid improv: chord bump on — the chords move on after N notes picked; off (the default) — the transport. */
   chordBump: boolean;
-  moveBy: MoveBy;
   /** A standard progression (SPEC §3.12): its chords, bars, time signature and title never edit; its etudes do. */
   locked: boolean;
   /** Loop (SPEC §3.7): the form (or the looped bars) goes round again — the transport's, and grid improv's by notes. */
@@ -172,7 +171,6 @@ export type Intent =
   | { type: 'sound'; what: 'chord' | 'bass' | 'scale' }
   | { type: 'toggle-mute' }
   | { type: 'set-arrival'; how: OnArrival }
-  | { type: 'set-move-by'; moveBy: MoveBy }
   /** Grid improv's chord bump switch. */
   | { type: 'set-chord-bump'; on: boolean }
   /** The loop pill's Loop switch (and edit progression's transport). */
@@ -226,7 +224,6 @@ export type Effect =
         muted?: boolean;
         playArrival?: OnArrival;
         lastInstrument?: string;
-        moveBy?: MoveBy;
         chordBump?: boolean;
         chordBumpNotes?: ChordBumpNotes;
         lastMode?: Mode;
@@ -257,7 +254,7 @@ export type Carried = Pick<SessionState, 'mode' | 'clip'>;
  */
 export function initialSession(
   p: Progression,
-  device: { muted?: boolean; onArrival: OnArrival; moveBy?: MoveBy; chordBump?: boolean; chordBumpNotes?: ChordBumpNotes; lastMode?: Mode; loop?: boolean },
+  device: { muted?: boolean; onArrival: OnArrival; chordBump?: boolean; chordBumpNotes?: ChordBumpNotes; lastMode?: Mode; loop?: boolean },
   etude?: string | null,
   carried?: Carried,
   opts: { locked?: boolean } = {},
@@ -265,8 +262,7 @@ export function initialSession(
   const wanted = carried?.mode ?? device.lastMode ?? 'grid';
   // Edit etude and ins read need chords: without any, the open starts in edit progression.
   const mode = modeProfile(wanted).needsChords && !hasChords(p) ? 'progression' : wanted;
-  const moveBy = device.moveBy ?? 'notes';
-  const chordBump = device.chordBump !== false;
+  const chordBump = device.chordBump === true;
   const open = etudeOf(p, etude).id;
   const caret = melodyEnd(etudeOf(p, open).melody); // opens at the melody's end; not saved
   const slot = instrumentView(p, open).slotAt(caret).index;
@@ -278,7 +274,7 @@ export function initialSession(
     rest: false,
     slot,
     running: false,
-    arrival: modeProfile(mode, false, chordBump ? moveBy : 'off').arrivalWaits ? slot : null, // as when entering the mode: the slot's sound waits for a note
+    arrival: modeProfile(mode, false, chordBump ? 'notes' : 'time').arrivalWaits ? slot : null, // as when entering the mode: the slot's sound waits for a note
     selection: null,
     clip: carried?.clip ?? null,
     halo: null,
@@ -287,7 +283,6 @@ export function initialSession(
     muted: device.muted === true,
     onArrival: device.onArrival,
     bumpCount: 0,
-    moveBy,
     chordBump,
     locked: opts.locked === true,
     loop: device.loop !== false,
@@ -295,8 +290,8 @@ export function initialSession(
   };
 }
 
-/** How grid improv's chords move on: by notes, with the metronome, or (chord bump off) by hand only. */
-export const moveOn = (s: Pick<SessionState, 'chordBump' | 'moveBy'>): MoveOn => (s.chordBump ? s.moveBy : 'off');
+/** How grid improv's chords move on: by notes (chord bump on) or with the transport (off). */
+export const moveOn = (s: Pick<SessionState, 'chordBump'>): MoveBy => (s.chordBump ? 'notes' : 'time');
 
 /** The caret clamped to the form (the form can shrink under it). */
 export function caretOf(s: SessionState, p: Progression): number {
@@ -348,7 +343,6 @@ const ANY_MODE: Intent['type'][] = [
   'restored',
   'refusal-shown',
   'notice-done',
-  'set-move-by',
   'set-chord-bump',
   'set-loop',
   'set-chord-bump-notes',
@@ -624,7 +618,7 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
       return done();
     case 'set-chord-bump':
       if (intent.on === s.chordBump) return done();
-      // Off: nothing moves the form on — a running metronome stops.
+      // On: by notes, no transport — a running one stops. Off: the transport (stopped).
       set({ chordBump: intent.on, running: false, bumpCount: 0 });
       set({ arrival: profile().arrivalWaits ? current : null });
       effects.push({ type: 'device', patch: { chordBump: intent.on } });
@@ -633,13 +627,6 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
       if (intent.on === s.loop) return done();
       set({ loop: intent.on });
       effects.push({ type: 'device', patch: { practiceLoop: intent.on } });
-      return done();
-    case 'set-move-by':
-      if (intent.moveBy === s.moveBy) return done();
-      // By notes has no transport: switching to it stops a running one.
-      set({ moveBy: intent.moveBy, running: false, bumpCount: 0 });
-      set({ arrival: profile().arrivalWaits ? current : null });
-      effects.push({ type: 'device', patch: { moveBy: intent.moveBy } });
       return done();
     case 'set-chord-bump-notes':
       set({ chordBumpNotes: intent.notes, bumpCount: 0 });
