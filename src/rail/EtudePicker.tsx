@@ -1,6 +1,7 @@
 // The etude picker (SPEC §3.1): in every mode, the open etude — whose melody Write etude and Read etude show, and
 // whose instrument every mode follows — and the progression's other etudes; then New, Duplicate, Rename and Delete
-// (on the last etude: Clear, since a fresh empty one takes its place). Each is a session intent; all undo.
+// (on the last etude: Clear, since a fresh empty one takes its place) — each a session intent, all undo — and Share
+// etude… (a link, SPEC §3.13), where given.
 import { useState } from 'react';
 import { instrumentOf } from '../instruments';
 import type { Etude } from '../progression';
@@ -15,11 +16,13 @@ export interface EtudePickerProps {
   onDuplicate: () => void;
   onRename: (text: string) => void;
   onDelete: () => void;
+  /** Share etude… (SPEC §3.13): a link to the open etude. */
+  onShare?: () => void;
 }
 
-const ACTIONS = { new: 'action:new', duplicate: 'action:duplicate', rename: 'action:rename', delete: 'action:delete' } as const;
+const ACTIONS = { new: 'action:new', duplicate: 'action:duplicate', rename: 'action:rename', delete: 'action:delete', share: 'action:share' } as const;
 
-export function EtudePicker({ etudes, open, onOpen, onNew, onDuplicate, onRename, onDelete }: EtudePickerProps) {
+export function EtudePicker({ etudes, open, onOpen, onNew, onDuplicate, onRename, onDelete, onShare }: EtudePickerProps) {
   const [renaming, setRenaming] = useState(false);
   const current = etudes.find((e) => e.id === open) ?? etudes[0];
   if (renaming) {
@@ -35,6 +38,7 @@ export function EtudePicker({ etudes, open, onOpen, onNew, onDuplicate, onRename
     { value: ACTIONS.duplicate, label: 'Duplicate' },
     { value: ACTIONS.rename, label: 'Rename' },
     { value: ACTIONS.delete, label: etudes.length === 1 ? 'Clear etude' : 'Delete' },
+    ...(onShare ? [{ value: ACTIONS.share, label: 'Share etude…', divider: true }] : []),
   ];
   return (
     <span className="etude-picker">
@@ -48,6 +52,7 @@ export function EtudePicker({ etudes, open, onOpen, onNew, onDuplicate, onRename
           else if (v === ACTIONS.duplicate) onDuplicate();
           else if (v === ACTIONS.rename) setRenaming(true);
           else if (v === ACTIONS.delete) onDelete();
+          else if (v === ACTIONS.share) onShare?.();
           else onOpen(v);
         }}
       />

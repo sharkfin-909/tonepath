@@ -122,6 +122,7 @@ export function HelpModal({ mode, onClose, onShortcuts }: { mode: Mode; onClose:
           <li>Everything saves as you go, in this browser.</li>
           <li>☰ → Library lists your chord sequences; each holds one or more etudes (pick one under etude:).</li>
           <li>Export all makes a backup file — do it now and then. Import adds sequences from a file, never overwriting.</li>
+          <li>To share an etude, choose Share etude… in the etude picker: a link is copied that opens it, with its chords, in anyone's Tonepath. Over a standard progression it joins their etudes there.</li>
         </ul>
       </section>
 

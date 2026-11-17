@@ -138,6 +138,15 @@ Built-in, **read-only** progressions (`standards.ts`), so etudes written over th
 - **Make my own copy** (the banner, or the library row): a new progression of mine, *‹title› (my copy)*, with the standard's chords and one fresh empty etude — the etudes stay with the standard — opened with its title in edit.
 - **First launch** opens the 12-bar blues (the demos are still seeded into my progressions).
 
+### 3.13 Share links — [Mode families](issues/084-mode-families-plan.md), slice 5
+
+Sharing one etude as a link (`share.ts`), no backend.
+
+- **Share etude…** — the etude picker's last item (header, and *now open* in the library): a link to the **open etude** copied to the clipboard (*Link to “‹name›” copied — paste it to share*).
+- **The link**: the page's address and a **fragment**, `#share=1…` — never sent to a server. It holds the etude (name, instrument, clef, melody), a **copy of its chords** (title, time signature, bars per row, bars with scale overrides) and, over a standard (§3.12), the **standard's id**: JSON, deflate-raw compressed, base64url; `1` is the format version. A 64-note etude makes a link of a few hundred characters.
+- **Too long** (over 8000 characters, where some chat and mail apps break links) or **no clipboard**: the etude is saved as a file instead (Export one of a progression holding just it), to send by other means.
+- **Opening a link** (on load, or pasted into an open tab): the fragment is cleared first (a reload never imports twice), then the data goes through the file importer's repair (§12.3), so a damaged or hand-made link can't put bad data in the library; unreadable → *That share link couldn't be read*. Over a standard this app has, **with the same chords**: the etude joins your etudes under it (*‹name› (shared)* if the name is taken). Otherwise — no standard, one this app lacks, or chords that differ — a new progression of mine, *‹title› (shared)* (then *(shared 2)*, …), with the link's chords and that etude. Either way it opens there, on that etude, with a line at the top: *Shared etude “‹name›” added to ‹title›*. A read-only tab (§12.4) adds nothing.
+
 ### 3.4 Read etude (formerly Etude view, Stand)
 
 Reading and playing the written etude, e.g. on a tablet on a music stand: the chart **Fit page** (every bar on one screen, auto-zoomed, no floor; 32 bars at 4/row fit on 1024×768), the transport, the sound pill. No hex, no tuner bar, no mic. **Standard notation** throughout: each bar's stave and the **open etude**'s melody (§3.9), with **chord and scale** as the only meta above the stave (no key pill).

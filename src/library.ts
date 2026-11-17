@@ -3,11 +3,12 @@
 
 import { readDevice, writeDevice } from './device';
 import { instrumentOf } from './instruments';
-import { SCHEMA_VERSION, newEtude, newProgression, setTitle, type Progression } from './progression';
+import { SCHEMA_VERSION, freshEtudeId, newEtude, newProgression, setTitle, type Progression } from './progression';
 import { importSummary, migrate, parseFile, uniqueTitle } from './schema';
 import { PROGRESSION_PREFIX, listProgressions, saveProgression, type StoredProgression } from './storage';
 import { isReadOnly, setReadOnly } from './readOnly';
-import { standardOf, withStandard } from './standards';
+import { listMine, standardOf, withStandard } from './standards';
+import type { Shared } from './share';
 
 type MakeId = () => string;
 const uuid: MakeId = () => crypto.randomUUID();
@@ -64,6 +65,38 @@ export function copyStandard(storage: Storage, id: string, makeId: MakeId = uuid
   const inst = readDevice(storage).lastInstrument;
   const { id: _id, ...form } = s;
   return addProgression(storage, { ...form, title: `${s.title} (my copy)`, bars: s.bars.map((b) => b.map((x) => ({ ...x }))), etudes: [newEtude(typeof inst === 'string' ? inst : undefined)] }, makeId, now);
+}
+
+/** `‹name› (shared)`, then `(shared 2)`, … — the first not in `taken`. */
+function sharedName(name: string, taken: Set<string>): string {
+  const base = `${name} (shared)`;
+  if (!taken.has(base)) return base;
+  for (let k = 2; ; k++) if (!taken.has(`${name} (shared ${k})`)) return `${name} (shared ${k})`;
+}
+
+/**
+ * Open a share link (SPEC §3.13). Over a standard this app has, with the same chords: the etude joins your etudes
+ * under it (`‹name› (shared)` if the name is taken). Otherwise — no standard, one this app lacks, or chords that
+ * differ — a new progression of mine, `‹title› (shared)`, with the link's chords and that etude. Either way it is the
+ * open etude there.
+ */
+export function importShared(storage: Storage, shared: Shared, makeId: MakeId = uuid, now = new Date()): { progression: StoredProgression; etudeId: string } {
+  const etude = shared.progression.etudes[0];
+  const std = shared.std ? standardOf(shared.std) : undefined;
+  const sameChords = !!std && std.timeSignature === shared.progression.timeSignature && JSON.stringify(std.bars) === JSON.stringify(shared.progression.bars);
+  if (std && sameChords) {
+    const rec = openStandard(storage, std.id, now);
+    const id = freshEtudeId(rec.etudes);
+    const names = new Set(rec.etudes.map((e) => e.name));
+    const joined = { ...etude, id, name: names.has(etude.name) ? sharedName(etude.name, names) : etude.name };
+    const saved = saveProgression(storage, { ...rec, etudes: [...rec.etudes, joined], openEtudeId: id }, now);
+    return { progression: withStandard(saved), etudeId: id };
+  }
+  const titles = new Set(listMine(listProgressions(storage)).map((p) => p.title));
+  const title = sharedName(shared.progression.title, titles);
+  const added = addProgression(storage, { ...shared.progression, title, etudes: [{ ...etude, id: 'e1' }] }, makeId, now);
+  const opened = saveProgression(storage, { ...added, openEtudeId: 'e1' }, now);
+  return { progression: opened, etudeId: 'e1' };
 }
 
 /** Delete: removes the key and returns the raw string, so Undo restores it exactly (updatedAt included). */

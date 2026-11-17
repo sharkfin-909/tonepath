@@ -31,6 +31,9 @@ import { useChartSession } from './useChartSession';
 import { Logo } from './Logo';
 import { useTransport } from './useTransport';
 import { etudeOf, hasChords } from './progression';
+import { shareLink } from './share';
+import { exportOne } from './schema';
+import { download } from './download';
 import { moveOn, type Carried } from './session';
 import { EtudePicker } from './rail/EtudePicker';
 import type { LibraryCurrent } from './library/LibraryScreen';
@@ -92,6 +95,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
       onDuplicate: () => dispatch({ type: 'etude-duplicate' }),
       onRename: (text) => dispatch({ type: 'etude-rename', text }),
       onDelete: () => dispatch({ type: 'etude-delete' }),
+      onShare: () => shareRef.current(),
     });
     return () => onEtudeDock?.(null);
   }, [onEtudeDock, progression, etude.id, dispatch, session.locked]);
@@ -155,6 +159,36 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
   useEffect(() => {
     if (mode !== 'read') setShowReadScales(false);
   }, [mode]);
+  /** A short notice from the screen itself (Share etude's), beside the session's. */
+  const [toast, setToast] = useState<{ text: string; n: number } | null>(null);
+  const say = (text: string) => setToast((t) => ({ text, n: (t?.n ?? 0) + 1 }));
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(id);
+  }, [toast]);
+  /**
+   * Share etude… (SPEC §3.13): a link to the open etude (its chords too; a standard's id) on the clipboard — or, too
+   * long for a link (or no clipboard), the etude as a file to send instead.
+   */
+  const shareEtude = async () => {
+    const one = { ...progression, etudes: [etude] };
+    const asFile = (why: string) => {
+      const f = exportOne(one);
+      download(f.filename, f.text);
+      say(`${why}: “${etude.name}” saved as a file to send instead`);
+    };
+    const r = await shareLink(location.href, progression, etude.id, session.locked ? initial.id : undefined);
+    if (r.kind === 'too-long') return asFile('Too long for a link');
+    try {
+      await navigator.clipboard.writeText(r.url);
+      say(`Link to “${etude.name}” copied — paste it to share`);
+    } catch {
+      asFile("Couldn't copy the link");
+    }
+  };
+  const shareRef = useRef(shareEtude);
+  shareRef.current = shareEtude;
   /** Bumped on each A pick: the docked hex pops the hovered ball (`DockedHex` keyPick). */
   const [keyPick, setKeyPick] = useState(0);
   const [editRequest, setEditRequest] = useState<{ bar: number; part: number; n: number } | null>(null);
@@ -559,6 +593,7 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
                   onDuplicate={() => dispatch({ type: 'etude-duplicate' })}
                   onRename={(text) => dispatch({ type: 'etude-rename', text })}
                   onDelete={() => dispatch({ type: 'etude-delete' })}
+                  onShare={() => void shareEtude()}
                 />
               </span>
             </span>
@@ -657,6 +692,11 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
         {session.notice && (
           <p key={session.notice.n} className="notice" role="status">
             {session.notice.text}
+          </p>
+        )}
+        {toast && (
+          <p key={`toast-${toast.n}`} className="notice" role="status">
+            {toast.text}
           </p>
         )}
         {dockedBottom ? (

@@ -3396,3 +3396,20 @@ select {
 .transport-bars.off {
   opacity: 0.4;
 }
+
+/* A share link opened (SPEC §3.13): one line at the top centre, for a few seconds. */
+.share-toast {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  translate: -50% 0;
+  z-index: 60;
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: #2b2825;
+  color: #fff;
+  font-size: 13px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  max-width: calc(100vw - 32px);
+}

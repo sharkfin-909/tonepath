@@ -2,7 +2,7 @@
 id: 84
 title: "Mode families: six modes, progression mode, standard progressions, share links"
 labels: [wayfinder:map]
-status: open
+status: closed
 assignee:
 ---
 
@@ -163,3 +163,15 @@ Each slice ships with its tests (test-first, as for the rest of the build) and i
 - Where **Share etude** sits: the etude picker, the Library's Now open block, or both.
 - The size limit for a share link, and what happens past it (a very long etude).
 - Whether **ins read** also lights heard notes on the hex. It has no hex today.
+
+## Resolution
+
+All five slices built (2026-11-17), with these decisions taken on the way:
+
+- **Share etude…** sits in the etude picker (header and the library's *now open*); a link over 8000 characters, or no
+  clipboard, saves a file instead. Links are deflate-raw compressed (a 64-note etude: a few hundred characters).
+- A shared etude over a standard joins your etudes there only if the link's chords match the frozen ones; otherwise
+  it arrives as a new progression of mine.
+- Ins read has no hex, so it lights nothing.
+- Later changes to the plan's grid improv: one **chord bump** switch (off by default — the transport moves the
+  chords; on — notes per chord), and a shared **loop pill** in the practice modes.

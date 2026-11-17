@@ -8,6 +8,7 @@ import { App } from './App';
 import {
   copyStandard,
   createProgression,
+  importShared,
   openStandard,
   deleteProgression,
   duplicateProgression,
@@ -25,6 +26,8 @@ import { countUnreadable, listProgressions, onSaveStatus, type StoredProgression
 import { backupAge, isSafari, shouldRemind } from './backup';
 import { readDevice, writeDevice } from './device';
 import { exportAll, exportOne } from './schema';
+import { download } from './download';
+import { decodeShare, tokenIn } from './share';
 import { isReadOnly } from './readOnly';
 import type { Carried } from './session';
 import { FIRST_STANDARD, STANDARDS, listMine } from './standards';
@@ -32,15 +35,6 @@ import { FIRST_STANDARD, STANDARDS, listMine } from './standards';
 /** The open progression (null: none, e.g. an empty library) — `n` re-mounts the chart when it changes underneath. */
 type Chart = { progression: StoredProgression; rename: boolean; n: number } | null;
 
-/** Save a text file through the browser's download. */
-function download(filename: string, text: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
 
 function initialChart(): Chart {
   migrateStorage(localStorage); // SPEC §12.4: older storage is migrated; newer makes the tab read-only
@@ -84,6 +78,34 @@ export function Root() {
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, [showLibrary]);
+
+  // A share link (SPEC §3.13): on load, or pasted into this tab (only the fragment changes, so no reload) — its etude
+  // is imported and opened, and the fragment cleared so a reload doesn't import it again.
+  const [shareNote, setShareNote] = useState<{ text: string; n: number } | null>(null);
+  useEffect(() => {
+    const take = async () => {
+      const token = tokenIn(location.hash);
+      if (token === null) return;
+      history.replaceState(null, '', location.pathname + location.search); // cleared first: a reload never repeats it
+      const shared = await decodeShare(token);
+      const say = (text: string) => setShareNote((t) => ({ text, n: (t?.n ?? 0) + 1 }));
+      if (!shared || isReadOnly()) return say(shared ? 'This tab is read-only: the shared etude was not added' : "That share link couldn't be read");
+      const r = importShared(localStorage, shared);
+      refresh();
+      open(r.progression);
+      const name = r.progression.etudes.find((e) => e.id === r.etudeId)?.name ?? 'the etude';
+      say(`Shared etude “${name}” added to ${r.progression.title}`);
+    };
+    void take();
+    window.addEventListener('hashchange', take);
+    return () => window.removeEventListener('hashchange', take);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- on load and on each fragment change
+  }, []);
+  useEffect(() => {
+    if (!shareNote) return;
+    const id = setTimeout(() => setShareNote(null), 6000);
+    return () => clearTimeout(id);
+  }, [shareNote]);
 
   // The open progression renamed from *now open*: its row follows (the edit is already saved).
   const openTitle = currentEtude?.title;
@@ -147,6 +169,11 @@ export function Root() {
     <>
     {banner}
     <Tooltips />
+    {shareNote && (
+      <p key={shareNote.n} className="share-toast" role="status">
+        {shareNote.text}
+      </p>
+    )}
     {/* Keyed by id (and reloads): a fresh chart screen (and empty undo history) for every progression opened. */}
     {chart && (
       <App

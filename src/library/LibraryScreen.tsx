@@ -26,6 +26,8 @@ export interface LibraryCurrent {
   onDuplicate: () => void;
   onRename: (text: string) => void;
   onDelete: () => void;
+  /** Share etude… (SPEC §3.13). */
+  onShare: () => void;
 }
 
 /** A standard's row (SPEC §3.12): built in; `stored` once opened (it holds your etudes over it). */
@@ -183,6 +185,7 @@ export function LibraryScreen(props: LibraryScreenProps) {
                 onDuplicate={current.onDuplicate}
                 onRename={current.onRename}
                 onDelete={current.onDelete}
+                onShare={current.onShare}
               />
             </span>
           </div>
