@@ -1,5 +1,7 @@
 # Tonepath
 
+**Try it: [tonepath.truelathe.com](https://tonepath.truelathe.com)**, free, in the browser, no sign-up.
+
 A static web app for writing **practice etudes over chord changes** and **practising improvisation** on them.
 Type chord symbols into a bar grid; each slot gets a scale, and each of the progression's **etudes** (one or more,
 each for its own instrument) a fragment of one continuous melody, entered on the

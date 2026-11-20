@@ -3,7 +3,39 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tonepath</title>
+    <title>Tonepath — free jazz improvisation practice in the browser</title>
+    <!-- What search results and link previews show. The app has one page: every ?mode= view is this one (canonical). -->
+    <meta name="description" content="Write etudes over chord changes and practise improvising on them: chord scales on a hexagonal note grid, a click, playback and a mic tuner. Free, no sign-up." />
+    <link rel="canonical" href="https://tonepath.truelathe.com/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Tonepath" />
+    <meta property="og:url" content="https://tonepath.truelathe.com/" />
+    <meta property="og:title" content="Tonepath — free jazz improvisation practice in the browser" />
+    <meta property="og:description" content="Write etudes over chord changes and practise improvising on them, with each chord's scale laid out as a hexagonal grid. Free, no sign-up." />
+    <meta property="og:image" content="https://tonepath.truelathe.com/og.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Tonepath: a twelve-bar chord chart over the hexagonal note grid, coloured by scale degree" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <!-- Structured data: a free music web app, by Ben Amato of Truelathe, its code on GitHub. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Tonepath",
+        "url": "https://tonepath.truelathe.com/",
+        "description": "A browser app for writing practice etudes over chord changes and practising improvisation on them, with each chord's scale laid out as a hexagonal note grid.",
+        "applicationCategory": "MusicApplication",
+        "operatingSystem": "Any (web browser)",
+        "browserRequirements": "A modern browser; the microphone features need HTTPS.",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "image": "https://tonepath.truelathe.com/og.jpg",
+        "author": { "@type": "Person", "name": "Ben Amato", "url": "https://truelathe.com/about" },
+        "publisher": { "@type": "Organization", "name": "Truelathe", "url": "https://truelathe.com" },
+        "sameAs": ["https://github.com/sharkfin-909/tonepath", "https://truelathe.com/portfolio/tonepath"]
+      }
+    </script>
     <!-- Favicon: the logo in gold on the header's brown (public/favicon.svg); PNGs for browsers without SVG icons and
          for iOS home screens (iOS rounds the corners itself). -->
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -15,7 +47,21 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100;400;600;700;800&family=Firjar:wght@300..700&display=swap" rel="stylesheet" />
   </head>
   <body>
-    <div id="root"></div>
+    <!-- What search engines and no-JavaScript visitors read: the app replaces it as soon as it starts (main.tsx). -->
+    <div id="root">
+      <main class="boot">
+        <h1>Tonepath</h1>
+        <p>Free jazz improvisation practice in the browser. Type a chord progression, and Tonepath gives each chord its scale, laid out as a hexagonal note grid: the next step of the scale to the right, a third up and to the left, every note coloured by its degree.</p>
+        <ul>
+          <li><strong>Write etude</strong>: write a melody over the changes by picking notes on the grid, shown as notation as you go.</li>
+          <li><strong>Read etude</strong>: play the etude from one page, with a click and a moving playhead.</li>
+          <li><strong>Improvise</strong>: play over the chord chart with a click, the grid following each chord as it comes.</li>
+          <li><strong>Tune</strong>: warm up and tune; the grid lights every note you play into the microphone.</li>
+        </ul>
+        <p>No account and no backend: progressions are saved in your browser, with export and import. Built by <a href="https://truelathe.com/portfolio/tonepath">Truelathe</a>; the code is open source on <a href="https://github.com/sharkfin-909/tonepath">GitHub</a>.</p>
+        <noscript><p>Tonepath needs JavaScript to run.</p></noscript>
+      </main>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
