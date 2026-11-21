@@ -1,0 +1,85 @@
+/* The home page (index.html): what Tonepath is, in the app's colours and type. The app's own CSS doesn't load here. */
+:root {
+  --ink: #1d1b19;
+  --muted: #6b655f;
+  --paper: #f7f3e5; /* the chart's cream */
+  --band: #efe8d2;
+  --dock: #453f38; /* the header's and the hex panel's brown */
+  --gold: #eddd95; /* the wordmark */
+  --amber: #dca021; /* the app's highlight */
+  --line: #d9cfb5;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font: 400 1.0625rem/1.65 'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: var(--ink);
+  background: var(--paper);
+}
+a { color: inherit; text-decoration-color: var(--amber); text-underline-offset: 0.18em; }
+a:hover { color: #8a5a00; }
+h1, h2, h3 { line-height: 1.2; margin: 0; }
+h1 { font-weight: 700; font-size: clamp(2rem, 1.4rem + 2.6vw, 3.2rem); letter-spacing: -0.01em; max-width: 22ch; }
+h2 { font-weight: 700; font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2.1rem); margin-bottom: 0.6rem; }
+h3 { font-weight: 600; font-size: 1.15rem; }
+
+/* The header: the app's brown bar, the gold mark and wordmark. */
+.bar {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: 0.7rem clamp(1rem, 4vw, 2.5rem);
+  background: var(--dock); color: var(--gold);
+  box-shadow: inset 0 0 28px rgba(245, 233, 176, 0.18);
+}
+.brand { display: inline-flex; align-items: center; gap: 0.5rem; text-decoration: none; color: var(--gold); }
+.brand:hover { color: var(--gold); }
+.brand .mark { width: 2rem; height: 2rem; }
+.brand span { font: 700 1.2rem/1 'Firjar', 'Outfit', sans-serif; letter-spacing: 0.18em; }
+
+/* The call to action: the app's gold on brown, rounded like its pills. */
+.cta {
+  display: inline-block; padding: 0.7em 1.4em; border-radius: 999px;
+  background: var(--dock); color: var(--gold); font-weight: 600; text-decoration: none;
+  border: 1px solid var(--dock); transition: background-color 0.2s, color 0.2s;
+}
+.cta:hover { background: var(--gold); color: var(--dock); }
+.cta.small { padding: 0.45em 1.1em; font-size: 0.95rem; border-color: var(--gold); }
+
+main section { padding: clamp(2.5rem, 6vw, 4.5rem) clamp(1rem, 5vw, 3rem); }
+main section > * { max-width: 62rem; margin-left: auto; margin-right: auto; }
+.band { background: var(--band); }
+
+.hero { text-align: center; }
+.hero h1 { margin: 0 auto; }
+.lead { font-size: 1.2rem; color: #3d3833; max-width: 44rem; margin: 1.2rem auto 0; }
+.actions { margin-top: 1.6rem; display: flex; gap: 1.4rem; justify-content: center; align-items: center; flex-wrap: wrap; }
+.more { font-weight: 600; }
+.note { color: var(--muted); font-size: 0.95rem; margin-top: 0.8rem; }
+.hero-shot { display: block; width: 100%; height: auto; margin-top: 2.2rem; border-radius: 10px; box-shadow: 0 12px 40px rgba(29, 27, 25, 0.25); }
+
+figure { margin: 1.6rem auto; text-align: center; }
+.hexdiagram { width: min(100%, 36rem); height: auto; }
+.hexdiagram text { font: 600 13px 'Outfit', sans-serif; text-anchor: middle; }
+.hexdiagram .chord { font-size: 17px; font-weight: 700; fill: var(--ink); }
+.hexdiagram .scale { font-size: 13px; font-weight: 400; fill: var(--muted); }
+.hexdiagram .arrow { fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+figcaption { color: var(--muted); font-size: 0.95rem; max-width: 40rem; margin: 0.4rem auto 0; }
+
+.points { padding-left: 1.2rem; }
+.points li + li { margin-top: 0.7rem; }
+.points li::marker { color: var(--amber); }
+
+/* The modes: two columns, one on a phone. */
+.modes { list-style: none; padding: 0; display: grid; gap: 1.5rem; grid-template-columns: 1fr; margin-top: 1.4rem; }
+@media (min-width: 40rem) { .modes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.mode { background: #fffdf6; border: 1px solid var(--line); border-radius: 10px; padding: 0.9rem 1rem 1.1rem; }
+.mode img { display: block; width: 100%; height: auto; border-radius: 6px; border: 1px solid var(--line); margin-bottom: 0.8rem; }
+.mode p { margin: 0.35rem 0 0; color: #3d3833; font-size: 0.98rem; }
+
+.faq h3 { margin-top: 1.3rem; }
+.faq p { margin-top: 0.3rem; margin-bottom: 0; } /* not `margin`: the sides stay auto, so answers keep the column */
+
+.foot { background: var(--dock); color: #e9e1cf; padding: 1.6rem clamp(1rem, 4vw, 2.5rem); display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; align-items: center; justify-content: space-between; }
+.foot p { margin: 0; font-size: 0.95rem; }
+.foot a { color: var(--gold); }

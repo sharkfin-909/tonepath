@@ -558,8 +558,11 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
       >
         {/* Row 1, centre: the wordmark (where the sound pill was). */}
         <div className="topbar-brand">
-          <Logo className="brand-logo" />
-          <span className="brand">TONEPATH</span>
+          {/* The mark and wordmark lead home, to the home page at /. */}
+          <a className="brand-home" href="/" aria-label="Tonepath home page">
+            <Logo className="brand-logo" />
+            <span className="brand">TONEPATH</span>
+          </a>
           <a className="brand-credit" href="https://truelathe.com" target="_blank" rel="noopener">
             made by
             <br />

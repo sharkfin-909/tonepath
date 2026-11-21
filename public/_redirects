@@ -1,0 +1,3 @@
+# The app moved from / to /app/: a ?mode= view of the old address opens it there (crawlers and old bookmarks).
+# A #share= link can't be seen here (fragments stay in the browser); index.html forwards those.
+/  mode=:mode  /app/?mode=:mode  301

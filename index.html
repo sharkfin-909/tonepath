@@ -4,64 +4,205 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tonepath — free jazz improvisation practice in the browser</title>
-    <!-- What search results and link previews show. The app has one page: every ?mode= view is this one (canonical). -->
-    <meta name="description" content="Write etudes over chord changes and practise improvising on them: chord scales on a hexagonal note grid, a click, playback and a mic tuner. Free, no sign-up." />
+    <!-- The home page: what Tonepath is, for people and search engines. The app itself is at /app/ (app/index.html). -->
+    <script>
+      // Links from before the app moved to /app/ (a ?mode= view, a #share= link) open the app, keeping their address.
+      if (/[?&]mode=/.test(location.search) || location.hash.startsWith('#share=')) location.replace('/app/' + location.search + location.hash);
+    </script>
+    <meta name="description" content="Practise improvising over chord changes, write your own etudes, and see every chord’s scale as a shape on a hexagonal note grid. Free, no sign-up." />
     <link rel="canonical" href="https://tonepath.truelathe.com/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Tonepath" />
     <meta property="og:url" content="https://tonepath.truelathe.com/" />
     <meta property="og:title" content="Tonepath — free jazz improvisation practice in the browser" />
-    <meta property="og:description" content="Write etudes over chord changes and practise improvising on them, with each chord's scale laid out as a hexagonal grid. Free, no sign-up." />
+    <meta property="og:description" content="Practise improvising over chord changes and see every chord’s scale as a shape on a hexagonal note grid. Free, no sign-up." />
     <meta property="og:image" content="https://tonepath.truelathe.com/og.jpg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="Tonepath: a twelve-bar chord chart over the hexagonal note grid, coloured by scale degree" />
     <meta name="twitter:card" content="summary_large_image" />
-    <!-- Structured data: a free music web app, by Ben Amato of Truelathe, its code on GitHub. -->
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
         "@type": "WebApplication",
         "name": "Tonepath",
         "url": "https://tonepath.truelathe.com/",
-        "description": "A browser app for writing practice etudes over chord changes and practising improvisation on them, with each chord's scale laid out as a hexagonal note grid.",
+        "description": "A browser app for practising improvisation over chord changes and writing etudes on them, with each chord's scale laid out as a hexagonal note grid.",
         "applicationCategory": "MusicApplication",
         "operatingSystem": "Any (web browser)",
         "browserRequirements": "A modern browser; the microphone features need HTTPS.",
         "isAccessibleForFree": true,
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
         "image": "https://tonepath.truelathe.com/og.jpg",
+        "screenshot": "https://tonepath.truelathe.com/screens/grid.jpg",
         "author": { "@type": "Person", "name": "Ben Amato", "url": "https://truelathe.com/about" },
         "publisher": { "@type": "Organization", "name": "Truelathe", "url": "https://truelathe.com" },
         "sameAs": ["https://github.com/sharkfin-909/tonepath", "https://truelathe.com/portfolio/tonepath"]
       }
     </script>
-    <!-- Favicon: the logo in gold on the header's brown (public/favicon.svg); PNGs for browsers without SVG icons and
-         for iOS home screens (iOS rounds the corners itself). -->
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#453f38" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100;400;600;700;800&family=Firjar:wght@300..700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Firjar:wght@700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/landing/landing.css" />
   </head>
   <body>
-    <!-- What search engines and no-JavaScript visitors read: the app replaces it as soon as it starts (main.tsx). -->
-    <div id="root">
-      <main class="boot">
-        <h1>Tonepath</h1>
-        <p>Free jazz improvisation practice in the browser. Type a chord progression, and Tonepath gives each chord its scale, laid out as a hexagonal note grid: the next step of the scale to the right, a third up and to the left, every note coloured by its degree.</p>
-        <ul>
-          <li><strong>Write etude</strong>: write a melody over the changes by picking notes on the grid, shown as notation as you go.</li>
-          <li><strong>Read etude</strong>: play the etude from one page, with a click and a moving playhead.</li>
-          <li><strong>Improvise</strong>: play over the chord chart with a click, the grid following each chord as it comes.</li>
-          <li><strong>Tune</strong>: warm up and tune; the grid lights every note you play into the microphone.</li>
+    <header class="bar">
+      <a class="brand" href="/"><svg class="mark" viewBox="3 0 120 120" aria-hidden="true"><polygon points="80,76 63,105.4 29,105.4 12,76 29,46.6 63,46.6" fill="none" stroke="currentColor" stroke-width="6.5" stroke-linejoin="round"/><g fill="currentColor" transform="rotate(28 46 76)"><circle cx="46" cy="76" r="12"/><rect x="53.5" y="-1" width="4.5" height="74" rx="1"/><path d="M58 -1 C61.5 11 87.5 14 99.5 26 C108.5 35 109.5 45 104.5 53 C103.5 44 98.5 36 89.5 31 C80.5 26 67.5 24 58 23 Z"/></g></svg><span>TONEPATH</span></a>
+      <a class="cta small" href="/app/">open tonepath</a>
+    </header>
+
+    <main>
+      <section class="hero">
+        <h1>Build your ear, guided by visual patterns</h1>
+        <p class="lead">Tonepath lays out each chord's guide tones and passing notes as a honeycomb of highlighted cells, that becomes a map that you navigate. Use the app to enter or select a chord progression, then use the hexagonal grid to create your own exercise, guided by the highlighted cells. Then play your etude on your instrument and expand your musical vocabulary.</p>
+        <p class="actions"><a class="cta" href="/app/">open tonepath</a> <a class="more" href="#grid">How the grid works ↓</a></p>
+        <p class="note">Free. No account. Runs in your browser.</p>
+        <img class="hero-shot" src="/screens/grid.jpg" alt="Tonepath: a twelve-bar blues chart over the hexagonal note grid, each note coloured by its scale degree" width="1280" height="800" fetchpriority="high" />
+      </section>
+
+      <section id="grid" class="band">
+        <h2>Voice leading principles gamified</h2>
+        <p>You enter notes of a selected length in free time. As you enter the last note of a chord, the new chord is applied to the grid and you are guided by the pattern. </p>
+        <figure>
+          <svg class="hexdiagram" viewBox="0 0 560 210" role="img" aria-labelledby="hexdiagram-title">
+      <title id="hexdiagram-title">A ii–V–I in C on Tonepath's grid: D Dorian, G Mixolydian and C Ionian, each scale a small honeycomb with steps to the right and thirds up and to the left. The chord tones are coloured by degree and the seventh, the guide tone, is outlined.</title>
+      <path d="M70.0 97.0 L88.2 107.5 L88.2 128.5 L70.0 139.0 L51.8 128.5 L51.8 107.5 Z" fill="#12EAEA" stroke="#a39385" stroke-width="1"/>
+      <text x="70.0" y="123.0" fill="#1d1b19">D</text>
+      <path d="M106.4 97.0 L124.6 107.5 L124.6 128.5 L106.4 139.0 L88.2 128.5 L88.2 107.5 Z" fill="#bfafa2" stroke="#a39385" stroke-width="1"/>
+      <text x="106.4" y="123.0" fill="#1d1b19">E</text>
+      <path d="M51.8 65.5 L70.0 76.0 L70.0 97.0 L51.8 107.5 L33.6 97.0 L33.6 76.0 Z" fill="#EC7C25" stroke="#a39385" stroke-width="1"/>
+      <text x="51.8" y="91.5" fill="#1d1b19">F</text>
+      <path d="M88.2 65.5 L106.4 76.0 L106.4 97.0 L88.2 107.5 L70.0 97.0 L70.0 76.0 Z" fill="#bfafa2" stroke="#a39385" stroke-width="1"/>
+      <text x="88.2" y="91.5" fill="#1d1b19">G</text>
+      <path d="M33.6 34.0 L51.8 44.5 L51.8 65.5 L33.6 76.0 L15.4 65.5 L15.4 44.5 Z" fill="#9E0059" stroke="#a39385" stroke-width="1"/>
+      <text x="33.6" y="60.0" fill="#ffffff">A</text>
+      <path d="M70.0 34.0 L88.2 44.5 L88.2 65.5 L70.0 76.0 L51.8 65.5 L51.8 44.5 Z" fill="#bfafa2" stroke="#a39385" stroke-width="1"/>
+      <text x="70.0" y="60.0" fill="#1d1b19">B</text>
+      <path d="M106.4 34.0 L124.6 44.5 L124.6 65.5 L106.4 76.0 L88.2 65.5 L88.2 44.5 Z" fill="#7B4A26" stroke="#1d1b19" stroke-width="2.5"/>
+      <text x="106.4" y="60.0" fill="#ffffff">C</text>
+      <text class="chord" x="88.2" y="169.0">Dm7</text>
+      <text class="scale" x="88.2" y="189.0">D Dorian</text>
+      <path d="M148 88 l22 0 m-7 -6 l7 6 l-7 6" class="arrow"/><path d="M338 88 l22 0 m-7 -6 l7 6 l-7 6" class="arrow"/>
+      <path d="M260.0 97.0 L278.2 107.5 L278.2 128.5 L260.0 139.0 L241.8 128.5 L241.8 107.5 Z" fill="#12EAEA" stroke="#a39385" stroke-width="1"/>
+      <text x="260.0" y="123.0" fill="#1d1b19">G</text>
+      <path d="M296.4 97.0 L314.6 107.5 L314.6 128.5 L296.4 139.0 L278.2 128.5 L278.2 107.5 Z" fill="#bfafa2" stroke="#a39385" stroke-width="1"/>
+      <text x="296.4" y="123.0" fill="#1d1b19">A</text>
+      <path d="M241.8 65.5 L260.0 76.0 L260.0 97.0 L241.8 107.5 L223.6 97.0 L223.6 76.0 Z" fill="#EC7C25" stroke="#a39385" stroke-width="1"/>
+      <text x="241.8" y="91.5" fill="#1d1b19">B</text>
+      <path d="M278.2 65.5 L296.4 76.0 L296.4 97.0 L278.2 107.5 L260.0 97.0 L260.0 76.0 Z" fill="#bfafa2" stroke="#a39385" stroke-width="1"/>
+      <text x="278.2" y="91.5" fill="#1d1b19">C</text>
+      <path d="M223.6 34.0 L241.8 44.5 L241.8 65.5 L223.6 76.0 L205.4 65.5 L205.4 44.5 Z" fill="#9E0059" stroke="#a39385" stroke-width="1"/>
+      <text x="223.6" y="60.0" fill="#ffffff">D</text>
+      <path d="M260.0 34.0 L278.2 44.5 L278.2 65.5 L260.0 76.0 L241.8 65.5 L241.8 44.5 Z" fill="#bfafa2" stroke="#a39385" stroke-width="1"/>
+      <text x="260.0" y="60.0" fill="#1d1b19">E</text>
+      <path d="M296.4 34.0 L314.6 44.5 L314.6 65.5 L296.4 76.0 L278.2 65.5 L278.2 44.5 Z" fill="#7B4A26" stroke="#1d1b19" stroke-width="2.5"/>
+      <text x="296.4" y="60.0" fill="#ffffff">F</text>
+      <text class="chord" x="278.2" y="169.0">G7</text>
+      <text class="scale" x="278.2" y="189.0">G Mixolydian</text>
+      <path d="M450.0 97.0 L468.2 107.5 L468.2 128.5 L450.0 139.0 L431.8 128.5 L431.8 107.5 Z" fill="#12EAEA" stroke="#a39385" stroke-width="1"/>
+      <text x="450.0" y="123.0" fill="#1d1b19">C</text>
+      <path d="M486.4 97.0 L504.6 107.5 L504.6 128.5 L486.4 139.0 L468.2 128.5 L468.2 107.5 Z" fill="#bfafa2" stroke="#a39385" stroke-width="1"/>
+      <text x="486.4" y="123.0" fill="#1d1b19">D</text>
+      <path d="M431.8 65.5 L450.0 76.0 L450.0 97.0 L431.8 107.5 L413.6 97.0 L413.6 76.0 Z" fill="#EC7C25" stroke="#a39385" stroke-width="1"/>
+      <text x="431.8" y="91.5" fill="#1d1b19">E</text>
+      <path d="M468.2 65.5 L486.4 76.0 L486.4 97.0 L468.2 107.5 L450.0 97.0 L450.0 76.0 Z" fill="#bfafa2" stroke="#a39385" stroke-width="1"/>
+      <text x="468.2" y="91.5" fill="#1d1b19">F</text>
+      <path d="M413.6 34.0 L431.8 44.5 L431.8 65.5 L413.6 76.0 L395.4 65.5 L395.4 44.5 Z" fill="#9E0059" stroke="#a39385" stroke-width="1"/>
+      <text x="413.6" y="60.0" fill="#ffffff">G</text>
+      <path d="M450.0 34.0 L468.2 44.5 L468.2 65.5 L450.0 76.0 L431.8 65.5 L431.8 44.5 Z" fill="#bfafa2" stroke="#a39385" stroke-width="1"/>
+      <text x="450.0" y="60.0" fill="#1d1b19">A</text>
+      <path d="M486.4 34.0 L504.6 44.5 L504.6 65.5 L486.4 76.0 L468.2 65.5 L468.2 44.5 Z" fill="#7B4A26" stroke="#1d1b19" stroke-width="2.5"/>
+      <text x="486.4" y="60.0" fill="#ffffff">B</text>
+      <text class="chord" x="468.2" y="169.0">Cmaj7</text>
+      <text class="scale" x="468.2" y="189.0">C Ionian</text>
+    </svg>
+          <figcaption>A ii–V–I in C. Each chord’s scale as Tonepath draws it on the chart, from the bottom row up: steps to the right, thirds up and to the left. The chord tones take their degree’s colour, and the seventh, the guide tone, is outlined.</figcaption>
+        </figure>
+        <ul class="points">
+          <li><strong>Steps run to the right, thirds run up-left.</strong> So a chord’s tones sit in a tight cluster, and the guide tones (the 3rds and 7ths that carry the harmony) are always close at hand.</li>
+          <li><strong>Every note is coloured by its degree.</strong> Root, third, fifth and seventh each keep their colour from chord to chord, so you can watch what changes when the harmony moves.</li>
+          <li><strong>The grid changes with the chord.</strong> As a ii–V–I goes by, the grid reshapes itself for each chord, and you see which notes stay and which move.</li>
         </ul>
-        <p>No account and no backend: progressions are saved in your browser, with export and import. Built by <a href="https://truelathe.com/portfolio/tonepath">Truelathe</a>; the code is open source on <a href="https://github.com/sharkfin-909/tonepath">GitHub</a>.</p>
-        <noscript><p>Tonepath needs JavaScript to run.</p></noscript>
-      </main>
-    </div>
-    <script type="module" src="/src/main.tsx"></script>
+      </section>
+
+      <section class="modes-section">
+        <h2>What you can do with it</h2>
+        <ol class="modes">
+        <li class="mode">
+          <img src="/screens/progression.jpg" alt="Editing the chords and their scales: a twelve-bar blues in F, each bar with its scale as a small honeycomb" width="1280" height="800" loading="lazy" decoding="async" />
+          <h3>Set up the changes</h3>
+          <p>Type chord symbols into a bar grid. Tonepath suggests chords that belong to the key, but you may choose any chord. Each chord gets the standard scale, which you may change.</p>
+        </li>
+        <li class="mode">
+          <img src="/screens/grid.jpg" alt="Improvising on the grid: the chord chart above the hexagonal note grid" width="1280" height="800" loading="lazy" decoding="async" />
+          <h3>Improvise on the grid</h3>
+          <p>You can play over the form by by picking notes on the grid with the mouse, but it's more comfortable to move the mouse and press the A key to trigger a note. Chord bump can move to the next chord after a set number of notes, so you work through the changes at your own pace. Alternatively you can use the metronome. Both ways the chord will be played ( or just bass or root if you select that option )</p>
+        </li>
+        <li class="mode">
+          <img src="/screens/write.jpg" alt="Writing an etude: notation over the chords, with the note grid below" width="1280" height="800" loading="lazy" decoding="async" />
+          <h3>Write an etude</h3>
+          <p>Compose a melody over the changes  Your etude is written out as standard notation as you go.</p>
+        </li>
+        <li class="mode">
+          <img src="/screens/read.jpg" alt="Reading an etude: every bar on one page" width="1280" height="800" loading="lazy" decoding="async" />
+          <h3>Read your etude</h3>
+          <p>Play it from one page with a :wclick and a moving playhead, on a tablet on your music stand if you like.</p>
+        </li>
+        <li class="mode">
+          <img src="/screens/improvise.jpg" alt="Improvising on an instrument: the chart with the grid following the chords" width="1280" height="800" loading="lazy" decoding="async" />
+          <h3>Improvise on your instrument</h3>
+          <p>Play over the chord chart with a click while the grid follows each chord, and the microphone shows you the notes you’re actually playing.</p>
+        </li>
+        <li class="mode">
+          <img src="/screens/tune.jpg" alt="Tuning: the grid waiting for the microphone" width="1280" height="800" loading="lazy" decoding="async" />
+          <h3>Tune and warm up</h3>
+          <p>The grid lights up every note you play into the microphone.</p>
+        </li>
+        </ol>
+      </section>
+
+      <section class="band">
+        <h2>Made for jazz students and anyone learning to improvise</h2>
+        <ul class="points">
+          <li><strong>Your instrument’s key.</strong> Etudes show in written pitch for B♭ trumpet, clarinet and tenor sax, E♭ alto and baritone sax, F horn, trombone, guitar, bass, flute, violin, viola, cello and vibraphone.</li>
+          <li><strong>Loop what’s hard.</strong> Pick the bars you’re stuck on and loop them at your own tempo.</li>
+          <li><strong>Hear the harmony.</strong> Each chord can sound as it arrives, as a chord, its root or its bass note.</li>
+          <li><strong>Start from the classics.</strong> Built-in progressions include the 12-bar blues, a jazz blues, a minor blues, rhythm changes in B♭, a I–vi–ii–V turnaround and a Dorian vamp. Make your own copy of any of them, or write your own.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Free, private, open source</h2>
+        <ul class="points">
+          <li><strong>No account.</strong> Your progressions and etudes are saved in your browser, and you can export them to a file and import them anywhere.</li>
+          <li><strong>Nothing is recorded.</strong> The microphone only listens while you play, to light up the grid.</li>
+          <li><strong>Open source.</strong> The code is on <a href="https://github.com/sharkfin-909/tonepath">GitHub</a>. Built by <a href="https://truelathe.com/portfolio/tonepath">Ben Amato at Truelathe</a>.</li>
+        </ul>
+        <p class="actions"><a class="cta" href="/app/">open tonepath</a></p>
+      </section>
+
+      <section class="band faq">
+        <h2>Questions</h2>
+        <h3>Is Tonepath free?</h3>
+        <p>Yes, completely. There’s no account, no trial and no ads.</p>
+        <h3>What do I need?</h3>
+        <p>A modern browser. It works best on a laptop or desktop, reads well on a tablet, and is usable on a phone. The microphone features need your browser’s permission.</p>
+        <h3>Does it work with my instrument?</h3>
+        <p>Any instrument works with the microphone, one note at a time. Etudes can be shown in written pitch for the common transposing instruments (B♭, E♭ and F), as well as for concert-pitch instruments.</p>
+        <h3>Can I use the changes to a jazz standard?</h3>
+        <p>Yes. Type in any chord progression you like, and Tonepath gives each chord its scale.</p>
+        <h3>Where are my etudes saved?</h3>
+        <p>In your browser, on this device. Export them to a file to back them up or move them to another computer.</p>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <a class="brand" href="/"><svg class="mark" viewBox="3 0 120 120" aria-hidden="true"><polygon points="80,76 63,105.4 29,105.4 12,76 29,46.6 63,46.6" fill="none" stroke="currentColor" stroke-width="6.5" stroke-linejoin="round"/><g fill="currentColor" transform="rotate(28 46 76)"><circle cx="46" cy="76" r="12"/><rect x="53.5" y="-1" width="4.5" height="74" rx="1"/><path d="M58 -1 C61.5 11 87.5 14 99.5 26 C108.5 35 109.5 45 104.5 53 C103.5 44 98.5 36 89.5 31 C80.5 26 67.5 24 58 23 Z"/></g></svg><span>TONEPATH</span></a>
+      <p>Free jazz improvisation practice in the browser · <a href="https://github.com/sharkfin-909/tonepath">Source on GitHub</a> · Built by <a href="https://truelathe.com">Truelathe</a></p>
+    </footer>
   </body>
 </html>
