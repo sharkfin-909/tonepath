@@ -71,7 +71,7 @@ figcaption { color: var(--muted); font-size: 0.95rem; max-width: 40rem; margin: 
 .points li::marker { color: var(--amber); }
 
 /* The modes, in the app's two groups (each under its heading): one column, each card its screenshot beside its
-   words from tablet width up, stacked on a phone. */
+   words from tablet width up, left and right in turn; stacked on a phone. */
 .mode-group { margin-top: 2rem; font-size: 1.35rem; color: #5a4f45; }
 .mode-group + .modes { margin-top: 0.9rem; }
 .modes { list-style: none; padding: 0; display: grid; gap: 1.2rem; grid-template-columns: 1fr; margin-top: 1.4rem; }
@@ -80,6 +80,10 @@ figcaption { color: var(--muted); font-size: 0.95rem; max-width: 40rem; margin: 
   .mode img { grid-row: span 2; margin-bottom: 0; }
   .mode h4 { align-self: end; }
   .mode p { align-self: start; }
+  /* Alternating: every other card has its screenshot on the right. */
+  .mode:nth-child(even) { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); }
+  .mode:nth-child(even) img { grid-column: 2; grid-row: 1 / span 2; }
+  .mode:nth-child(even) h4, .mode:nth-child(even) p { grid-column: 1; }
 }
 .mode { background: #fffdf6; border: 1px solid var(--line); border-radius: 10px; padding: 0.9rem 1rem 1.1rem; }
 .mode img { display: block; width: 100%; height: auto; border-radius: 6px; border: 1px solid var(--line); margin-bottom: 0.8rem; }
