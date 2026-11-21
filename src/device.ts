@@ -10,7 +10,7 @@ export const DEVICE_KEY = 'tonepath:device';
 export type OnArrival = 'silent' | 'chord' | 'root' | 'bass' | 'bass-chord';
 const ARRIVALS: OnArrival[] = ['silent', 'chord', 'root', 'bass', 'bass-chord'];
 
-/** UI labels for *On arrival* — shown as *Audio on chord* (SPEC §3.3). */
+/** UI labels for *On arrival* — shown as *Accompaniment* (SPEC §3.3). */
 export const ON_ARRIVAL_LABELS: Record<OnArrival, string> = {
   silent: 'Silent',
   chord: 'Chord',
@@ -20,7 +20,8 @@ export const ON_ARRIVAL_LABELS: Record<OnArrival, string> = {
 };
 
 export function onArrivalOf(d: DeviceSettings): OnArrival {
-  return ARRIVALS.includes(d.playArrival as OnArrival) ? (d.playArrival as OnArrival) : 'silent';
+  // Never chosen on this device (or not a choice we know): the bass note and the chord, so the changes are heard.
+  return ARRIVALS.includes(d.playArrival as OnArrival) ? (d.playArrival as OnArrival) : 'bass-chord';
 }
 
 export interface DeviceSettings {
@@ -36,7 +37,7 @@ export interface DeviceSettings {
   hexShape?: 'honeycomb' | 'linear';
   /** The hex panel hidden (SPEC §3.1). */
   hexHidden?: boolean;
-  /** *Audio on chord* (*On arrival*, SPEC §3.3). */
+  /** *Accompaniment* (*On arrival*, SPEC §3.3). */
   playArrival?: OnArrival;
   /** Last-picked instrument: the default for new progressions (SPEC §10). */
   lastInstrument?: string;

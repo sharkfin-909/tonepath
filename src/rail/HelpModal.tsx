@@ -104,7 +104,7 @@ export function HelpModal({ mode, onClose, onShortcuts }: { mode: Mode; onClose:
           <li>The transport (grid improv with chord bump off, ins improv, ins read) runs the chords in time: set the tempo and click sound, then ▶.</li>
           <li>On the grid, by notes: after the number of notes you set, picked on the hex, the form moves on to the next chord.</li>
           <li>To loop a few bars, click a bar number (⇧-click another to extend), or pick the first and last bar in the transport. × goes back to the whole sequence.</li>
-          <li>Audio on chord plays the chord, its root or its bass as each chord arrives. ▶ chord, bass and scale play them on demand.</li>
+          <li>Accompaniment plays the chord, its root or its bass as each chord arrives. ▶ chord, bass and scale play them on demand.</li>
         </ul>
       </section>
 

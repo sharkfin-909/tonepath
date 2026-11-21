@@ -41,7 +41,7 @@ export function scaleRun(h: SlotHarmony): number[] {
   return [...steps.map((s) => root + s), root + 12];
 }
 
-/** *Audio on chord*'s Root note: the chord's bass (the slash bass if any) in concert octave 3. Null without a chord. */
+/** *Accompaniment*'s Root note: the chord's bass (the slash bass if any) in concert octave 3. Null without a chord. */
 export function rootNote(h: SlotHarmony): number | null {
   if (h.kind !== 'chord') return null;
   return OCTAVE_3 + pc(h.bass ?? h.root);
@@ -67,9 +67,9 @@ export const midiToHz = (m: number) => 440 * 2 ** ((m - 69) / 12);
 type Envelope = { gain: number; attack: number; decay: number; /** Held at full level before the decay (s). */ hold?: number };
 const NOTE: Envelope = { gain: 0.22, attack: 0.01, decay: 0.9 };
 const CHORD: Envelope = { gain: 0.06, attack: 0.04, decay: 3.2 };
-/** *Audio on chord*'s bass note sustains under the chord: held, then a long fade (~3.6 s in all). */
+/** *Accompaniment*'s bass note sustains under the chord: held, then a long fade (~3.6 s in all). */
 const BASS: Envelope = { gain: 0.24, attack: 0.01, hold: 1.2, decay: 2.4 };
-/** How long each *Audio on chord* sound rings (ms): the mic's echo guard (`micIntake.ts`). */
+/** How long each *Accompaniment* sound rings (ms): the mic's echo guard (`micIntake.ts`). */
 export const RING_MS = {
   chord: (CHORD.attack + CHORD.decay) * 1000,
   bass: (BASS.attack + (BASS.hold ?? 0) + BASS.decay) * 1000,
@@ -172,7 +172,7 @@ export function playScale(h: SlotHarmony): void {
   scaleRun(h).forEach((m, i) => tone(m, c.currentTime + i * SCALE_GAP, NOTE));
 }
 
-/** *Audio on chord* (*On arrival*): Root note. */
+/** *Accompaniment* (*On arrival*): Root note. */
 export function playRoot(h: SlotHarmony): void {
   const c = ready();
   const m = rootNote(h);
