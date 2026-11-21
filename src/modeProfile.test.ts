@@ -19,7 +19,7 @@ const pick = (m: ModeProfile) => ({
 
 describe('mode profile', () => {
   it('six modes, the hex grid three first, then the instrument three', () => {
-    expect(MODES).toEqual(['progression', 'write', 'grid', 'tune', 'improvise', 'read']);
+    expect(MODES).toEqual(['progression', 'grid', 'write', 'tune', 'improvise', 'read']);
   });
 
   it.each<[Mode, boolean, ReturnType<typeof pick>]>([

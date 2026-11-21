@@ -52,8 +52,8 @@ The **Mode:** dropdown offers six modes in two families ([Mode families](issues/
 | Full name (menu, Help) | Short (button) | Id | Section |
 |---|---|---|---|
 | edit progression | progression | `progression` | §3.10 |
-| edit etude | etude | `write` | §3.2 |
 | improvise on the grid | grid improv | `grid` | §3.11 |
+| edit etude | etude | `write` | §3.2 |
 | tune instrument | ins tune | `tune` | §3.8 |
 | improvise on instrument | ins improv | `improvise` | §3.3 |
 | read etude on instrument | ins read | `read` | §3.4 |
@@ -62,13 +62,13 @@ A launch URL may name a mode by its id, e.g. `?mode=grid` (any of the six ids ab
 
 Each is a fixed set of panels; nothing is toggled per mode except **Hide hex** in ins improv and grid improv's **move on** choice.
 
-| | **progression** | **etude** | **grid improv** | **ins tune** | **ins improv** | **ins read** |
+| | **progression** | **grid improv** | **etude** | **ins tune** | **ins improv** | **ins read** |
 |---|---|---|---|---|---|---|
 | Listen (mic) | off | off | off | on | on | off |
 | Tuner bar | — | — | — | yes | yes | — |
-| Header row 2, centre | form group + transport bar (no loop pickers) | editing pill | move-on pill (+ transport bar, in time) | — | transport bar (§3.7) | transport bar |
-| Chart | lead sheet, editable | chart with the etude, caret | lead sheet, read-only | the pane, empty | lead sheet | the etude, Fit page, playhead |
-| Docked hex | none (the chart takes the screen) | note input at the caret | current slot; picks audition (and count, by notes) | unchecked hex; lights what is played | stopped: current slot, lights what is played; running: targets | none |
+| Header row 2, centre | form group + transport bar (no loop pickers) | move-on pill (+ transport bar, in time) | editing pill | — | transport bar (§3.7) | transport bar |
+| Chart | lead sheet, editable | lead sheet, read-only | chart with the etude, caret | the pane, empty | lead sheet | the etude, Fit page, playhead |
+| Docked hex | none (the chart takes the screen) | current slot; picks audition (and count, by notes) | note input at the caret | unchecked hex; lights what is played | stopped: current slot, lights what is played; running: targets | none |
 | Hide hex | — | — | — | — | yes | — |
 
 - **Opening**: launching or reloading starts in the **device's last mode** (`lastMode`, §12.5); the very first launch, in **grid improv** on the **12-bar blues** standard (§3.12). Opening another progression (from the library) **keeps the mode** you were in, so the browser may ask for the microphone at once; while it asks, the tuner bar shows **allow the microphone to start listening**. Where the browser keeps audio suspended until a user gesture, the tuner bar shows **tap to start listening** until the first click or key.
