@@ -47,7 +47,7 @@ The mode menu of [Mode menu](issues/068-mode-menu.md) (2026-11-16) replaced the 
 
 ### 3.0 The modes
 
-The **Mode:** dropdown offers six modes in two families ([Mode families](issues/084-mode-families-plan.md), 2026-11-17): the **hex grid**'s three, a line, then the **instrument**'s three. The menu shows each full name; the mode pill's button shows the short name. Internal ids kept from the four-mode app in brackets.
+The **Mode:** dropdown offers six modes in two families ([Mode families](issues/084-mode-families-plan.md), 2026-11-17): the **hex grid**'s three under the heading *hex grid modes*, a line, then the **instrument**'s three under *instrument modes* (the headings can't be chosen; the keys pass over them). The menu shows each full name; the mode pill's button shows the short name. Internal ids kept from the four-mode app in brackets.
 
 | Full name (menu, Help) | Short (button) | Id | Section |
 |---|---|---|---|

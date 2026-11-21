@@ -1,5 +1,5 @@
 // The mode panel (SPEC §3.0, §3.1): top left of the header, sharing a pill with Ins: — the mode dropdown: the six modes,
-// the hex grid's three, a line, then the instrument's three; each with what it is for and what it uses or edits, and the
+// the hex grid's three under "hex grid modes", a line, then the instrument's three under "instrument modes"; each with what it is for and what it uses or edits, and the
 // keys to switch. The button shows the mode's short name. The mode alone decides whether the mic listens.
 import { MODES, MODE_LABELS, MODE_SHORT, type Mode } from '../session';
 import { Dropdown } from './Dropdown';
@@ -56,6 +56,7 @@ export function ModePanel({ mode, onMode, hasChords }: ModePanelProps) {
           description: MODE_INFO[m].blurb,
           tags: MODE_INFO[m].uses,
           divider: m === 'tune', // the instrument's modes start here
+          group: m === MODES[0] ? 'hex grid modes' : m === 'tune' ? 'instrument modes' : undefined,
           ...(!hasChords && modeProfile(m).needsChords ? { disabled: true, hint: 'add chords first' } : {}),
         }))}
         onChange={onMode}
