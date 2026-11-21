@@ -17,13 +17,17 @@ and import.
 
 ```sh
 npm install
-npm run dev        # http://localhost:5173
+npm run dev        # http://localhost:5173 (home page) · /app/ (the app)
 npm test           # vitest: the pure modules, ~550 tests
 npm run typecheck
 npm run build      # typecheck + static build into dist/
 ```
 
 The microphone (Listen: Tune and Improvise) works on `localhost` and over HTTPS.
+
+Two pages: `index.html` is the **home page** at `/`, static (what Tonepath is, for people and search engines; its
+styles in `src/landing/landing.css`), and `app/index.html` is **the app** at `/app/`. Old `/?mode=` links and
+`#share=` links to `/` open the app (`public/_redirects`, and a line of script in `index.html`).
 
 ## Where things are
 
