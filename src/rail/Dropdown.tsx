@@ -17,6 +17,9 @@ export interface DropdownOption<T extends string | number> {
   hint?: string;
   /** A line above this option: it starts a new section (e.g. the etude picker's actions). */
   divider?: boolean;
+  /** A heading above this option, naming the group it starts (the mode menu's "hex grid modes"). Not an option:
+   *  the keys pass over it. */
+  group?: string;
   /** Its label is shown as typed (not lowercased with the group). */
   asTyped?: boolean;
   /** A small icon before the label, in the menu and on the button (the modes). */
@@ -82,7 +85,8 @@ export function Dropdown<T extends string | number>({ value, options, onChange, 
 
   // Keep the highlighted option in view (long lists scroll).
   useEffect(() => {
-    if (open) list.current?.children[active]?.scrollIntoView({ block: 'nearest' });
+    // By id, not by position: a group's heading is a row of the list too.
+    if (open) document.getElementById(`${id}-${active}`)?.scrollIntoView({ block: 'nearest' });
   }, [open, active]);
 
   const choose = (i: number) => {
@@ -149,14 +153,19 @@ export function Dropdown<T extends string | number>({ value, options, onChange, 
       {open && (
         <div ref={menu} className={['dropdown-menu', rich ? 'rich' : 'compact', alignRight && 'right'].filter(Boolean).join(' ')}>
           <ul ref={list} id={id} role="listbox" aria-label={label} aria-activedescendant={`${id}-${active}`} tabIndex={-1} onKeyDown={onKey}>
-            {options.map((o, i) => (
+            {options.map((o, i) => [
+              o.group && (
+                <li key={`group-${String(o.value)}`} role="presentation" className={['dropdown-group', o.divider && 'divider'].filter(Boolean).join(' ')}>
+                  {o.group}
+                </li>
+              ),
               <li
                 key={String(o.value)}
                 id={`${id}-${i}`}
                 role="option"
                 aria-selected={o.value === value}
                 aria-disabled={o.disabled || undefined}
-                className={['dropdown-option', i === active && 'active', o.value === value && 'current', o.divider && 'divider', o.asTyped && 'as-typed', o.disabled && 'disabled'].filter(Boolean).join(' ')}
+                className={['dropdown-option', i === active && 'active', o.value === value && 'current', o.divider && !o.group && 'divider', o.asTyped && 'as-typed', o.disabled && 'disabled'].filter(Boolean).join(' ')}
                 onPointerEnter={() => setActive(i)}
                 onClick={() => choose(i)}
               >
@@ -176,8 +185,8 @@ export function Dropdown<T extends string | number>({ value, options, onChange, 
                   )}
                 </span>
                 {o.description && <span className="dropdown-option-blurb">{o.description}</span>}
-              </li>
-            ))}
+              </li>,
+            ])}
           </ul>
           {footer && <p className="dropdown-footer">{footer}</p>}
         </div>

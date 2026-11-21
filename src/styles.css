@@ -3126,6 +3126,28 @@ select {
   border-top: 1px solid rgba(255, 255, 255, 0.14);
 }
 /* The mode menu: the line between the hex grid's modes and the instrument's, with room either side. */
+/* A group's heading in a menu (the mode menu's "hex grid modes" / "instrument modes"): small, muted, not choosable.
+   With `divider` it carries the line above its group. */
+.dropdown-group {
+  padding: 8px 10px 2px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.55);
+  list-style: none;
+  cursor: default;
+}
+.dropdown-group.divider {
+  margin-top: 13px;
+  position: relative;
+}
+.dropdown-group.divider::before {
+  content: '';
+  position: absolute;
+  top: -7px;
+  left: 10px;
+  right: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.28);
+}
 .rich .dropdown-option.divider {
   margin-top: 13px;
 }
