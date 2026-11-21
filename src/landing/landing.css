@@ -70,11 +70,20 @@ figcaption { color: var(--muted); font-size: 0.95rem; max-width: 40rem; margin: 
 .points li + li { margin-top: 0.7rem; }
 .points li::marker { color: var(--amber); }
 
-/* The modes: two columns, one on a phone. */
-.modes { list-style: none; padding: 0; display: grid; gap: 1.5rem; grid-template-columns: 1fr; margin-top: 1.4rem; }
-@media (min-width: 40rem) { .modes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* The modes, in the app's two groups (each under its heading): one column, each card its screenshot beside its
+   words from tablet width up, stacked on a phone. */
+.mode-group { margin-top: 2rem; font-size: 1.35rem; color: #5a4f45; }
+.mode-group + .modes { margin-top: 0.9rem; }
+.modes { list-style: none; padding: 0; display: grid; gap: 1.2rem; grid-template-columns: 1fr; margin-top: 1.4rem; }
+@media (min-width: 48rem) {
+  .mode { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); column-gap: 1.4rem; align-items: center; }
+  .mode img { grid-row: span 2; margin-bottom: 0; }
+  .mode h4 { align-self: end; }
+  .mode p { align-self: start; }
+}
 .mode { background: #fffdf6; border: 1px solid var(--line); border-radius: 10px; padding: 0.9rem 1rem 1.1rem; }
 .mode img { display: block; width: 100%; height: auto; border-radius: 6px; border: 1px solid var(--line); margin-bottom: 0.8rem; }
+.mode h4 { margin: 0; font-weight: 600; font-size: 1.15rem; line-height: 1.2; }
 .mode p { margin: 0.35rem 0 0; color: #3d3833; font-size: 0.98rem; }
 
 .faq h3 { margin-top: 1.3rem; }
