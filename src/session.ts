@@ -61,14 +61,14 @@ export interface Selection {
 }
 
 /**
- * The six modes, in the mode menu's order (SPEC §3.0): the hex grid's three (progression, etude, grid improv), then the
+ * The six modes, in the mode menu's order (SPEC §3.0): the hex grid's three (progression, grid improv, etude), then the
  * instrument's three (ins tune, ins improv, ins read). Ids kept from the four-mode app: `write` is edit etude,
  * `improvise` is ins improv, `read` is ins read.
  */
 export type Mode = 'progression' | 'write' | 'grid' | 'tune' | 'improvise' | 'read';
-export const MODES: readonly Mode[] = ['progression', 'write', 'grid', 'tune', 'improvise', 'read'];
+export const MODES: readonly Mode[] = ['progression', 'grid', 'write', 'tune', 'improvise', 'read'];
 /** The hex grid's modes; the rest play your instrument (the menu's line falls between). */
-export const GRID_MODES: readonly Mode[] = ['progression', 'write', 'grid'];
+export const GRID_MODES: readonly Mode[] = ['progression', 'grid', 'write'];
 /** Full names: the mode menu, Help. */
 export const MODE_LABELS: Record<Mode, string> = {
   progression: 'edit progression',

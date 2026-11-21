@@ -134,11 +134,13 @@ describe('opening, and the mode decides', () => {
 
 describe('switching modes', () => {
   const to = (mode: Extract<Intent, { type: 'mode' }>['mode']): Intent => ({ type: 'mode', mode });
-  it('[ / ] step through progression · etude · grid improv · ins tune · ins improv · ins read, no wrap', () => {
-    expect(run([to('prev')]).state.mode).toBe('progression');
+  it('[ / ] step through progression · grid improv · etude · ins tune · ins improv · ins read, no wrap', () => {
+    // From etude (the test's start), now third.
+    expect(run([to('prev')]).state.mode).toBe('grid');
     expect(run([to('prev'), to('prev')]).state.mode).toBe('progression');
-    expect(run([to('next')]).state.mode).toBe('grid');
-    expect(run([to('next'), to('next'), to('next')]).state.mode).toBe('improvise');
+    expect(run([to('prev'), to('prev'), to('prev')]).state.mode).toBe('progression');
+    expect(run([to('next')]).state.mode).toBe('tune');
+    expect(run([to('next'), to('next'), to('next')]).state.mode).toBe('read');
     expect(run([to('read'), to('next')]).state.mode).toBe('read');
   });
 
