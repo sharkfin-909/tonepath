@@ -2433,6 +2433,19 @@ select {
   /* A soft glow in the mark's own colour, shared by the logo and the wordmark. */
   filter: drop-shadow(0 0 5px rgba(237, 221, 149, 0.45));
 }
+/* The link round the mark and the wordmark (to the home page): laid out as they were, side by side on the baseline,
+   in their own gold, with no underline. */
+.brand-home {
+  display: inline-flex;
+  align-items: baseline;
+  color: inherit;
+  text-decoration: none;
+}
+.brand-home:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
 .brand-logo {
   width: 34px;
   height: 34px;
