@@ -504,10 +504,10 @@ export function App({ initial, onLibrary, renameOnOpen = false, carried, onCarry
           noChord={profile.noChord}
         />
         <div className="rail-setting on-arrival">
-          <span className="pill-label">Audio on chord</span>
+          <span className="pill-label">Accompaniment</span>
           <Dropdown
             value={session.onArrival}
-            label="Audio on chord"
+            label="Accompaniment"
             disabled={profile.noChord}
             options={(Object.keys(ON_ARRIVAL_LABELS) as OnArrival[]).map((v) => ({ value: v, label: ON_ARRIVAL_LABELS[v] }))}
             onChange={(how) => dispatch({ type: 'set-arrival', how })}

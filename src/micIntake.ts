@@ -1,6 +1,6 @@
 // Mic intake (SPEC §3.3, §9.2): what becomes of each note start the mic hears in Improvise — a note played (it
-// brings a waiting *Audio on chord* sound, while the transport is stopped) or ignored: the app's own sounds, under an
-// echo guard over *Audio on chord* and hex-pick auditions, merged while they ring. Lighting the hex needs no intake
+// brings a waiting *Accompaniment* sound, while the transport is stopped) or ignored: the app's own sounds, under an
+// echo guard over *Accompaniment* and hex-pick auditions, merged while they ring. Lighting the hex needs no intake
 // (the heard pitch does that). Pure: times come in (ms), state comes back.
 
 import { RING_MS, chordVoicing, rootNote, bassNote } from './audio';

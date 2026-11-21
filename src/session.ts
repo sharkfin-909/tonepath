@@ -168,7 +168,7 @@ export type Intent =
   | { type: 'mode'; mode: Mode | 'prev' | 'next' | 'partner' }
   /** The transport's start / stop (SPEC §3.7). */
   | { type: 'transport'; run: boolean }
-  /** The running transport reached a chord: *Audio on chord* sounds with it. */
+  /** The running transport reached a chord: *Accompaniment* sounds with it. */
   | { type: 'transport-chord'; index: number }
   /** The transport finished the form (or the looped bars) without Loop: stopped, back on their first chord. */
   | { type: 'transport-end' }
@@ -610,7 +610,7 @@ export function reduce(state: SessionState, p: Progression, intent: Intent): Out
       return done();
     case 'sound':
       effects.push({
-        type: intent.what, // ▶ Bass / B: the bass note (concert octave 2), an octave below Audio on chord's root note
+        type: intent.what, // ▶ Bass / B: the bass note (concert octave 2), an octave below Accompaniment's root note
         harmony: active.concert,
       });
       return done();

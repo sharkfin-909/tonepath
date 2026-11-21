@@ -72,7 +72,8 @@ describe('Bass note', () => {
   });
   it('the on-arrival setting reads every option; anything else is Silent', () => {
     for (const v of ['silent', 'chord', 'root', 'bass', 'bass-chord'] as const) expect(onArrivalOf({ playArrival: v })).toBe(v);
-    expect(onArrivalOf({ playArrival: 'loud' as never })).toBe('silent');
+    expect(onArrivalOf({ playArrival: 'loud' as never })).toBe('bass-chord');
+    expect(onArrivalOf({})).toBe('bass-chord'); // never chosen: the default
   });
 });
 

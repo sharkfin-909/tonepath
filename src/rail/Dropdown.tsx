@@ -1,4 +1,4 @@
-// The app's dropdown (SPEC §3.1): every choice in the header — Mode, Audio on chord, bars per row, click sound, clef,
+// The app's dropdown (SPEC §3.1): every choice in the header — Mode, Accompaniment, bars per row, click sound, clef,
 // instrument. A button showing the value opens a dark card under it. Options
 // with descriptions or tags get the rich layout (the mode menu); plain ones a compact list. The current value is
 // marked (accent bar, ✓).
